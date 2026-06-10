@@ -1,0 +1,162 @@
+using DeltaUI.Core.UI.Values;
+using System.Drawing;
+using System.Windows;
+using System.Windows.Input;
+
+namespace DeltaUI.WPF
+{
+    public static partial class VisualExtention
+    {
+        public static T Cursor<T>(this T node, Cursor cursor) where T:IElement
+        {
+            node.SetProperty ("Cursor", ToCoreCursorIfSupported(cursor));
+            return node;
+        }
+
+        public static T Cursor<T>(this T node, CursorValue cursor) where T:IElement
+        {
+            node.SetProperty ("Cursor", cursor);
+            return node;
+        }
+
+        private static object ToCoreCursorIfSupported(Cursor cursor)
+        {
+            try
+            {
+                return WpfValueMapper.FromWpfCursor(cursor);
+            }
+            catch (System.NotSupportedException)
+            {
+                return cursor;
+            }
+        }
+
+        public static T Name<T>(this T node, string name) where T : IElement
+        {
+            node.Name = name;
+            return node;
+        }
+
+        public static T Key<T>(this T node, string key) where T : IElement
+        {
+            node.Key = key;
+            return node;
+        }
+
+        public static T BitmapScalingMode<T>(this T node, System.Windows.Media.BitmapScalingMode value) where T : IElement
+        {
+            node.SetProperty ("RenderOptions.BitmapScalingMode", value);
+            return node;
+        }
+        public static T Row<T>(this T node, int value) where T  : IElement
+        {
+            node.SetProperty ("Grid.Row", value);
+            return node;
+        }
+        public static T Column<T>(this T node, int value) where T : IElement
+        {
+            node.SetProperty ("Grid.Column", value);
+            return node;
+        }
+        public static T RowSpan<T>(this T node, int value) where T : IElement
+        {
+            node.SetProperty ("Grid.RowSpan", value);
+            return node;
+        }
+        public static T ColumnSpan<T>(this T node, int value) where T : IElement
+        {
+            node.SetProperty ("Grid.ColumnSpan", value);
+            return node;
+        }
+        public static T Size<T>(this T node, double width = 0.0, double height = 0.0) where T : IElement
+        {
+            node.Width (width)
+                .Height(height);
+            return node;
+        }
+
+        public static T Width<T>(this T node, double value) where T : IElement
+        {
+            node.SetProperty (nameof (Width), value);
+            return node;
+        }
+
+        public static T Height<T>(this T node, double value) where T : IElement
+        {
+            node.SetProperty (nameof (Height), value);
+            return node;
+        }
+        public static T Margin<T>(this T node, double value = 0.0) where T : IElement
+        {
+            node.SetProperty (nameof (Margin), ThicknessValue.Uniform(value));
+            return node;
+        }
+        public static T Margin<T>(this T node, double left = 0.0, double top = 0.0, double right = 0.0, double bottom = 0.0) where T : IElement
+        {
+            node.SetProperty (nameof (Margin), new ThicknessValue(left, top, right, bottom));
+            return node;
+        }
+
+        public static T Background<T>(this T node, System.Windows.Media.LinearGradientBrush brushes) where T : IElement
+        {
+            node.SetProperty (nameof (Background), WpfValueMapper.FromWpfBrush(brushes));
+            return node;
+        }
+
+        public static T Background<T>(this T node, System.Windows.Media.SolidColorBrush brushes) where T : IElement
+        {
+            node.SetProperty (nameof (Background), WpfValueMapper.FromWpfBrush(brushes));
+            return node;
+        }
+        public static T Background<T>(this T node, Color color) where T : IElement
+        {
+            node.SetProperty (nameof (Background), new BrushValue.Solid(WpfValueMapper.FromDrawingColor(color)));
+            return node;
+        }
+        public static T Background<T>(this T node, string colorCode) where T : IElement
+        {
+            if (colorCode[0] != '#')
+                throw new System.Exception ("ColorCode Error");
+
+            node.SetProperty (nameof (Background), new BrushValue.Solid(ColorValue.FromHex(colorCode)));
+
+            return node;
+        }
+
+        public static T Start<T>(this T node) where T : IElement
+        {
+            node.SetProperty ("HorizontalAlignment", HorizontalAlignment.Left);
+            return node;
+        }
+        public static T HCenter<T>(this T node) where T : IElement
+        {
+            node.SetProperty ("HorizontalAlignment", HorizontalAlignment.Center);
+            return node;
+        }
+        public static T End<T>(this T node) where T : IElement
+        {
+            node.SetProperty ("HorizontalAlignment", HorizontalAlignment.Right);
+            return node;
+        }
+        public static T Top<T>(this T node) where T : IElement
+        {
+            node.SetProperty ("VerticalAlignment", VerticalAlignment.Top);
+            return node;
+        }
+        public static T VCenter<T>(this T node) where T : IElement
+        {
+            node.SetProperty ("VerticalAlignment", VerticalAlignment.Center);
+            return node;
+        }
+        public static T Bottom<T>(this T node) where T : IElement
+        {
+            node.SetProperty ("VerticalAlignment", VerticalAlignment.Bottom);
+            return node;
+        }
+        public static T Center<T>(this T node) where T : IElement
+        {
+            node.HCenter ().VCenter ();
+            return node;
+        }
+    }
+}
