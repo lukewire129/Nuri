@@ -6,12 +6,12 @@
 
 #split
 
-$_ = Install-Package DeltaMVU -v -Force -Scope CurrentUser
-$_ = Add-Type -PassThru -AssemblyName ((Get-ChildItem -Recurse (Split-Path (Get-Package DeltaMVU).Source)).FullName |? {$_ -like "*net8*.dll"})
+$_ = Install-Package Nuri -v -Force -Scope CurrentUser
+$_ = Add-Type -PassThru -AssemblyName ((Get-ChildItem -Recurse (Split-Path (Get-Package Nuri).Source)).FullName |? {$_ -like "*net8*.dll"})
 
 #split
 
-Using Namespace Delta.WPF
+Using Namespace Nuri.WPF
 Class Comp : Component {
     [IElement] Render() {
         $script:count1, $script:setCount1 = $this.UseState[int](0)[0..1]

@@ -1,13 +1,12 @@
-using DeltaUI.WPF;
-using System.Drawing;
-using System.Windows;
-using System.Windows.Input;
+using Nuri.UI.Controls;
+using Nuri.UI.Dsl;
+using Nuri.UI.Values;
 
 namespace ContentControlChildrenTest.Components
 {
     public class CounterComponent : Component
     {
-        public override IVisual Render()
+        public override IElement Render()
         {
             var (isHover, setIsHover) = useState(false);
             var (isToggle, setIsToggle) = useState(true);
@@ -16,12 +15,12 @@ namespace ContentControlChildrenTest.Components
                     Div(DivTypes.Block)
                         .Background("#00070E")
                         .Brush("#34291E")
-                        .Margin(left: 10),
+                        .Margin(10, 0, 0, 0),
 
                     Image("Resources/logo.png")
                         .Start()
                         .Height(38)
-                        .BitmapScalingMode(System.Windows.Media.BitmapScalingMode.Fant),
+                        .BitmapScalingMode(ImageScalingModeValue.Fant),
 
                     Div(DivTypes.Block)
                         .Background(isHover ? "#1D3B4A" : "#1E2328")
@@ -32,25 +31,25 @@ namespace ContentControlChildrenTest.Components
                     Div(DivTypes.Grid,
                         Text("Play")
                             .FontSize(15)
-                            .FontWeight(FontWeights.Bold)
+                            .FontWeight(FontWeightValue.Bold)
                             .Center()
                             .FontColor("#FFFFFF")
-                            .Margin(30, isToggle ? 0 : 100)
-                            .Transitions("Margin", 500, Easing.CubicInOut),
+                            .Margin(30, isToggle ? 0 : 100, 0, 0)
+                            .Transition(500, EasingValue.CubicInOut),
                         Text("Stop")
                             .FontSize(15)
-                            .FontWeight(FontWeights.Bold)
+                            .FontWeight(FontWeightValue.Bold)
                             .Center()
                             .FontColor("#3C3C41")
-                            .Margin(30, bottom: isToggle ? 100 : 0)
-                            .Transitions("Margin", 500, Easing.CubicInOut)
+                            .Margin(30, 0, 0, isToggle ? 100 : 0)
+                            .Transition(500, EasingValue.CubicInOut)
                     )
                 )
-                .OnHover((s, e) => setIsHover(e.RoutedEvent == UIElement.MouseEnterEvent))
-                .OnClick((s, e) => setIsToggle(!isToggle))
+                .OnHover(setIsHover)
+                .OnClick(() => setIsToggle(!isToggle))
                 .Size(165, 38)
-                .Cursor(isHover ? Cursors.Hand : Cursors.Arrow)
-                .Background(Color.Transparent);
+                .Cursor(isHover ? CursorValue.Hand : CursorValue.Arrow)
+                .Background(ColorValue.FromArgb(0, 0, 0, 0));
         }
     }
 }

@@ -1,15 +1,15 @@
-using DeltaUI.WPF;
+using Nuri.UI.Dsl;
 
 namespace DiffingEngineTest.Components
 {
     public class CounterComponent : Component
     {
-        public override IVisual Render()
+        public override IElement Render()
         {
             var (visible, setVisible) = useState (true);
 
             return Div (
-                        Input (InputTypes.Button, $"Count1: {visible}", (s, e) => setVisible (!visible)),
+                        Button ($"Count1: {visible}", () => setVisible (!visible)),
                         visible? new CounterComponent1 () : null!
                    );
         }

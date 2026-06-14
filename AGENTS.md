@@ -4,16 +4,16 @@ These instructions apply to AI agents working in this repository, including Open
 
 ## Project Direction
 
-- `DeltaUI.Core` must stay platform-neutral.
-- Do not add WPF, Avalonia, Uno, OpenSilver, MAUI, or other UI framework types to `DeltaUI.Core`.
-- `DeltaUI.WPF` is a compatibility DSL plus renderer adapter.
+- `Nuri` must stay platform-neutral.
+- Do not add WPF, Avalonia, Uno, OpenSilver, MAUI, or other UI framework types to `Nuri`.
+- `Nuri.WPF` is a compatibility DSL plus renderer adapter.
 - Component `Render()` methods should produce virtual UI descriptions, not native WPF controls.
 - Native WPF controls should be created only by the WPF renderer/registry path.
 - Preserve existing user-facing DSL compatibility unless the user explicitly approves a breaking change.
 
 ## Architecture Rules
 
-- Keep platform-neutral concepts in `src/DeltaUI.Core`:
+- Keep platform-neutral concepts in `src/Nuri`:
   - virtual entries
   - patch operations
   - diffing
@@ -21,7 +21,7 @@ These instructions apply to AI agents working in this repository, including Open
   - element abstractions
   - value models
   - neutral event/animation descriptions
-- Keep WPF materialization in `src/DeltaUI.WPF`:
+- Keep WPF materialization in `src/Nuri.WPF`:
   - WPF control factories
   - WPF property mapping
   - WPF event delegate materialization
@@ -48,14 +48,14 @@ These instructions apply to AI agents working in this repository, including Open
 Run this after meaningful changes:
 
 ```powershell
-dotnet build "Delta.sln" -c Release
+dotnet build "Nuri.sln" -c Release
 ```
 
 For performance sanity checks:
 
 ```powershell
-dotnet run --project "perf\DeltaUI.Performance\DeltaUI.Performance.csproj" -c Release -- --label after
-dotnet run --project "perf\DeltaUI.WpfPerformance\DeltaUI.WpfPerformance.csproj" -c Release -- --label after
+dotnet run --project "perf\Nuri.Performance\Nuri.Performance.csproj" -c Release -- --label after
+dotnet run --project "perf\Nuri.WPFPerformance\Nuri.WPFPerformance.csproj" -c Release -- --label after
 ```
 
 ## Documentation Policy

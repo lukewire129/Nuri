@@ -1,23 +1,23 @@
-using DeltaUI.WPF;
+using Nuri.UI.Dsl;
 
 namespace DiffingEngineTest.Components
 {
     public class CounterComponent1 : Component
     {
-        public override IVisual Render()
+        public override IElement Render()
         {
             var (count, setCount) = useState (0);
 
-            return Div (
-                        Rows (100, 100),
-                        Input (InputTypes.Button, $"Comopent Count!: {count}", (s, e) => setCount (count + 1))
+            return Grid (
+                        Button ($"Comopent Count!: {count}", () => setCount (count + 1))
                             .Size (150, 50)
                             .Start ()
                             .Row (0),
 
-                        Input (InputTypes.Button, "Comopent Count Reset", (s, e) => setCount (0))
+                        Button ("Comopent Count Reset", () => setCount (0))
                             .Row (1)
-                    );
+                    )
+                    .Rows (Pixels(100), Pixels(100));
         }
     }
 }

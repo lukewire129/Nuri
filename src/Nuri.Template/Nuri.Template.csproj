@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageType>Template</PackageType>
+    <PackageVersion>0.4.0</PackageVersion>
+    <PackageId>Nuri.Template</PackageId>
+    <Title>Nuri Template</Title>
+    <Description>Nuri Template</Description>
+    <PackageTags>dotnet-new;templates;lukewire;WPF;Delta;KOREA</PackageTags>
+    <PackageProjectUrl>https://github.com/lukewire129/Delta</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/lukewire129/Delta</RepositoryUrl>
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <ContentTargetFolders>content</ContentTargetFolders>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <NoPackageAnalysis>true</NoPackageAnalysis>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="Items\**\*" Exclude="templates\**\bin\**;templates\**\obj\**" />
+    <Content Include="Template.Project\**\*" Exclude="templates\**\bin\**;templates\**\obj\**" />
+    <Compile Remove="**\*" />
+  </ItemGroup>
+</Project>

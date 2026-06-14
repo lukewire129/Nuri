@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net6.0-windows;net7.0-windows;net8.0-windows</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <UseWPF>true</UseWPF>
+    <!--<LangVersion>preview</LangVersion>-->
+    <LangVersion>latest</LangVersion>
+    <Authors>lukewire129</Authors>
+  </PropertyGroup>
+  
+  <PropertyGroup>
+    <PackageVersion>0.1.0</PackageVersion>
+    <EnablePackageValidation>true</EnablePackageValidation>
+    <PackageId>Nuri.WPF</PackageId>
+    <Description>WPF CSharp MVU</Description>
+    <PackageProjectUrl>https://github.com/lukewire129/Nuri</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/lukewire129/Nuri</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>lukewire; WPF; React Hook; CSharp Markup;</PackageTags>
+    <Copyright>Copyright © 2024 lukewire129.</Copyright>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <Compile Remove="cc\**" />
+    <EmbeddedResource Remove="cc\**" />
+    <None Remove="cc\**" />
+    <Page Remove="cc\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Button.cs" />
+    <Compile Remove="NuriControl.cs" />
+    <Compile Remove="Grid.cs" />
+    <Compile Remove="HookComponent.cs" />
+    <Compile Remove="HStack.cs" />
+    <Compile Remove="Panel.cs" />
+    <Compile Remove="Text.cs" />
+    <Compile Remove="VisualNode.cs" />
+    <Compile Remove="VStack.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Nuri\Nuri.csproj" />
+  </ItemGroup>
+
+</Project>

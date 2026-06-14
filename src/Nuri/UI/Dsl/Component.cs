@@ -1,0 +1,24 @@
+using System;
+using Nuri.UI.Values;
+
+namespace Nuri.UI.Dsl
+{
+    public abstract partial class Component : ComponentBase<IElement, AnimationValue>, IElement
+    {
+        public static event EventHandler<Component>? AnyStateChanged;
+
+        public event EventHandler? StateChanged;
+
+        public abstract IElement Render();
+
+        protected override void OnStateChanged()
+        {
+            StateChanged?.Invoke(this, EventArgs.Empty);
+            AnyStateChanged?.Invoke(this, this);
+        }
+
+        public override void Dispose()
+        {
+        }
+    }
+}

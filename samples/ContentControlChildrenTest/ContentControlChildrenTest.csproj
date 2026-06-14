@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\DeltaUI.WPF\DeltaUI.WPF.csproj" />
+    <ProjectReference Include="..\..\src\Nuri.WPF\Nuri.WPF.csproj" />
   </ItemGroup>
 
 </Project>

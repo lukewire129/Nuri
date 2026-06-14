@@ -1,57 +1,58 @@
-using DeltaUI.WPF;
-using System.Drawing;
+using Nuri.UI.Controls;
+using Nuri.UI.Dsl;
+using Nuri.UI.Values;
 
 namespace GridTest.Components
 {
     public class CounterComponent : Component
     {
-        public override IVisual Render()
+        public override IElement Render()
         {
             var (count, setCount) = useState(0);
             var (text, setText) = useState("");
             var (checkedValue, setCheckedValue) = useState(false);
             var (radioValue, setRadioValue) = useState(false);
 
-            return Div(
-                    Rows(Auto, Auto, Auto, Auto),
+            return Grid(
                     Div(DivTypes.Row,
-                        Input(InputTypes.Primary, $"Count: {count}")
+                        Button($"Count: {count}")
                             .Key("count-increment")
                             .OnClick(() => setCount(count + 1))
                             .Size(120, 50)
                             .Background("#e8b8FFFF"),
-                        Input(InputTypes.Button, "Reset")
+                        Button("Reset")
                             .Key("count-reset")
                             .OnClick(() => setCount(0))
-                            .Margin(left: 12)
+                            .Margin(12, 0, 0, 0)
                     ).Row(0),
 
                     Div(DivTypes.Column,
                         Text($"TextChanged: {text}")
                             .FontSize(20)
-                            .FontColor(Color.Red),
-                        Input(InputTypes.Text)
+                            .FontColor(ColorValue.FromRgb(255, 0, 0)),
+                        TextBox()
                             .OnTextChanged(setText)
-                            .FontColor(Color.Blue)
+                            .FontColor(ColorValue.FromRgb(0, 0, 255))
                             .Size(160, 50)
                     ).Row(1),
 
                     Div(DivTypes.Column,
                         Text($"Checkbox: {checkedValue}")
                             .FontSize(20)
-                            .FontColor(Color.Red),
-                        Input(InputTypes.Checkbox)
+                            .FontColor(ColorValue.FromRgb(255, 0, 0)),
+                        CheckBox()
                             .OnCheckChanged(setCheckedValue)
                             .Size(100, 50)
                     ).Row(2),
 
                     Div(DivTypes.Column,
-                        Input(InputTypes.Radio, $"Radio 1: {radioValue}")
+                        RadioButton($"Radio 1: {radioValue}")
                             .OnCheckChanged(setRadioValue),
-                        Input(InputTypes.Radio, $"Radio 2: {!radioValue}")
+                        RadioButton($"Radio 2: {!radioValue}")
                             .OnCheckChanged(value => setRadioValue(!value))
                     ).Row(3)
                 )
+                .Rows(Auto, Auto, Auto, Auto)
                 .Padding(12);
         }
     }
