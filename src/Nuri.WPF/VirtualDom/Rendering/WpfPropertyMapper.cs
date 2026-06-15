@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -17,6 +18,9 @@ namespace Nuri.WPF
     {
         public static bool TrySetProperty(FrameworkElement element, string propertyName, object? value)
         {
+            if (propertyName.StartsWith("ExitAnimation.", StringComparison.Ordinal))
+                return true;
+
             switch (propertyName)
             {
                 case "Width":
@@ -34,6 +38,12 @@ namespace Nuri.WPF
                 case "Tag":
                     element.Tag = value;
                     return true;
+                case "NativeFactory":
+                    return true;
+                case "Style":
+                    return TrySetStyle(element, value);
+                case "Classes":
+                    return TrySetClasses(element, value);
                 case "Cursor":
                     element.Cursor = (Cursor?)value;
                     return true;
@@ -93,6 +103,9 @@ namespace Nuri.WPF
 
         public static bool TryResetProperty(FrameworkElement element, string propertyName)
         {
+            if (propertyName.StartsWith("ExitAnimation.", StringComparison.Ordinal))
+                return true;
+
             switch (propertyName)
             {
                 case "Width":
@@ -109,6 +122,12 @@ namespace Nuri.WPF
                     return true;
                 case "Tag":
                     element.ClearValue(FrameworkElement.TagProperty);
+                    return true;
+                case "NativeFactory":
+                    return true;
+                case "Style":
+                case "Classes":
+                    element.ClearValue(FrameworkElement.StyleProperty);
                     return true;
                 case "Cursor":
                     element.ClearValue(FrameworkElement.CursorProperty);
@@ -164,6 +183,109 @@ namespace Nuri.WPF
                     return TryClearFill(element);
                 default:
                     return false;
+            }
+        }
+
+        private static bool TrySetStyle(FrameworkElement element, object? value)
+        {
+            if (value is Style style)
+            {
+                element.Style = style;
+                return true;
+            }
+
+            if (value is string resourceKey && TryFindStyle(element, resourceKey, out var resourceStyle))
+                element.Style = resourceStyle;
+
+            return true;
+        }
+
+        private static bool TrySetClasses(FrameworkElement element, object? value)
+        {
+            var classNames = ToClassNames(value);
+            if (classNames.Count == 0)
+            {
+                element.ClearValue(FrameworkElement.StyleProperty);
+                return true;
+            }
+
+            var composedStyle = new Style(element.GetType());
+            if (element.Style is not null && IsStyleCompatible(element.GetType(), element.Style.TargetType))
+                composedStyle.BasedOn = element.Style;
+
+            foreach (var className in classNames)
+            {
+                if (!TryFindStyle(element, className, out var classStyle))
+                    continue;
+
+                if (!IsStyleCompatible(element.GetType(), classStyle.TargetType))
+                    continue;
+
+                foreach (SetterBase setter in classStyle.Setters)
+                {
+                    if (CloneSetter(setter) is { } clone)
+                        composedStyle.Setters.Add(clone);
+                }
+            }
+
+            element.Style = composedStyle;
+            return true;
+        }
+
+        private static List<string> ToClassNames(object? value)
+        {
+            var classNames = new List<string>();
+            switch (value)
+            {
+                case string className:
+                    AddClassName(classNames, className);
+                    break;
+                case IEnumerable<string> values:
+                    foreach (var item in values)
+                        AddClassName(classNames, item);
+                    break;
+            }
+
+            return classNames;
+        }
+
+        private static void AddClassName(List<string> classNames, string? className)
+        {
+            if (!string.IsNullOrWhiteSpace(className))
+                classNames.Add(className);
+        }
+
+        private static bool TryFindStyle(FrameworkElement element, string resourceKey, out Style style)
+        {
+            var resource = element.TryFindResource(resourceKey) ?? Application.Current?.TryFindResource(resourceKey);
+            if (resource is Style foundStyle)
+            {
+                style = foundStyle;
+                return true;
+            }
+
+            style = null!;
+            return false;
+        }
+
+        private static bool IsStyleCompatible(Type elementType, Type? targetType)
+        {
+            return targetType is null || targetType.IsAssignableFrom(elementType);
+        }
+
+        private static SetterBase? CloneSetter(SetterBase setter)
+        {
+            switch (setter)
+            {
+                case Setter valueSetter:
+                    return new Setter(valueSetter.Property, valueSetter.Value, valueSetter.TargetName);
+                case EventSetter eventSetter:
+                    return new EventSetter(eventSetter.Event, eventSetter.Handler)
+                    {
+                        HandledEventsToo = eventSetter.HandledEventsToo
+                    };
+                default:
+                    return null;
             }
         }
 

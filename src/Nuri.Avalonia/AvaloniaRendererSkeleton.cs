@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using Nuri.Hosting;
+using Nuri.Runtime;
+using Nuri.UI.Dsl;
 using Nuri.VirtualDom;
 using Nuri.VirtualDom.Rendering;
 
@@ -43,6 +46,14 @@ namespace Nuri.Avalonia
         public void ReplaceChild(object parent, object oldChild, object newChild)
         {
             throw new NotImplementedException("Map child replacement to Avalonia content/panel APIs.");
+        }
+    }
+
+    public sealed class AvaloniaHostAdapterSkeleton : INuriHostAdapter<object, object>
+    {
+        public NuriMountedRoot<object> Attach(object host, IElement rootElement, NuriServiceProvider? services = null)
+        {
+            throw new NotImplementedException("Replace object with Avalonia.Controls.ContentControl, build the native root with AvaloniaRendererSkeleton, and assign it to host.Content. Keep Avalonia startup owned by the Avalonia app.");
         }
     }
 }

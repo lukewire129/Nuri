@@ -122,6 +122,14 @@ namespace Nuri.UI.Dsl
         }
     }
 
+    public sealed class NativeView : Visual
+    {
+        public NativeView(object nativeFactory) : base(VirtualControlTypes.Native)
+        {
+            SetProperty("NativeFactory", nativeFactory);
+        }
+    }
+
     public sealed class OverlayView : Panel, IOverlay
     {
         public OverlayView(string kind, params IElement[] children) : base(VirtualControlTypes.Overlay, children)

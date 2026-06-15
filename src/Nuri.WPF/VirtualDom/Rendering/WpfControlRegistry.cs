@@ -10,6 +10,9 @@ namespace Nuri.WPF
     {
         public static FrameworkElement Create(Nuri.VirtualDom.VirtualEntry entry)
         {
+            if (entry.Type == VirtualControlTypes.Native)
+                return CreateNative(entry);
+
             return Create(entry.Type, entry.Kind);
         }
 
@@ -46,6 +49,8 @@ namespace Nuri.WPF
                         ItemsTypes.Tree => new TreeView(),
                         _ => new ItemsControl()
                     };
+                case VirtualControlTypes.Native:
+                    throw new InvalidOperationException("Native WPF elements require a NativeFactory property.");
                 case VirtualControlTypes.Overlay:
                     return new DivElement(new System.Windows.Controls.Grid());
                 case VirtualControlTypes.Select:
@@ -55,6 +60,17 @@ namespace Nuri.WPF
                 default:
                     throw new InvalidOperationException($"Unknown WPF element type: {type}");
             }
+        }
+
+        private static FrameworkElement CreateNative(Nuri.VirtualDom.VirtualEntry entry)
+        {
+            if (!entry.Properties.TryGetValue("NativeFactory", out var factoryValue))
+                throw new InvalidOperationException("Native WPF element is missing the NativeFactory property.");
+
+            if (factoryValue is Func<FrameworkElement> factory)
+                return factory();
+
+            throw new InvalidOperationException($"Unsupported NativeFactory type: {factoryValue?.GetType().FullName ?? "null"}");
         }
 
         public static FrameworkElement GetPropertyTarget(FrameworkElement element, string propertyName)

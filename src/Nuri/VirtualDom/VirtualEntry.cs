@@ -7,6 +7,7 @@ namespace Nuri.VirtualDom
     public sealed class VirtualEntry
     {
         private readonly List<VirtualEntry> _children;
+        private readonly List<IDisposable> _owners;
 
         public VirtualEntry(
             string type,
@@ -15,7 +16,8 @@ namespace Nuri.VirtualDom
             IEnumerable<KeyValuePair<string, object?>>? properties = null,
             IEnumerable<KeyValuePair<string, object?>>? events = null,
             IEnumerable<KeyValuePair<string, object?>>? animations = null,
-            IEnumerable<VirtualEntry>? children = null)
+            IEnumerable<VirtualEntry>? children = null,
+            IEnumerable<IDisposable>? owners = null)
         {
             Type = type ?? throw new ArgumentNullException(nameof(type));
             Kind = kind ?? string.Empty;
@@ -24,6 +26,7 @@ namespace Nuri.VirtualDom
             Events = ToDictionary(events ?? Enumerable.Empty<KeyValuePair<string, object?>>());
             Animations = ToDictionary(animations ?? Enumerable.Empty<KeyValuePair<string, object?>>());
             _children = new List<VirtualEntry>(children ?? Enumerable.Empty<VirtualEntry>());
+            _owners = new List<IDisposable>(owners ?? Enumerable.Empty<IDisposable>());
         }
 
         public string Type { get; }
@@ -43,6 +46,19 @@ namespace Nuri.VirtualDom
         public IReadOnlyDictionary<string, object?> Animations { get; }
 
         public IReadOnlyList<VirtualEntry> Children => _children;
+
+        public IReadOnlyList<IDisposable> Owners => _owners;
+
+        public VirtualEntry WithOwner(IDisposable owner)
+        {
+            if (owner == null)
+                throw new ArgumentNullException(nameof(owner));
+
+            if (!_owners.Any(existing => ReferenceEquals(existing, owner)))
+                _owners.Add(owner);
+
+            return this;
+        }
 
         public VirtualEntry WithIdentity(string id, string? parentId, bool rewriteChildren = true)
         {

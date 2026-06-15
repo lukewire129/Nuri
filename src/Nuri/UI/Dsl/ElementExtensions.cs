@@ -19,6 +19,41 @@ namespace Nuri.UI.Dsl
             return node;
         }
 
+        public static T Style<T>(this T node, string resourceKey) where T : IElement
+        {
+            node.SetProperty("Style", resourceKey);
+            return node;
+        }
+
+        public static T Class<T>(this T node, string className) where T : IElement
+        {
+            if (!node.Properties.TryGetValue("Classes", out var value))
+            {
+                node.SetProperty("Classes", new[] { className });
+                return node;
+            }
+
+            if (value is string[] existingClasses)
+            {
+                var classNames = new string[existingClasses.Length + 1];
+                Array.Copy(existingClasses, classNames, existingClasses.Length);
+                classNames[classNames.Length - 1] = className;
+                node.SetProperty("Classes", classNames);
+                return node;
+            }
+
+            if (value is string existingClass)
+                node.SetProperty("Classes", new[] { existingClass, className });
+
+            return node;
+        }
+
+        public static T Classes<T>(this T node, params string[] classNames) where T : IElement
+        {
+            node.SetProperty("Classes", classNames);
+            return node;
+        }
+
         public static T Width<T>(this T node, double value) where T : IElement
         {
             node.SetProperty("Width", value);
@@ -35,6 +70,25 @@ namespace Nuri.UI.Dsl
         {
             node.Width(width);
             node.Height(height);
+            return node;
+        }
+
+        public static T Opacity<T>(this T node, double value) where T : IElement
+        {
+            node.SetProperty("Opacity", value);
+            return node;
+        }
+
+        public static T FadeIn<T>(this T node, int milliseconds, EasingValue? easing = null) where T : IElement
+        {
+            node.SetProperty("Opacity", 1.0);
+            node.AddAnimation("Opacity", new AnimationValue("Opacity", 1.0, TimeSpan.FromMilliseconds(milliseconds), easing, 0.0));
+            return node;
+        }
+
+        public static T FadeOut<T>(this T node, int milliseconds, EasingValue? easing = null) where T : IElement
+        {
+            node.SetProperty("ExitAnimation.Opacity", new AnimationValue("Opacity", 0.0, TimeSpan.FromMilliseconds(milliseconds), easing, 1.0));
             return node;
         }
 

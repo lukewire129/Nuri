@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
+using System.Windows.Controls;
+using Nuri.Runtime;
 using Nuri.UI;
 using Nuri.UI.Dsl;
 
@@ -48,7 +50,7 @@ namespace Nuri.WPF
             return Attach(window, CreateRoot<TComponent>(title, width, height));
         }
 
-        public static ApplicationRoot Attach(Window window, IElement rootElement)
+        public static ApplicationRoot Attach(Window window, IElement rootElement, NuriServiceProvider? services = null)
         {
             if (window == null)
                 throw new ArgumentNullException(nameof(window));
@@ -58,7 +60,7 @@ namespace Nuri.WPF
 
             EnsureHotReloadAttached();
 
-            var root = ApplicationRoot.Initialize(rootElement, window);
+            var root = ApplicationRoot.Initialize(rootElement, window, services ?? CreateDefaultServices());
             Register(root);
             window.Closed += (_, __) =>
             {
@@ -67,6 +69,57 @@ namespace Nuri.WPF
             };
 
             return root;
+        }
+
+        public static ApplicationRoot Attach(Window window, IElement rootElement, Action<NuriServiceCollection> configureServices)
+        {
+            return Attach(window, rootElement, BuildServices(configureServices));
+        }
+
+        public static ApplicationRoot Attach(Window window, IElement rootElement, IServiceProvider serviceProvider)
+        {
+            return Attach(window, rootElement, BuildServices(serviceProvider, null));
+        }
+
+        public static ApplicationRoot Attach(Window window, IElement rootElement, IServiceProvider serviceProvider, Action<NuriServiceCollection> configureServices)
+        {
+            return Attach(window, rootElement, BuildServices(serviceProvider, configureServices));
+        }
+
+        public static ApplicationRoot Attach(ContentControl host, IElement rootElement, NuriServiceProvider? services = null)
+        {
+            if (host == null)
+                throw new ArgumentNullException(nameof(host));
+
+            if (rootElement == null)
+                throw new ArgumentNullException(nameof(rootElement));
+
+            EnsureHotReloadAttached();
+
+            var root = ApplicationRoot.Initialize(rootElement, host, services ?? CreateDefaultServices());
+            Register(root);
+            host.Unloaded += (_, __) =>
+            {
+                Unregister(root);
+                root.Dispose();
+            };
+
+            return root;
+        }
+
+        public static ApplicationRoot Attach(ContentControl host, IElement rootElement, Action<NuriServiceCollection> configureServices)
+        {
+            return Attach(host, rootElement, BuildServices(configureServices));
+        }
+
+        public static ApplicationRoot Attach(ContentControl host, IElement rootElement, IServiceProvider serviceProvider)
+        {
+            return Attach(host, rootElement, BuildServices(serviceProvider, null));
+        }
+
+        public static ApplicationRoot Attach(ContentControl host, IElement rootElement, IServiceProvider serviceProvider, Action<NuriServiceCollection> configureServices)
+        {
+            return Attach(host, rootElement, BuildServices(serviceProvider, configureServices));
         }
 
         public static void Configure()
@@ -147,6 +200,36 @@ namespace Nuri.WPF
             return new WindowView(new TComponent())
                 .WithTitle(title)
                 .WithSize(width, height);
+        }
+
+        private static NuriServiceProvider BuildServices(Action<NuriServiceCollection> configureServices)
+        {
+            if (configureServices == null)
+                throw new ArgumentNullException(nameof(configureServices));
+
+            var services = new NuriServiceCollection();
+            services.AddNuriWpfServices();
+            configureServices(services);
+            return services.BuildServiceProvider();
+        }
+
+        private static NuriServiceProvider BuildServices(IServiceProvider serviceProvider, Action<NuriServiceCollection>? configureServices)
+        {
+            if (serviceProvider == null)
+                throw new ArgumentNullException(nameof(serviceProvider));
+
+            var services = new NuriServiceCollection();
+            services.UseFallback(serviceProvider);
+            services.AddNuriWpfServices();
+            configureServices?.Invoke(services);
+            return services.BuildServiceProvider();
+        }
+
+        public static NuriServiceProvider CreateDefaultServices()
+        {
+            var services = new NuriServiceCollection();
+            services.AddNuriWpfServices();
+            return services.BuildServiceProvider();
         }
     }
 }

@@ -1,4 +1,5 @@
 using System;
+using Nuri.Navigation;
 using Nuri.UI.Controls;
 using Nuri.UI.Values;
 
@@ -206,6 +207,11 @@ namespace Nuri.UI.Dsl
         public static OverlayView Overlay(string kind, params IElement[] children)
         {
             return new OverlayView(kind, children);
+        }
+
+        public static RouterOutlet Outlet(IRouter router)
+        {
+            return new RouterOutlet(router);
         }
 
         public static SelectView Select(params IElement[] children)

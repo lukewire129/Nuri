@@ -51,11 +51,17 @@ namespace Nuri.WPF
                     rendered.Properties[property.Key] = property.Value;
             }
 
+            foreach (var animation in component.Animations)
+            {
+                if (!rendered.Animations.ContainsKey(animation.Key))
+                    rendered.Animations[animation.Key] = animation.Value;
+            }
+
             rendered.ParentId = component.ParentId;
             rendered.Id = component.Id;
             Nuri.UI.ElementTree<Nuri.UI.Dsl.IElement, Nuri.UI.Values.AnimationValue>.AssignDescendantIds(component.Id, rendered);
 
-            return rendered.ToVirtualEntry();
+            return rendered.ToVirtualEntry().WithOwner(component);
         }
 
         private static string? GetKey(string key, string name)

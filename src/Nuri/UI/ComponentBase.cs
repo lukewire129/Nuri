@@ -96,6 +96,11 @@ namespace Nuri.UI
             return (state, SetState);
         }
 
+        protected TService useService<TService>() where TService : class
+        {
+            return NuriRuntimeContext.Services.GetRequiredService<TService>();
+        }
+
         protected void ResetStateIndex()
         {
             _stateIndex = 0;

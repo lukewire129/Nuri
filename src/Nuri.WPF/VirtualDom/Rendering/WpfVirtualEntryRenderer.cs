@@ -70,6 +70,7 @@ namespace Nuri.WPF
             ApplyProperties(element, entry.Properties);
             ApplyEvents(element, entry);
             ApplyChildren(element, entry);
+            ApplyAnimations(element, entry.Animations);
 
             return element;
         }
@@ -107,16 +108,34 @@ namespace Nuri.WPF
             }
         }
 
+        private static void ApplyAnimations(FrameworkElement element, IReadOnlyDictionary<string, object?> animations)
+        {
+            foreach (var animation in animations)
+            {
+                if (animation.Value is AnimationValue animationValue)
+                    BeginAnimation(element, animation.Key, WpfValueMapper.ToWpfAnimation(animationValue));
+            }
+        }
+
         private static void ReplaceEntry(Dictionary<string, FrameworkElement> controlIndex, ReplaceEntryPatch operation)
         {
             if (!controlIndex.TryGetValue(operation.OldEntry.Id, out var target))
                 return;
 
-            var replacement = Build(operation.NewEntry);
             var parent = LogicalTreeHelper.GetParent(target);
 
             if (parent is FrameworkElement parentElement)
             {
+                if (TryBeginExitAnimation(target, operation.OldEntry, () =>
+                {
+                    var replacement = Build(operation.NewEntry);
+                    RemoveFromIndex(controlIndex, target);
+                    WpfControlRegistry.ReplaceChild(parentElement, target, replacement);
+                    AddToIndex(controlIndex, replacement);
+                }))
+                    return;
+
+                var replacement = Build(operation.NewEntry);
                 RemoveFromIndex(controlIndex, target);
                 WpfControlRegistry.ReplaceChild(parentElement, target, replacement);
                 AddToIndex(controlIndex, replacement);
@@ -173,6 +192,13 @@ namespace Nuri.WPF
             var parent = LogicalTreeHelper.GetParent(child);
             if (parent is FrameworkElement parentElement)
             {
+                if (TryBeginExitAnimation(child, operation.Child, () =>
+                {
+                    RemoveFromIndex(controlIndex, child);
+                    WpfControlRegistry.RemoveChild(parentElement, child);
+                }))
+                    return;
+
                 RemoveFromIndex(controlIndex, child);
                 WpfControlRegistry.RemoveChild(parentElement, child);
             }
@@ -316,6 +342,20 @@ namespace Nuri.WPF
             }
 
             element.BeginAnimation(dependencyProperty, animation);
+        }
+
+        private static bool TryBeginExitAnimation(FrameworkElement element, VirtualEntry entry, Action completed)
+        {
+            if (!entry.Properties.TryGetValue("ExitAnimation.Opacity", out var value) || value is not AnimationValue animationValue)
+                return false;
+
+            var animation = WpfValueMapper.ToWpfAnimation(animationValue);
+            if (animation == null)
+                return false;
+
+            animation.Completed += (_, __) => completed();
+            BeginAnimation(element, animationValue.PropertyName, animation);
+            return true;
         }
 
         private static bool TryBeginBackgroundAnimation(FrameworkElement element, AnimationTimeline? animation)
