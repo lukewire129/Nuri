@@ -31,6 +31,9 @@ namespace Nuri.WPF
                 case "Name":
                     element.Name = (string)value!;
                     return true;
+                case "Tag":
+                    element.Tag = value;
+                    return true;
                 case "Cursor":
                     element.Cursor = (Cursor?)value;
                     return true;
@@ -103,6 +106,9 @@ namespace Nuri.WPF
                     return true;
                 case "Name":
                     element.ClearValue(FrameworkElement.NameProperty);
+                    return true;
+                case "Tag":
+                    element.ClearValue(FrameworkElement.TagProperty);
                     return true;
                 case "Cursor":
                     element.ClearValue(FrameworkElement.CursorProperty);

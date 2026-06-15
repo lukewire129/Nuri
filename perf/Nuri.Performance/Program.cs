@@ -47,7 +47,7 @@ foreach (var scenario in scenarios)
         patchCount / (double)iterations));
 }
 
-Console.WriteLine($"# Delta Performance ({label})");
+Console.WriteLine($"# Nuri Performance ({label})");
 Console.WriteLine();
 Console.WriteLine($"Size: {size}, Iterations: {iterations}, Warmup: {warmup}");
 Console.WriteLine();

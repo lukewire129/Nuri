@@ -16,6 +16,7 @@ internal static class Program
 
         var scenarios = new[]
         {
+            new Scenario("Initial build", () => CreateReorderedTree(size), false),
             new Scenario("Keyed reorder", () => CreateReorderedTree(size), true),
         };
 
@@ -68,7 +69,7 @@ internal static class Program
 
     private static void PrintResults(string label, int size, int iterations, int warmup, IReadOnlyList<Result> results)
     {
-        Console.WriteLine($"# Delta WPF Performance ({label})");
+        Console.WriteLine($"# Nuri WPF Performance ({label})");
         Console.WriteLine();
         Console.WriteLine($"Size: {size}, Iterations: {iterations}, Warmup: {warmup}");
         Console.WriteLine();

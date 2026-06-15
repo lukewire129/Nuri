@@ -1,8 +1,10 @@
 using Nuri.VirtualDom;
 using Nuri.UI.Values;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -15,6 +17,8 @@ namespace Nuri.WPF
     {
         private static readonly ConditionalWeakTable<FrameworkElement, Dictionary<string, FrameworkElement>> ControlIndexes = new ConditionalWeakTable<FrameworkElement, Dictionary<string, FrameworkElement>>();
         private static readonly ConditionalWeakTable<FrameworkElement, Dictionary<string, Delegate>> EventHandlers = new ConditionalWeakTable<FrameworkElement, Dictionary<string, Delegate>>();
+        private static readonly ConcurrentDictionary<(Type Type, string PropertyName), PropertyInfo?> PropertyCache = new ConcurrentDictionary<(Type, string), PropertyInfo?>();
+        private static readonly ConcurrentDictionary<(Type Type, string EventName), EventInfo?> EventCache = new ConcurrentDictionary<(Type, string), EventInfo?>();
 
         public static void ApplyDiff(FrameworkElement root, IReadOnlyList<PatchOperation> operations)
         {
@@ -142,7 +146,7 @@ namespace Nuri.WPF
             if (WpfPropertyMapper.TryResetProperty(propertyTarget, operation.PropertyName))
                 return;
 
-            var property = propertyTarget.GetType().GetProperty(operation.PropertyName);
+            var property = GetCachedProperty(propertyTarget.GetType(), operation.PropertyName);
             if (property != null && property.CanWrite)
             {
                 var defaultValue = property.PropertyType.IsValueType ? Activator.CreateInstance(property.PropertyType) : null;
@@ -207,7 +211,7 @@ namespace Nuri.WPF
             if (!WpfEventMapper.TryCreate(evt.Key, evt.Value, out var wpfEventName, out var handler))
                 return;
 
-            var eventInfo = element.GetType().GetEvent(wpfEventName);
+            var eventInfo = GetCachedEvent(element.GetType(), wpfEventName);
             if (eventInfo == null)
                 return;
 
@@ -221,7 +225,7 @@ namespace Nuri.WPF
             if (!WpfEventMapper.TryCreate(evt.Key, evt.Value, out var wpfEventName, out var fallbackHandler))
                 return;
 
-            var eventInfo = element.GetType().GetEvent(wpfEventName);
+            var eventInfo = GetCachedEvent(element.GetType(), wpfEventName);
             if (eventInfo == null)
                 return;
 
@@ -260,7 +264,7 @@ namespace Nuri.WPF
             if (WpfPropertyMapper.TrySetProperty(propertyTarget, propertyName, value))
                 return;
 
-            var property = propertyTarget.GetType().GetProperty(propertyName);
+            var property = GetCachedProperty(propertyTarget.GetType(), propertyName);
             if (property != null && property.CanWrite)
             {
                 property.SetValue(propertyTarget, value);
@@ -270,6 +274,16 @@ namespace Nuri.WPF
                 if (value != null)
                     propertyTarget.UpdateAttachedProperty(propertyName, value);
             }
+        }
+
+        private static PropertyInfo? GetCachedProperty(Type type, string propertyName)
+        {
+            return PropertyCache.GetOrAdd((type, propertyName), key => key.Type.GetProperty(key.PropertyName));
+        }
+
+        private static EventInfo? GetCachedEvent(Type type, string eventName)
+        {
+            return EventCache.GetOrAdd((type, eventName), key => key.Type.GetEvent(key.EventName));
         }
 
         private static void BeginAnimation(FrameworkElement element, string propertyName, AnimationTimeline? animation)

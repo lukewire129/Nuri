@@ -1,6 +1,5 @@
 using Nuri.VirtualDom;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace Nuri.WPF
 {
@@ -11,12 +10,23 @@ namespace Nuri.WPF
             if (element is Nuri.UI.Dsl.Component component)
                 return ToVirtualEntry(component);
 
-            var properties = element.Properties.Select(property => new KeyValuePair<string, object?>(property.Key, property.Value));
-            var animations = element.Animations.Select(animation => new KeyValuePair<string, object?>(animation.Key, animation.Value));
-            var children = element.Children.Select(ToVirtualEntry);
-            var events = element.Events
-                .Select(evt => new KeyValuePair<string, object?>(evt.Key, evt.Value))
-                .Concat(element.VirtualEvents.Select(evt => new KeyValuePair<string, object?>(evt.Key, evt.Value)));
+            var properties = new List<KeyValuePair<string, object?>>(element.Properties.Count);
+            foreach (var property in element.Properties)
+                properties.Add(new KeyValuePair<string, object?>(property.Key, property.Value));
+
+            var animations = new List<KeyValuePair<string, object?>>(element.Animations.Count);
+            foreach (var animation in element.Animations)
+                animations.Add(new KeyValuePair<string, object?>(animation.Key, animation.Value));
+
+            var children = new List<VirtualEntry>(element.Children.Count);
+            foreach (var child in element.Children)
+                children.Add(child.ToVirtualEntry());
+
+            var events = new List<KeyValuePair<string, object?>>(element.Events.Count + element.VirtualEvents.Count);
+            foreach (var evt in element.Events)
+                events.Add(new KeyValuePair<string, object?>(evt.Key, evt.Value));
+            foreach (var evt in element.VirtualEvents)
+                events.Add(new KeyValuePair<string, object?>(evt.Key, evt.Value));
 
             var entry = new VirtualEntry(
                 element.Type,
