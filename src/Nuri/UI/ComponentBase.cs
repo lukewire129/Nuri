@@ -96,6 +96,37 @@ namespace Nuri.UI
             return (state, SetState);
         }
 
+        protected (TState state, Action<TAction> dispatch) useReducer<TState, TAction>(Func<TState, TAction, TState> reducer, TState initialState)
+        {
+            if (reducer == null)
+                throw new ArgumentNullException(nameof(reducer));
+
+            var index = _stateIndex;
+            var state = StateStore.GetOrCreateState(Id, index, initialState);
+
+            void Dispatch(TAction action)
+            {
+                var currentState = StateStore.GetOrCreateState(Id, index, initialState);
+                var newState = reducer(currentState, action);
+                if (EqualityComparer<TState>.Default.Equals(currentState, newState))
+                    return;
+
+                StateStore.UpdateState(Id, index, newState);
+                OnStateChanged();
+            }
+
+            _stateIndex++;
+            return (state, Dispatch);
+        }
+
+        protected Ref<T> useRef<T>(T initialValue)
+        {
+            var index = _stateIndex;
+            var reference = StateStore.GetOrCreateState(Id, index, new Ref<T>(initialValue));
+            _stateIndex++;
+            return reference;
+        }
+
         protected void ResetStateIndex()
         {
             _stateIndex = 0;
@@ -111,5 +142,15 @@ namespace Nuri.UI
         }
 
         public abstract void Dispose();
+    }
+
+    public sealed class Ref<T>
+    {
+        public Ref(T current)
+        {
+            Current = current;
+        }
+
+        public T Current { get; set; }
     }
 }

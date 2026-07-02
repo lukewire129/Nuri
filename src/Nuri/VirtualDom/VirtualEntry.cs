@@ -62,6 +62,17 @@ namespace Nuri.VirtualDom
             return this;
         }
 
+        public VirtualEntry RewriteIdentity(string id, string? parentId)
+        {
+            Id = id;
+            ParentId = parentId;
+
+            for (var i = 0; i < Children.Count; i++)
+                Children[i].RewriteIdentity($"{id}.{i}", id);
+
+            return this;
+        }
+
         public bool IsSameEntry(VirtualEntry other)
         {
             if (other == null)

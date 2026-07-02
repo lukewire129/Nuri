@@ -81,11 +81,45 @@ namespace Nuri.WPF
                     wpfEventName = eventName;
                     handler = new MouseEventHandler((s, e) => Invoke(virtualEvent.Handler, eventName == "MouseEnter"));
                     return true;
+                case VirtualEventKind.KeyDown:
+                    wpfEventName = eventName == "PreviewKeyDown" ? "PreviewKeyDown" : "KeyDown";
+                    handler = new KeyEventHandler((s, e) =>
+                    {
+                        var key = ToKeyboardKey(e);
+                        if (key == KeyboardKey.Unknown || e.Handled)
+                            return;
+
+                        Invoke(virtualEvent.Handler, key);
+
+                        if (key == KeyboardKey.Up || key == KeyboardKey.Down || key == KeyboardKey.Enter || key == KeyboardKey.Escape)
+                            e.Handled = true;
+                    });
+                    return true;
                 default:
                     wpfEventName = string.Empty;
                     handler = null!;
                     return false;
             }
+        }
+
+        private static KeyboardKey ToKeyboardKey(KeyEventArgs args)
+        {
+            var key = args.Key == Key.System
+                ? args.SystemKey
+                : args.Key == Key.ImeProcessed
+                    ? args.ImeProcessedKey
+                    : args.Key;
+
+            if (key == Key.Up)
+                return KeyboardKey.Up;
+            if (key == Key.Down)
+                return KeyboardKey.Down;
+            if (key == Key.Return)
+                return KeyboardKey.Enter;
+            if (key == Key.Escape)
+                return KeyboardKey.Escape;
+
+            return KeyboardKey.Unknown;
         }
 
         private static void Invoke(Delegate handler, params object[] values)

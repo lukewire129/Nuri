@@ -86,6 +86,10 @@ namespace Nuri.WPF
                     return TrySetStrokeThickness(element, value);
                 case "Fill":
                     return TrySetFill(element, value);
+                case "AutoFocus":
+                    return TrySetAutoFocus(element, value);
+                case "BringIntoView":
+                    return TrySetBringIntoView(element, value);
                 default:
                     return false;
             }
@@ -162,6 +166,10 @@ namespace Nuri.WPF
                     return TryClearStrokeThickness(element);
                 case "Fill":
                     return TryClearFill(element);
+                case "AutoFocus":
+                    return true;
+                case "BringIntoView":
+                    return true;
                 default:
                     return false;
             }
@@ -396,7 +404,11 @@ namespace Nuri.WPF
             if (element is TextBlock textBlock)
                 textBlock.Text = (string?)value;
             else if (element is TextBox textBox)
-                textBox.Text = (string?)value;
+            {
+                var text = (string?)value ?? string.Empty;
+                if (!string.Equals(textBox.Text, text, StringComparison.Ordinal))
+                    textBox.Text = text;
+            }
             else
                 return false;
 
@@ -584,6 +596,46 @@ namespace Nuri.WPF
                 return false;
             shape.Fill = (Brush?)value;
             return true;
+        }
+
+        private static bool TrySetAutoFocus(FrameworkElement element, object? value)
+        {
+            if (value is not bool autoFocus || !autoFocus)
+                return true;
+
+            element.Loaded += FocusWhenLoaded;
+            return true;
+        }
+
+        private static bool TrySetBringIntoView(FrameworkElement element, object? value)
+        {
+            if (value is not bool bringIntoView || !bringIntoView)
+                return true;
+
+            if (!element.IsLoaded)
+                element.Loaded += BringIntoViewWhenLoaded;
+            else
+                element.Dispatcher.BeginInvoke((Action)element.BringIntoView);
+
+            return true;
+        }
+
+        private static void FocusWhenLoaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement element)
+                return;
+
+            element.Loaded -= FocusWhenLoaded;
+            element.Dispatcher.BeginInvoke((Action)(() => element.Focus()));
+        }
+
+        private static void BringIntoViewWhenLoaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is not FrameworkElement element)
+                return;
+
+            element.Loaded -= BringIntoViewWhenLoaded;
+            element.Dispatcher.BeginInvoke((Action)element.BringIntoView);
         }
 
         private static bool TryClearFill(FrameworkElement element)

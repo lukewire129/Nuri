@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Nuri.UI.Events;
 using Nuri.UI.Values;
 
@@ -6,6 +7,15 @@ namespace Nuri.UI.Dsl
 {
     public static class ElementExtensions
     {
+        private static readonly HashSet<string> DefaultTransitionProperties = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "Background",
+            "Foreground",
+            "Margin",
+            "Opacity",
+            "Rotate"
+        };
+
         public static T Key<T>(this T node, string key) where T : IElement
         {
             node.Key = key;
@@ -110,13 +120,13 @@ namespace Nuri.UI.Dsl
             return node;
         }
 
-        public static T Padding<T>(this T node, double value) where T : IDiv
+        public static T Padding<T>(this T node, double value) where T : IElement
         {
             node.SetProperty("Padding", ThicknessValue.Uniform(value));
             return node;
         }
 
-        public static T Padding<T>(this T node, double left, double top, double right, double bottom) where T : IDiv
+        public static T Padding<T>(this T node, double left, double top, double right, double bottom) where T : IElement
         {
             node.SetProperty("Padding", new ThicknessValue(left, top, right, bottom));
             return node;
@@ -188,6 +198,18 @@ namespace Nuri.UI.Dsl
         public static T TextValue<T>(this T node, string text) where T : IInput
         {
             node.SetProperty("Text", text);
+            return node;
+        }
+
+        public static T AutoFocus<T>(this T node) where T : IElement
+        {
+            node.SetProperty("AutoFocus", true);
+            return node;
+        }
+
+        public static T BringIntoView<T>(this T node) where T : IElement
+        {
+            node.SetProperty("BringIntoView", true);
             return node;
         }
 
@@ -340,6 +362,14 @@ namespace Nuri.UI.Dsl
             return node;
         }
 
+        public static T OnKeyDown<T>(this T node, Action<KeyboardKey> handler) where T : IElement
+        {
+            var virtualEvent = new VirtualEvent(VirtualEventKind.KeyDown, handler);
+            node.AddVirtualEvent("PreviewKeyDown", virtualEvent);
+            node.AddVirtualEvent("KeyDown", virtualEvent);
+            return node;
+        }
+
         public static T Transitions<T>(this T node, string property, int milliseconds, EasingValue? easing = null) where T : IElement
         {
             AddTransition(node, property, TimeSpan.FromMilliseconds(milliseconds), easing);
@@ -354,10 +384,13 @@ namespace Nuri.UI.Dsl
 
         public static T Transition<T>(this T node, TimeSpan duration, EasingValue? easing = null) where T : IElement
         {
-            if (string.IsNullOrEmpty(node.LastPropertyName))
-                throw new InvalidOperationException("Transition() must be called after a property setter.");
+            foreach (var property in node.Properties)
+            {
+                if (!DefaultTransitionProperties.Contains(property.Key))
+                    continue;
 
-            AddTransition(node, node.LastPropertyName, duration, easing);
+                AddTransition(node, property.Key, property.Value, duration, easing);
+            }
 
             return node;
         }
@@ -365,7 +398,12 @@ namespace Nuri.UI.Dsl
         private static void AddTransition<T>(T node, string property, TimeSpan duration, EasingValue? easing) where T : IElement
         {
             if (node.Properties.TryGetValue(property, out var value))
-                node.AddAnimation(property, new AnimationValue(property, value, duration, easing));
+                AddTransition(node, property, value, duration, easing);
+        }
+
+        private static void AddTransition<T>(T node, string property, object? value, TimeSpan duration, EasingValue? easing) where T : IElement
+        {
+            node.AddAnimation(property, new AnimationValue(property, value, duration, easing));
         }
     }
 }

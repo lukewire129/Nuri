@@ -90,6 +90,16 @@ Each window gets its own `ApplicationRoot` and virtual tree prefix, so root upda
 
 Nuri performs dirty component subtree render/diff/patch when possible, with root rebuild as fallback.
 
+## Samples
+
+Run the Command Palette sample:
+
+```powershell
+dotnet run --project "samples\Nuri.CommandPaletteSample\Nuri.CommandPaletteSample.csproj" -c Release
+```
+
+The sample exercises controlled `TextBox` input, neutral keyboard events, filtered keyed list rendering, selection styling, Enter execution, Esc reset, and Overlay/Panel composition. See `samples/Nuri.CommandPaletteSample/README.md` for sample-specific Known Issues.
+
 ## Layout
 
 Use `Grid(...)` with fluent `.Rows(...)` and `.Columns(...)` when defining grid layout. This keeps layout definitions separate from visual children.
