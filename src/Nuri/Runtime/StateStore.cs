@@ -40,6 +40,21 @@ namespace Nuri.Runtime
             _store.Remove(componentId);
         }
 
+        public void TrimComponentState(string componentId, int usedHookCount)
+        {
+            if (!_store.TryGetValue(componentId, out var states))
+                return;
+
+            foreach (var index in new List<int>(states.Keys))
+            {
+                if (index >= usedHookCount)
+                    states.Remove(index);
+            }
+
+            if (states.Count == 0)
+                _store.Remove(componentId);
+        }
+
         public void Clear()
         {
             _store.Clear();

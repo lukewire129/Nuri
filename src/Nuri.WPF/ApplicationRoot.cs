@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Threading;
 using System.Threading;
 using Nuri.Runtime;
+using Nuri.UI;
 using Nuri.UI.Dsl;
 using Nuri.UI.Values;
 using Nuri.VirtualDom;
@@ -43,10 +44,12 @@ namespace Nuri.WPF
                 return;
 
             var renderResult = Runtime.CreateRebuild();
+            CleanupRemovedComponentState(renderResult.Operations);
             if (_mainWindow != null)
                 ApplyWindowProperties(_mainWindow, renderResult.VisualNode);
             WpfVirtualEntryRenderer.ApplyDiff(_currentRootVisual, renderResult.Operations);
             Runtime.Commit(renderResult);
+            Component.FlushPendingEffects();
         }
 
         public void DispatchRebuild()
@@ -80,6 +83,7 @@ namespace Nuri.WPF
 
             mainWindow.Content = rootVisual;
             _currentRootVisual = rootVisual;
+            Component.FlushPendingEffects();
         }
 
         public void ScheduleComponentRebuild(Component component)
@@ -146,12 +150,25 @@ namespace Nuri.WPF
             var newEntry = newVisual.ToVirtualEntry();
             var operations = VirtualTreeDiff.Diff(oldEntry, newEntry);
 
+            CleanupRemovedComponentState(operations);
+
             WpfVirtualEntryRenderer.ApplyDiff(_currentRootVisual, operations);
 
             if (Runtime.CurrentVirtualEntry.ReplaceDescendant(component.Id, newEntry))
                 Runtime.CommitVirtualEntry(Runtime.CurrentVirtualEntry);
             else
                 Rebuild();
+
+            Component.FlushPendingEffects();
+        }
+
+        private static void CleanupRemovedComponentState(IEnumerable<PatchOperation> operations)
+        {
+            foreach (var removeChild in operations.OfType<RemoveChildPatch>())
+                Component.DisposeHookState(removeChild.Child.Id);
+
+            foreach (var replaceEntry in operations.OfType<ReplaceEntryPatch>())
+                Component.DisposeHookState(replaceEntry.OldEntry.Id);
         }
 
         private static IEnumerable<Component> FilterCoveredDirtyComponents(IEnumerable<Component> dirtyComponents)
@@ -186,6 +203,7 @@ namespace Nuri.WPF
         {
             component.ResetStateIndexForRender();
             var renderedChild = component.Render();
+            component.CompleteRenderHooks();
 
             foreach (var property in component.Properties)
             {
@@ -215,6 +233,8 @@ namespace Nuri.WPF
         {
             if (_disposed)
                 return;
+
+            Component.DisposeHookState(_treePrefix + "_0");
             _disposed = true;
         }
     }

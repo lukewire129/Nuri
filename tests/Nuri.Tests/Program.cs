@@ -13,6 +13,10 @@ internal static class Program
         KeyedSlidingWindowPreservesRetainedChildIdentities();
         UseReducerDispatchesFromCurrentState();
         UseRefPreservesReferenceAcrossRenders();
+        UseLatestTracksTheCurrentValue();
+        UseMemoCachesUntilDependenciesChange();
+        UseEffectRunsAfterRenderAndCleansUpOnDependencyChange();
+        RemovingHooksFromARenderCleansUpTheirState();
         TransitionAppliesToAllConfiguredProperties();
         Console.WriteLine("Nuri.Tests passed.");
     }
@@ -111,6 +115,69 @@ internal static class Program
         AssertEqual(42, secondRef.Current, "useRef should preserve mutable current value across renders.");
     }
 
+    private static void UseLatestTracksTheCurrentValue()
+    {
+        var component = new HookProbe { Id = "hook-latest" };
+
+        var firstRef = component.UseLatestNumber(1);
+        component.ResetStateIndexForRender();
+        var secondRef = component.UseLatestNumber(42);
+
+        AssertEqual(true, ReferenceEquals(firstRef, secondRef), "useLatest should preserve reference identity across renders.");
+        AssertEqual(42, secondRef.Current, "useLatest should update the current value each render.");
+    }
+
+    private static void UseMemoCachesUntilDependenciesChange()
+    {
+        var component = new HookProbe { Id = "hook-memo" };
+
+        var firstValue = component.UseMemoValue("alpha");
+        component.ResetStateIndexForRender();
+        var secondValue = component.UseMemoValue("alpha");
+        AssertEqual(1, component.MemoFactoryCallCount, "useMemo should cache within the same dependency set.");
+        AssertEqual(firstValue, secondValue, "useMemo should return the cached value when dependencies do not change.");
+
+        component.ResetStateIndexForRender();
+        var thirdValue = component.UseMemoValue("beta");
+        AssertEqual(2, component.MemoFactoryCallCount, "useMemo should recompute when dependencies change.");
+        AssertNotEqual(secondValue, thirdValue, "useMemo should return a new value after dependency changes.");
+    }
+
+    private static void UseEffectRunsAfterRenderAndCleansUpOnDependencyChange()
+    {
+        var component = new HookProbe { Id = "hook-effect" };
+
+        component.RegisterEffect("alpha");
+        component.FlushEffects();
+        AssertEqual("run:alpha", component.EffectLog[0], "useEffect should run after render flush.");
+
+        component.ResetStateIndexForRender();
+        component.RegisterEffect("alpha");
+        component.FlushEffects();
+        AssertEqual(1, component.EffectLog.Count, "useEffect should skip rerun when dependencies do not change.");
+
+        component.ResetStateIndexForRender();
+        component.RegisterEffect("beta");
+        component.FlushEffects();
+        AssertEqual("cleanup:alpha", component.EffectLog[1], "useEffect should clean up before rerunning on dependency changes.");
+        AssertEqual("run:beta", component.EffectLog[2], "useEffect should rerun after dependency changes.");
+    }
+
+    private static void RemovingHooksFromARenderCleansUpTheirState()
+    {
+        var component = new HookProbe { Id = "hook-trim" };
+
+        component.RegisterConditionalEffects(includeSecond: true);
+        component.CompleteHooks();
+        component.FlushEffects();
+
+        component.ResetStateIndexForRender();
+        component.RegisterConditionalEffects(includeSecond: false);
+        component.CompleteHooks();
+
+        AssertEqual("cleanup:second", component.EffectLog.Last(), "Removing a hook slot should dispose its cleanup immediately.");
+    }
+
     private static void TransitionAppliesToAllConfiguredProperties()
     {
         var element = Component.Grid()
@@ -165,6 +232,10 @@ internal static class Program
 
     private sealed class HookProbe : Component
     {
+        public int MemoFactoryCallCount { get; private set; }
+
+        public List<string> EffectLog { get; } = new List<string>();
+
         public (int state, Action<int> dispatch) UseCounter()
         {
             return useReducer<int, int>((state, action) => state + action, 0);
@@ -173,6 +244,47 @@ internal static class Program
         public Ref<int> UseNumberRef()
         {
             return useRef(1);
+        }
+
+        public Ref<int> UseLatestNumber(int value)
+        {
+            return useLatest(value);
+        }
+
+        public string UseMemoValue(string value)
+        {
+            return useMemo(() =>
+            {
+                MemoFactoryCallCount++;
+                return value + ":" + MemoFactoryCallCount;
+            }, value);
+        }
+
+        public void RegisterEffect(string value)
+        {
+            useEffect(() =>
+            {
+                EffectLog.Add("run:" + value);
+                return () => EffectLog.Add("cleanup:" + value);
+            }, value);
+        }
+
+        public void FlushEffects()
+        {
+            FlushPendingEffectsForRender();
+        }
+
+        public void RegisterConditionalEffects(bool includeSecond)
+        {
+            useEffect(() => () => EffectLog.Add("cleanup:first"), "first");
+
+            if (includeSecond)
+                useEffect(() => () => EffectLog.Add("cleanup:second"), "second");
+        }
+
+        public void CompleteHooks()
+        {
+            CompleteHookRender();
         }
 
         public override IElement Render()

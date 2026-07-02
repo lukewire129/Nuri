@@ -20,8 +20,7 @@ public sealed class CommandPaletteComponent : Component
     public override IElement Render()
     {
         var (state, setState) = useState(new PaletteState(string.Empty, 0, "Type to filter commands."));
-        var stateRef = useRef(state);
-        stateRef.Current = state;
+        var stateRef = useLatest(state);
 
         void UpdateState(Func<PaletteState, PaletteState> update)
         {
@@ -98,7 +97,7 @@ public sealed class CommandPaletteComponent : Component
             }
         }
 
-        var filteredCommands = Filter(state.Query);
+        var filteredCommands = useMemo(() => Filter(state.Query), state.Query);
         var selectedIndex = Math.Clamp(state.SelectedIndex, 0, Math.Max(filteredCommands.Length - 1, 0));
 
         return Div(

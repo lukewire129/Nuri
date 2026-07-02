@@ -44,6 +44,7 @@ namespace Nuri.WPF
         {
             component.ResetStateIndexForRender();
             var rendered = component.Render();
+            component.CompleteRenderHooks();
 
             foreach (var property in component.Properties)
             {

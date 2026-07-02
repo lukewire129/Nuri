@@ -20,5 +20,20 @@ namespace Nuri.UI.Dsl
         public override void Dispose()
         {
         }
+
+        public static void FlushPendingEffects()
+        {
+            FlushPendingEffectsForRender();
+        }
+
+        public static void DisposeHookState(string rootComponentId)
+        {
+            DisposeHookStateForSubtree(rootComponentId);
+        }
+
+        public void CompleteRenderHooks()
+        {
+            CompleteHookRender();
+        }
     }
 }
