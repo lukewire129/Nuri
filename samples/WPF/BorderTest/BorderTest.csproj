@@ -9,6 +9,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Nuri.WPF\Nuri.WPF.csproj" />
+    <ProjectReference Include="..\..\..\src\Nuri.WPF\Nuri.WPF.csproj" />
   </ItemGroup>
 </Project>
