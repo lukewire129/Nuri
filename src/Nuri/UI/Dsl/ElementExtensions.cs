@@ -47,14 +47,12 @@ namespace Nuri.UI.Dsl
             node.Height(height);
             return node;
         }
-
         public static T Margin<T>(this T node, double value) where T : IElement
         {
-            node.SetProperty("Margin", ThicknessValue.Uniform(value));
+            node.SetProperty ("Margin", ThicknessValue.Uniform (value));
             return node;
         }
-
-        public static T Margin<T>(this T node, double left, double top, double right, double bottom) where T : IElement
+        public static T Margin<T>(this T node, double left=0, double top = 0, double right = 0, double bottom =0) where T : IElement
         {
             node.SetProperty("Margin", new ThicknessValue(left, top, right, bottom));
             return node;
@@ -144,34 +142,34 @@ namespace Nuri.UI.Dsl
             return node;
         }
 
-        public static T Brush<T>(this T node, BrushValue brush) where T : IDiv
+        public static T Brush<T>(this T node, BrushValue brush) where T : IVisual
         {
             node.SetProperty("BorderBrush", brush);
             EnsureBorderThickness(node);
             return node;
         }
 
-        public static T Brush<T>(this T node, ColorValue color) where T : IDiv
+        public static T Brush<T>(this T node, ColorValue color) where T : IVisual
         {
             node.SetProperty("BorderBrush", new BrushValue.Solid(color));
             EnsureBorderThickness(node);
             return node;
         }
 
-        public static T Brush<T>(this T node, string colorCode) where T : IDiv
+        public static T Brush<T>(this T node, string colorCode) where T : IVisual
         {
             node.SetProperty("BorderBrush", new BrushValue.Solid(ColorValue.FromHex(colorCode)));
             EnsureBorderThickness(node);
             return node;
         }
 
-        public static T Thickness<T>(this T node, double value) where T : IDiv
+        public static T Thickness<T>(this T node, double value) where T : IVisual
         {
             node.SetProperty("BorderThickness", ThicknessValue.Uniform(value));
             return node;
         }
 
-        public static T Thickness<T>(this T node, double left, double top, double right, double bottom) where T : IDiv
+        public static T Thickness<T>(this T node, double left = 0, double top = 0, double right = 0, double bottom = 0) where T : IVisual
         {
             node.SetProperty("BorderThickness", new ThicknessValue(left, top, right, bottom));
             return node;
@@ -213,7 +211,7 @@ namespace Nuri.UI.Dsl
             return node;
         }
 
-        private static void EnsureBorderThickness(IDiv node)
+        private static void EnsureBorderThickness(IVisual node)
         {
             if (!node.TryGetValue("BorderThickness", out _))
                 node.Thickness(1);
