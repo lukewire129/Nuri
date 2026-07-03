@@ -9,7 +9,7 @@ using Nuri.UI.Dsl;
 
 namespace Nuri.Avalonia
 {
-    public static class NuriAvaloniaApplication
+    public static class NuriApplication
     {
         private static readonly object SyncRoot = new object();
         private static readonly List<AvaloniaApplicationRoot> Roots = new List<AvaloniaApplicationRoot>();
@@ -130,7 +130,7 @@ namespace Nuri.Avalonia
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 var window = new Window();
-                NuriAvaloniaApplication.Attach(window, _rootElement);
+                NuriApplication.Attach(window, _rootElement);
                 desktop.MainWindow = window;
             }
 

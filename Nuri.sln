@@ -6,21 +6,21 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "samples", "samples", "{E3D2
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nuri.WPF", "src\Nuri.WPF\Nuri.WPF.csproj", "{0606E1EB-EF00-4C3E-ABF0-3D9D67C2BE1F}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NuriSample", "samples\NuriSample\NuriSample.csproj", "{736071D7-49CA-40C6-9E98-5BC6F1B2265C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NuriSample", "samples\WPF\NuriSample\NuriSample.csproj", "{736071D7-49CA-40C6-9E98-5BC6F1B2265C}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nuri.CommandPaletteSample", "samples\Nuri.CommandPaletteSample\Nuri.CommandPaletteSample.csproj", "{E6599706-2139-4865-8A46-C2A663304773}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nuri.CommandPaletteSample", "samples\WPF\Nuri.CommandPaletteSample\Nuri.CommandPaletteSample.csproj", "{E6599706-2139-4865-8A46-C2A663304773}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nuri.TodoNotesSample", "samples\Nuri.TodoNotesSample\Nuri.TodoNotesSample.csproj", "{EFC5EB6E-8CEA-4059-B1FA-46F41C966165}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nuri.TodoNotesSample", "samples\WPF\Nuri.TodoNotesSample\Nuri.TodoNotesSample.csproj", "{EFC5EB6E-8CEA-4059-B1FA-46F41C966165}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GridTest", "samples\GridTest\GridTest.csproj", "{22013BD4-9CD1-4C3A-985E-A35CCBBBDA84}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GridTest", "samples\WPF\GridTest\GridTest.csproj", "{22013BD4-9CD1-4C3A-985E-A35CCBBBDA84}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nuri.Template", "src\Nuri.Template\Nuri.Template.csproj", "{352F812F-2401-4F63-9240-2C2DF1951739}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DiffingEngineTest", "samples\DiffingEngineTest\DiffingEngineTest.csproj", "{B8DDCBD6-F7C4-4C38-B433-C0F18FB0C513}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DiffingEngineTest", "samples\WPF\DiffingEngineTest\DiffingEngineTest.csproj", "{B8DDCBD6-F7C4-4C38-B433-C0F18FB0C513}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ContentControlChildrenTest", "samples\ContentControlChildrenTest\ContentControlChildrenTest.csproj", "{727FE581-AA80-44F5-B8EF-39E92DA28391}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ContentControlChildrenTest", "samples\WPF\ContentControlChildrenTest\ContentControlChildrenTest.csproj", "{727FE581-AA80-44F5-B8EF-39E92DA28391}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BorderTest", "samples\BorderTest\BorderTest.csproj", "{15AE229C-8729-4F81-9DDB-28A18171C80A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BorderTest", "samples\WPF\BorderTest\BorderTest.csproj", "{15AE229C-8729-4F81-9DDB-28A18171C80A}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Live", "Live", "{C86FABC7-B6A2-41F1-BD9F-2F200C4E2A95}"
 EndProject
@@ -36,7 +36,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nuri.WPFPerformance", "perf
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nuri.Avalonia", "src\Nuri.Avalonia\Nuri.Avalonia.csproj", "{1A68F3F9-9BAB-4F7C-95D9-45D2236974DD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nuri.AvaloniaHotReloadSample", "samples\Nuri.AvaloniaHotReloadSample\Nuri.AvaloniaHotReloadSample.csproj", "{62EA90A8-9159-4CE6-B540-81FD1BC15BEC}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nuri.AvaloniaHotReloadSample", "samples\Avalonia\Nuri.AvaloniaHotReloadSample\Nuri.AvaloniaHotReloadSample.csproj", "{62EA90A8-9159-4CE6-B540-81FD1BC15BEC}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nuri.Tests", "tests\Nuri.Tests\Nuri.Tests.csproj", "{5AFDCE88-88EB-4E90-AE31-6E88E28B4B77}"
 EndProject

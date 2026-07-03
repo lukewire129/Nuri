@@ -8,6 +8,6 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
-        NuriAvaloniaApplication.Run<HotReloadProbeComponent>(args, "Nuri Avalonia Hot Reload", width: 760, height: 520);
+        NuriApplication.Run<HotReloadProbeComponent>(args, "Nuri Avalonia Hot Reload", width: 760, height: 520);
     }
 }
