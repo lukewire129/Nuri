@@ -14,7 +14,7 @@ Add Core features only after a sample makes the need obvious and repeatable.
 
 ## Current Samples
 
-- `NuriSample`: general starter sample
+- `RouterSample`: component composition and nested router sample
 - `GridTest`: layout and click basics
 - `BorderTest`: border and styling basics
 - `ContentControlChildrenTest`: content/child handling

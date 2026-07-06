@@ -1,3 +1,4 @@
+using Nuri.Constants;
 using Nuri.VirtualDom;
 using Nuri.UI.Values;
 using System;
@@ -305,12 +306,12 @@ namespace Nuri.WPF
                 return;
             }
 
-            if (propertyName == "Background" && TryBeginBackgroundAnimation(element, animation))
+            if (propertyName == PropertyKeys.Background && TryBeginBackgroundAnimation(element, animation))
             {
                 return;
             }
 
-            if (propertyName == "Foreground" && TryBeginForegroundAnimation(element, animation))
+            if (propertyName == PropertyKeys.Foreground && TryBeginForegroundAnimation(element, animation))
             {
                 return;
             }

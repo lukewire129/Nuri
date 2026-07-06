@@ -1,4 +1,5 @@
 using System;
+using Nuri.Constants;
 using Nuri.UI.Events;
 using System.Windows;
 using System.Windows.Controls;
@@ -38,19 +39,19 @@ namespace Nuri.WPF
             switch (virtualEvent.Kind)
             {
                 case VirtualEventKind.Click:
-                    if (eventName == "MouseLeftButtonDown")
+                    if (eventName == EventKeys.MouseLeftButtonDown)
                     {
-                        wpfEventName = "MouseLeftButtonDown";
+                        wpfEventName = EventKeys.MouseLeftButtonDown;
                         handler = new MouseButtonEventHandler((s, e) => Invoke(virtualEvent.Handler));
                     }
                     else
                     {
-                        wpfEventName = "Click";
+                        wpfEventName = EventKeys.Click;
                         handler = new RoutedEventHandler((s, e) => Invoke(virtualEvent.Handler));
                     }
                     return true;
                 case VirtualEventKind.TextChanged:
-                    wpfEventName = "TextChanged";
+                    wpfEventName = EventKeys.TextChanged;
                     handler = new TextChangedEventHandler((s, e) =>
                     {
                         if (s is TextBox textBox)
@@ -58,7 +59,7 @@ namespace Nuri.WPF
                     });
                     return true;
                 case VirtualEventKind.ContentChanged:
-                    wpfEventName = "ContentChanged";
+                    wpfEventName = EventKeys.ContentChanged;
                     handler = new RoutedEventHandler((s, e) =>
                     {
                         if (s is System.Windows.Controls.ContentControl contentControl)
@@ -79,10 +80,10 @@ namespace Nuri.WPF
                     return true;
                 case VirtualEventKind.HoverChanged:
                     wpfEventName = eventName;
-                    handler = new MouseEventHandler((s, e) => Invoke(virtualEvent.Handler, eventName == "MouseEnter"));
+                    handler = new MouseEventHandler((s, e) => Invoke(virtualEvent.Handler, eventName == EventKeys.MouseEnter));
                     return true;
                 case VirtualEventKind.KeyDown:
-                    wpfEventName = eventName == "PreviewKeyDown" ? "PreviewKeyDown" : "KeyDown";
+                    wpfEventName = eventName == EventKeys.PreviewKeyDown ? EventKeys.PreviewKeyDown : EventKeys.KeyDown;
                     handler = new KeyEventHandler((s, e) =>
                     {
                         var key = ToKeyboardKey(e);

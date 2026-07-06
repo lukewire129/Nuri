@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Nuri.Constants;
 using Nuri.UI.Events;
 using Nuri.UI.Values;
 
@@ -9,8 +10,8 @@ namespace Nuri.UI.Dsl
     {
         private static readonly HashSet<string> DefaultTransitionProperties = new HashSet<string>(StringComparer.Ordinal)
         {
-            "Background",
-            "Foreground",
+            PropertyKeys.Background,
+            PropertyKeys.Foreground,
             "Margin",
             "Opacity",
             "Rotate"
@@ -25,19 +26,19 @@ namespace Nuri.UI.Dsl
         public static T Name<T>(this T node, string name) where T : IElement
         {
             node.Name = name;
-            node.SetProperty("Name", name);
+            node.SetProperty(PropertyKeys.Name, name);
             return node;
         }
 
         public static T Width<T>(this T node, double value) where T : IElement
         {
-            node.SetProperty("Width", value);
+            node.SetProperty(PropertyKeys.Width, value);
             return node;
         }
 
         public static T Height<T>(this T node, double value) where T : IElement
         {
-            node.SetProperty("Height", value);
+            node.SetProperty(PropertyKeys.Height, value);
             return node;
         }
 
@@ -60,31 +61,31 @@ namespace Nuri.UI.Dsl
 
         public static T Background<T>(this T node, ColorValue color) where T : IElement
         {
-            node.SetProperty("Background", new BrushValue.Solid(color));
+            node.SetProperty(PropertyKeys.Background, new BrushValue.Solid(color));
             return node;
         }
 
         public static T Background<T>(this T node, string colorCode) where T : IElement
         {
-            node.SetProperty("Background", new BrushValue.Solid(ColorValue.FromHex(colorCode)));
+            node.SetProperty(PropertyKeys.Background, new BrushValue.Solid(ColorValue.FromHex(colorCode)));
             return node;
         }
 
         public static T Background<T>(this T node, BrushValue brush) where T : IElement
         {
-            node.SetProperty("Background", brush);
+            node.SetProperty(PropertyKeys.Background, brush);
             return node;
         }
 
         public static T FontColor<T>(this T node, ColorValue color) where T : IElement
         {
-            node.SetProperty("Foreground", new BrushValue.Solid(color));
+            node.SetProperty(PropertyKeys.Foreground, new BrushValue.Solid(color));
             return node;
         }
 
         public static T FontColor<T>(this T node, string colorCode) where T : IElement
         {
-            node.SetProperty("Foreground", new BrushValue.Solid(ColorValue.FromHex(colorCode)));
+            node.SetProperty(PropertyKeys.Foreground, new BrushValue.Solid(ColorValue.FromHex(colorCode)));
             return node;
         }
 
@@ -195,19 +196,25 @@ namespace Nuri.UI.Dsl
 
         public static T TextValue<T>(this T node, string text) where T : IInput
         {
-            node.SetProperty("Text", text);
+            node.SetProperty(PropertyKeys.Text, text);
+            return node;
+        }
+
+        public static T Checked<T>(this T node, bool value) where T : IInput
+        {
+            node.SetProperty(PropertyKeys.IsChecked, value);
             return node;
         }
 
         public static T AutoFocus<T>(this T node) where T : IElement
         {
-            node.SetProperty("AutoFocus", true);
+            node.SetProperty(PropertyKeys.AutoFocus, true);
             return node;
         }
 
         public static T BringIntoView<T>(this T node) where T : IElement
         {
-            node.SetProperty("BringIntoView", true);
+            node.SetProperty(PropertyKeys.BringIntoView, true);
             return node;
         }
 
@@ -329,42 +336,42 @@ namespace Nuri.UI.Dsl
 
         public static T OnClick<T>(this T node, Action handler) where T : IElement
         {
-            var eventName = node is IInput ? "Click" : "MouseLeftButtonDown";
+            var eventName = node is IInput ? EventKeys.Click : EventKeys.MouseLeftButtonDown;
             node.AddVirtualEvent(eventName, new VirtualEvent(VirtualEventKind.Click, handler));
             return node;
         }
 
         public static T OnTextChanged<T>(this T node, Action<string> handler) where T : IInput
         {
-            node.AddVirtualEvent("TextChanged", new VirtualEvent(VirtualEventKind.TextChanged, handler));
+            node.AddVirtualEvent(EventKeys.TextChanged, new VirtualEvent(VirtualEventKind.TextChanged, handler));
             return node;
         }
 
         public static T OnContentChanged<T>(this T node, Action<object> handler) where T : IContent
         {
-            node.AddVirtualEvent("ContentChanged", new VirtualEvent(VirtualEventKind.ContentChanged, handler));
+            node.AddVirtualEvent(EventKeys.ContentChanged, new VirtualEvent(VirtualEventKind.ContentChanged, handler));
             return node;
         }
 
         public static T OnCheckChanged<T>(this T node, Action<bool> handler) where T : IInput
         {
-            node.AddVirtualEvent("Checked", new VirtualEvent(VirtualEventKind.CheckChanged, handler));
-            node.AddVirtualEvent("Unchecked", new VirtualEvent(VirtualEventKind.CheckChanged, handler));
+            node.AddVirtualEvent(EventKeys.Checked, new VirtualEvent(VirtualEventKind.CheckChanged, handler));
+            node.AddVirtualEvent(EventKeys.Unchecked, new VirtualEvent(VirtualEventKind.CheckChanged, handler));
             return node;
         }
 
         public static T OnHover<T>(this T node, Action<bool> handler) where T : IElement
         {
-            node.AddVirtualEvent("MouseEnter", new VirtualEvent(VirtualEventKind.HoverChanged, handler));
-            node.AddVirtualEvent("MouseLeave", new VirtualEvent(VirtualEventKind.HoverChanged, handler));
+            node.AddVirtualEvent(EventKeys.MouseEnter, new VirtualEvent(VirtualEventKind.HoverChanged, handler));
+            node.AddVirtualEvent(EventKeys.MouseLeave, new VirtualEvent(VirtualEventKind.HoverChanged, handler));
             return node;
         }
 
         public static T OnKeyDown<T>(this T node, Action<KeyboardKey> handler) where T : IElement
         {
             var virtualEvent = new VirtualEvent(VirtualEventKind.KeyDown, handler);
-            node.AddVirtualEvent("PreviewKeyDown", virtualEvent);
-            node.AddVirtualEvent("KeyDown", virtualEvent);
+            node.AddVirtualEvent(EventKeys.PreviewKeyDown, virtualEvent);
+            node.AddVirtualEvent(EventKeys.KeyDown, virtualEvent);
             return node;
         }
 

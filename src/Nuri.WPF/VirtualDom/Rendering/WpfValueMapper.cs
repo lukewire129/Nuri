@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Nuri.Constants;
 using Nuri.UI.Values;
 using System.Windows;
 using System.Windows.Controls;
@@ -75,8 +76,8 @@ namespace Nuri.WPF
                         Duration = duration,
                         EasingFunction = easing
                     };
-                case "Background":
-                case "Foreground":
+                case PropertyKeys.Background:
+                case PropertyKeys.Foreground:
                     return new ColorAnimation
                     {
                         From = from == null ? null : ExtractColor(from),

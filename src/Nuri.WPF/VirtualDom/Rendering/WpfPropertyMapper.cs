@@ -1,10 +1,12 @@
 using System;
+using Nuri.Constants;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
+using System.Windows.Controls.Primitives;
 using WpfBorder = System.Windows.Controls.Border;
 using WpfContentControl = System.Windows.Controls.ContentControl;
 using WpfPanel = System.Windows.Controls.Panel;
@@ -19,16 +21,16 @@ namespace Nuri.WPF
         {
             switch (propertyName)
             {
-                case "Width":
+                case PropertyKeys.Width:
                     element.Width = ToDouble(value);
                     return true;
-                case "Height":
+                case PropertyKeys.Height:
                     element.Height = ToDouble(value);
                     return true;
                 case "Margin":
                     element.Margin = (Thickness)value!;
                     return true;
-                case "Name":
+                case PropertyKeys.Name:
                     element.Name = (string)value!;
                     return true;
                 case "Tag":
@@ -46,9 +48,9 @@ namespace Nuri.WPF
                 case "VerticalAlignment":
                     element.VerticalAlignment = (VerticalAlignment)value!;
                     return true;
-                case "Background":
+                case PropertyKeys.Background:
                     return TrySetBackground(element, value);
-                case "Foreground":
+                case PropertyKeys.Foreground:
                     return TrySetForeground(element, value);
                 case "FontSize":
                     return TrySetFontSize(element, value);
@@ -64,8 +66,10 @@ namespace Nuri.WPF
                     return TrySetBorderThickness(element, value);
                 case "CornerRadius":
                     return TrySetCornerRadius(element, value);
-                case "Text":
+                case PropertyKeys.Text:
                     return TrySetText(element, value);
+                case PropertyKeys.IsChecked:
+                    return TrySetIsChecked(element, value);
                 case "Content":
                     return TrySetContent(element, value);
                 case "Source":
@@ -86,9 +90,9 @@ namespace Nuri.WPF
                     return TrySetStrokeThickness(element, value);
                 case "Fill":
                     return TrySetFill(element, value);
-                case "AutoFocus":
+                case PropertyKeys.AutoFocus:
                     return TrySetAutoFocus(element, value);
-                case "BringIntoView":
+                case PropertyKeys.BringIntoView:
                     return TrySetBringIntoView(element, value);
                 default:
                     return false;
@@ -99,16 +103,16 @@ namespace Nuri.WPF
         {
             switch (propertyName)
             {
-                case "Width":
+                case PropertyKeys.Width:
                     element.ClearValue(FrameworkElement.WidthProperty);
                     return true;
-                case "Height":
+                case PropertyKeys.Height:
                     element.ClearValue(FrameworkElement.HeightProperty);
                     return true;
                 case "Margin":
                     element.ClearValue(FrameworkElement.MarginProperty);
                     return true;
-                case "Name":
+                case PropertyKeys.Name:
                     element.ClearValue(FrameworkElement.NameProperty);
                     return true;
                 case "Tag":
@@ -126,9 +130,9 @@ namespace Nuri.WPF
                 case "VerticalAlignment":
                     element.ClearValue(FrameworkElement.VerticalAlignmentProperty);
                     return true;
-                case "Background":
+                case PropertyKeys.Background:
                     return TryClearBackground(element);
-                case "Foreground":
+                case PropertyKeys.Foreground:
                     return TryClearForeground(element);
                 case "FontSize":
                     return TryClearFontSize(element);
@@ -144,8 +148,10 @@ namespace Nuri.WPF
                     return TryClearBorderThickness(element);
                 case "CornerRadius":
                     return TryClearCornerRadius(element);
-                case "Text":
+                case PropertyKeys.Text:
                     return TryClearText(element);
+                case PropertyKeys.IsChecked:
+                    return TryClearIsChecked(element);
                 case "Content":
                     return TryClearContent(element);
                 case "Source":
@@ -166,9 +172,9 @@ namespace Nuri.WPF
                     return TryClearStrokeThickness(element);
                 case "Fill":
                     return TryClearFill(element);
-                case "AutoFocus":
+                case PropertyKeys.AutoFocus:
                     return true;
-                case "BringIntoView":
+                case PropertyKeys.BringIntoView:
                     return true;
                 default:
                     return false;
@@ -424,6 +430,24 @@ namespace Nuri.WPF
             else
                 return false;
 
+            return true;
+        }
+
+        private static bool TrySetIsChecked(FrameworkElement element, object? value)
+        {
+            if (element is not ToggleButton toggleButton)
+                return false;
+
+            toggleButton.IsChecked = value is bool isChecked && isChecked;
+            return true;
+        }
+
+        private static bool TryClearIsChecked(FrameworkElement element)
+        {
+            if (element is not ToggleButton toggleButton)
+                return false;
+
+            toggleButton.ClearValue(ToggleButton.IsCheckedProperty);
             return true;
         }
 

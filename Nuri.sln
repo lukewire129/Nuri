@@ -6,7 +6,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "samples", "samples", "{E3D2
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nuri.WPF", "src\Nuri.WPF\Nuri.WPF.csproj", "{0606E1EB-EF00-4C3E-ABF0-3D9D67C2BE1F}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NuriSample", "samples\WPF\NuriSample\NuriSample.csproj", "{736071D7-49CA-40C6-9E98-5BC6F1B2265C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RouterSample", "samples\WPF\RouterSample\RouterSample.csproj", "{736071D7-49CA-40C6-9E98-5BC6F1B2265C}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nuri.CommandPaletteSample", "samples\WPF\Nuri.CommandPaletteSample\Nuri.CommandPaletteSample.csproj", "{E6599706-2139-4865-8A46-C2A663304773}"
 EndProject
