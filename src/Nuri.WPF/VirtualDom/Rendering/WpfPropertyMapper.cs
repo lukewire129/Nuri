@@ -413,7 +413,17 @@ namespace Nuri.WPF
             {
                 var text = (string?)value ?? string.Empty;
                 if (!string.Equals(textBox.Text, text, StringComparison.Ordinal))
-                    textBox.Text = text;
+                {
+                    textBox.SetSuppressChangeEvents(true);
+                    try
+                    {
+                        textBox.Text = text;
+                    }
+                    finally
+                    {
+                        textBox.SetSuppressChangeEvents(false);
+                    }
+                }
             }
             else
                 return false;
@@ -438,7 +448,20 @@ namespace Nuri.WPF
             if (element is not ToggleButton toggleButton)
                 return false;
 
-            toggleButton.IsChecked = value is bool isChecked && isChecked;
+            var nextValue = value is bool isChecked && isChecked;
+            if (toggleButton.IsChecked != nextValue)
+            {
+                toggleButton.SetSuppressChangeEvents(true);
+                try
+                {
+                    toggleButton.IsChecked = nextValue;
+                }
+                finally
+                {
+                    toggleButton.SetSuppressChangeEvents(false);
+                }
+            }
+
             return true;
         }
 

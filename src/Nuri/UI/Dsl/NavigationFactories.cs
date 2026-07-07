@@ -15,9 +15,19 @@ namespace Nuri.UI.Dsl
             return new Router(currentRoute, routes);
         }
 
+        public static Router Router(NavigationState navigationState, params RouteDefinition[] routes)
+        {
+            return new Router(navigationState, routes);
+        }
+
         public static Router Router(string currentRoute, Func<IElement> notFound, params RouteDefinition[] routes)
         {
             return new Router(currentRoute, notFound, routes);
+        }
+
+        public static Router Router(NavigationState navigationState, Func<IElement> notFound, params RouteDefinition[] routes)
+        {
+            return new Router(navigationState, notFound, routes);
         }
     }
 }

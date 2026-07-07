@@ -7,7 +7,7 @@ namespace Nuri.Runtime.Invalidation
 {
     public sealed class ComponentInvalidationQueue
     {
-        private readonly List<Component> _dirtyComponents = new List<Component>();
+        private readonly List<ComponentInvalidation> _dirtyComponents = new List<ComponentInvalidation>();
 
         public bool HasPending => _dirtyComponents.Count > 0;
 
@@ -16,23 +16,23 @@ namespace Nuri.Runtime.Invalidation
             if (component == null)
                 throw new ArgumentNullException(nameof(component));
 
-            if (!_dirtyComponents.Any(dirty => ReferenceEquals(dirty, component)))
-                _dirtyComponents.Add(component);
+            if (!_dirtyComponents.Any(dirty => ReferenceEquals(dirty.Component, component) && string.Equals(dirty.ComponentId, component.Id, StringComparison.Ordinal)))
+                _dirtyComponents.Add(new ComponentInvalidation(component, component.Id));
         }
 
-        public IReadOnlyList<Component> DrainCoveredByParents()
+        public IReadOnlyList<ComponentInvalidation> DrainCoveredByParents()
         {
             var ordered = _dirtyComponents
-                .Where(component => !string.IsNullOrEmpty(component.Id))
-                .OrderBy(component => component.Id.Length)
+                .Where(component => !string.IsNullOrEmpty(component.ComponentId))
+                .OrderBy(component => component.ComponentId.Length)
                 .ToList();
 
             _dirtyComponents.Clear();
 
-            var result = new List<Component>();
+            var result = new List<ComponentInvalidation>();
             foreach (var component in ordered)
             {
-                if (!result.Any(parent => IsDescendantId(component.Id, parent.Id)))
+                if (!result.Any(parent => IsDescendantId(component.ComponentId, parent.ComponentId)))
                     result.Add(component);
             }
 
@@ -44,5 +44,18 @@ namespace Nuri.Runtime.Invalidation
             return childId.Length > parentId.Length
                 && childId.StartsWith(parentId + "_", StringComparison.Ordinal);
         }
+    }
+
+    public sealed class ComponentInvalidation
+    {
+        public ComponentInvalidation(Component component, string componentId)
+        {
+            Component = component ?? throw new ArgumentNullException(nameof(component));
+            ComponentId = componentId ?? string.Empty;
+        }
+
+        public Component Component { get; }
+
+        public string ComponentId { get; }
     }
 }

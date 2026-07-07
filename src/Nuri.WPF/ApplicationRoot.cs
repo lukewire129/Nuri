@@ -100,29 +100,32 @@ namespace Nuri.WPF
             if (dirtyComponents.Count == 0)
                 return;
 
-            foreach (var component in dirtyComponents)
-                Rebuild(component);
+            foreach (var invalidation in dirtyComponents)
+                Rebuild(invalidation.Component, invalidation.ComponentId);
         }
 
-        private void Rebuild(Component component)
+        private void Rebuild(Component component, string componentId)
         {
-            if (string.Equals(component.Id, Runtime.CurrentVirtualEntry.Id, StringComparison.Ordinal))
+            if (string.Equals(componentId, Runtime.CurrentVirtualEntry.Id, StringComparison.Ordinal))
             {
                 Rebuild();
                 return;
             }
 
-            var oldEntry = Runtime.CurrentVirtualEntry.FindById(component.Id);
+            var oldEntry = Runtime.CurrentVirtualEntry.FindByComponentId(componentId)
+                ?? Runtime.CurrentVirtualEntry.FindById(componentId);
             if (oldEntry == null)
             {
                 Rebuild();
                 return;
             }
 
-            var newVisual = RenderComponentSubtree(component);
+            var newVisual = RenderComponentSubtree(component, componentId, oldEntry.ParentId);
             var newEntry = newVisual.ToVirtualEntry();
-            if (!Coordinator.RebuildSubtree(oldEntry, newEntry, component.Id))
+            if (!Coordinator.RebuildSubtree(oldEntry, newEntry, componentId))
+            {
                 Rebuild();
+            }
         }
 
         private bool IsInThisTree(Component component)
@@ -131,8 +134,10 @@ namespace Nuri.WPF
                 && component.Id.StartsWith(_treePrefix + "_", StringComparison.Ordinal);
         }
 
-        private static IElement RenderComponentSubtree(Component component)
+        private static IElement RenderComponentSubtree(Component component, string componentId, string? parentId)
         {
+            component.Id = componentId;
+            component.ParentId = parentId ?? string.Empty;
             component.ResetStateIndexForRender();
             var renderedChild = component.Render();
             component.CompleteRenderHooks();
@@ -143,10 +148,18 @@ namespace Nuri.WPF
                     renderedChild.Properties[property.Key] = property.Value;
             }
 
+            var renderedId = GetRenderedRootId(component, renderedChild);
             renderedChild.ParentId = component.ParentId;
-            renderedChild.Id = component.Id;
-            Nuri.UI.ElementTree<IElement, AnimationValue>.AssignDescendantIds(component.Id, renderedChild);
+            renderedChild.Id = renderedId;
+            Nuri.UI.ElementTree<IElement, AnimationValue>.AssignDescendantIds(renderedId, renderedChild);
             return renderedChild;
+        }
+
+        private static string GetRenderedRootId(Component component, IElement rendered)
+        {
+            return !string.IsNullOrWhiteSpace(rendered.Key)
+                ? component.Id + "#key:" + rendered.Key
+                : component.Id;
         }
 
         public void Dispose()

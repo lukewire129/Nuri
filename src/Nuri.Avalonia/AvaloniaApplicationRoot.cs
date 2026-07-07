@@ -5,6 +5,7 @@ using System.Threading;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using Nuri.Runtime;
+using Nuri.Runtime.Lifecycle;
 using Nuri.UI;
 using Nuri.UI.Dsl;
 using Nuri.UI.Values;
@@ -113,7 +114,8 @@ namespace Nuri.Avalonia
             if (_currentRootVisual == null)
                 return;
 
-            var oldEntry = Runtime.CurrentVirtualEntry.FindById(component.Id);
+            var oldEntry = Runtime.CurrentVirtualEntry.FindByComponentId(component.Id)
+                ?? Runtime.CurrentVirtualEntry.FindById(component.Id);
             if (oldEntry == null)
             {
                 Rebuild();
@@ -122,12 +124,15 @@ namespace Nuri.Avalonia
 
             var newVisual = RenderComponentSubtree(component);
             var newEntry = newVisual.ToVirtualEntry();
+            newEntry.RewriteIdentity(oldEntry.Id, oldEntry.ParentId);
+            newEntry.WithComponentId(component.Id);
             var operations = VirtualTreeDiff.Diff(oldEntry, newEntry);
 
             CleanupRemovedComponentState(operations);
             AvaloniaVirtualEntryRenderer.ApplyDiff(_currentRootVisual, operations);
 
-            if (Runtime.CurrentVirtualEntry.ReplaceDescendant(component.Id, newEntry))
+            if (Runtime.CurrentVirtualEntry.ReplaceDescendantByComponentId(component.Id, newEntry)
+                || Runtime.CurrentVirtualEntry.ReplaceDescendant(oldEntry.Id, newEntry))
                 Runtime.CommitVirtualEntry(Runtime.CurrentVirtualEntry);
             else
                 Rebuild();
@@ -137,11 +142,7 @@ namespace Nuri.Avalonia
 
         private static void CleanupRemovedComponentState(IEnumerable<PatchOperation> operations)
         {
-            foreach (var removeChild in operations.OfType<RemoveChildPatch>())
-                Component.DisposeHookState(removeChild.Child.Id);
-
-            foreach (var replaceEntry in operations.OfType<ReplaceEntryPatch>())
-                Component.DisposeHookState(replaceEntry.OldEntry.Id);
+            ComponentLifecycle.CleanupRemovedComponentState(operations);
         }
 
         private static IEnumerable<Component> FilterCoveredDirtyComponents(IEnumerable<Component> dirtyComponents)
@@ -184,10 +185,18 @@ namespace Nuri.Avalonia
                     renderedChild.Properties[property.Key] = property.Value;
             }
 
+            var renderedId = GetRenderedRootId(component, renderedChild);
             renderedChild.ParentId = component.ParentId;
-            renderedChild.Id = component.Id;
-            ElementTree<IElement, AnimationValue>.AssignDescendantIds(component.Id, renderedChild);
+            renderedChild.Id = renderedId;
+            ElementTree<IElement, AnimationValue>.AssignDescendantIds(renderedId, renderedChild);
             return renderedChild;
+        }
+
+        private static string GetRenderedRootId(Component component, IElement rendered)
+        {
+            return !string.IsNullOrWhiteSpace(rendered.Key)
+                ? component.Id + "#key:" + rendered.Key
+                : component.Id;
         }
 
         private static void ApplyWindowProperties(Window mainWindow, IElement rootElement)

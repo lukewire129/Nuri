@@ -13,6 +13,7 @@ namespace Nuri.UI
         private static readonly Dictionary<string, Dictionary<int, EffectHookState>> EffectStore = new Dictionary<string, Dictionary<int, EffectHookState>>();
         private static readonly Dictionary<string, HashSet<int>> PendingEffects = new Dictionary<string, HashSet<int>>();
         private int _stateIndex;
+        private bool _hasUsedHooks;
 
         public string ParentId { get; set; } = "0";
 
@@ -83,16 +84,19 @@ namespace Nuri.UI
 
         protected (T state, Action<T> setState) useState<T>(T initialValue)
         {
+            _hasUsedHooks = true;
+            var componentId = Id;
             var index = _stateIndex;
-            var state = StateStore.GetOrCreateState(Id, index, initialValue);
+            var state = StateStore.GetOrCreateState(componentId, index, initialValue);
 
             void SetState(T newValue)
             {
-                var currentState = StateStore.GetOrCreateState(Id, index, initialValue);
+                var currentState = StateStore.GetOrCreateState(componentId, index, initialValue);
                 if (EqualityComparer<T>.Default.Equals(currentState, newValue))
                     return;
 
-                StateStore.UpdateState(Id, index, newValue);
+                StateStore.UpdateState(componentId, index, newValue);
+                Id = componentId;
                 OnStateChanged();
             }
 
@@ -105,17 +109,20 @@ namespace Nuri.UI
             if (reducer == null)
                 throw new ArgumentNullException(nameof(reducer));
 
+            _hasUsedHooks = true;
+            var componentId = Id;
             var index = _stateIndex;
-            var state = StateStore.GetOrCreateState(Id, index, initialState);
+            var state = StateStore.GetOrCreateState(componentId, index, initialState);
 
             void Dispatch(TAction action)
             {
-                var currentState = StateStore.GetOrCreateState(Id, index, initialState);
+                var currentState = StateStore.GetOrCreateState(componentId, index, initialState);
                 var newState = reducer(currentState, action);
                 if (EqualityComparer<TState>.Default.Equals(currentState, newState))
                     return;
 
-                StateStore.UpdateState(Id, index, newState);
+                StateStore.UpdateState(componentId, index, newState);
+                Id = componentId;
                 OnStateChanged();
             }
 
@@ -125,8 +132,10 @@ namespace Nuri.UI
 
         protected Ref<T> useRef<T>(T initialValue)
         {
+            _hasUsedHooks = true;
+            var componentId = Id;
             var index = _stateIndex;
-            var reference = StateStore.GetOrCreateState(Id, index, new Ref<T>(initialValue));
+            var reference = StateStore.GetOrCreateState(componentId, index, new Ref<T>(initialValue));
             _stateIndex++;
             return reference;
         }
@@ -143,6 +152,7 @@ namespace Nuri.UI
             if (factory == null)
                 throw new ArgumentNullException(nameof(factory));
 
+            _hasUsedHooks = true;
             var index = _stateIndex;
 
             lock (HookSyncRoot)
@@ -195,6 +205,7 @@ namespace Nuri.UI
             if (effect == null)
                 throw new ArgumentNullException(nameof(effect));
 
+            _hasUsedHooks = true;
             var index = _stateIndex;
 
             lock (HookSyncRoot)
@@ -226,7 +237,8 @@ namespace Nuri.UI
 
         protected void CompleteHookRender()
         {
-            TrimHookStateForComponent(Id, _stateIndex);
+            if (_hasUsedHooks || _stateIndex > 0)
+                TrimHookStateForComponent(Id, _stateIndex);
         }
 
         protected static void FlushPendingEffectsForRender()

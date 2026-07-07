@@ -10,10 +10,10 @@ namespace Nuri.Runtime.Lifecycle
         public static void CleanupRemovedComponentState(IEnumerable<PatchOperation> operations)
         {
             foreach (var removeChild in operations.OfType<RemoveChildPatch>())
-                Component.DisposeHookState(removeChild.Child.Id);
+                DisposeEntryHookState(removeChild.Child);
 
             foreach (var replaceEntry in operations.OfType<ReplaceEntryPatch>())
-                Component.DisposeHookState(replaceEntry.OldEntry.Id);
+                DisposeEntryHookState(replaceEntry.OldEntry);
         }
 
         public static void FlushPendingEffects()
@@ -24,6 +24,26 @@ namespace Nuri.Runtime.Lifecycle
         public static void DisposeSubtree(string rootComponentId)
         {
             Component.DisposeHookState(rootComponentId);
+        }
+
+        private static void DisposeEntryHookState(VirtualEntry entry)
+        {
+            foreach (var componentId in EnumerateComponentIds(entry).Distinct())
+                Component.DisposeHookState(componentId);
+
+            Component.DisposeHookState(entry.Id);
+        }
+
+        private static IEnumerable<string> EnumerateComponentIds(VirtualEntry entry)
+        {
+            if (!string.IsNullOrWhiteSpace(entry.ComponentId))
+                yield return entry.ComponentId!;
+
+            foreach (var child in entry.Children)
+            {
+                foreach (var componentId in EnumerateComponentIds(child))
+                    yield return componentId;
+            }
         }
     }
 }

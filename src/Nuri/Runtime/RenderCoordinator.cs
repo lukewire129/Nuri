@@ -67,11 +67,15 @@ namespace Nuri.Runtime
             if (root == null)
                 return true;
 
+            newEntry.RewriteIdentity(oldEntry.Id, oldEntry.ParentId);
+            newEntry.WithComponentId(componentId);
+
             var operations = VirtualTreeDiff.Diff(oldEntry, newEntry);
             ComponentLifecycle.CleanupRemovedComponentState(operations);
             _renderer.ApplyDiff(root, operations);
 
-            if (!_runtime.CurrentVirtualEntry.ReplaceDescendant(componentId, newEntry))
+            if (!_runtime.CurrentVirtualEntry.ReplaceDescendantByComponentId(componentId, newEntry)
+                && !_runtime.CurrentVirtualEntry.ReplaceDescendant(oldEntry.Id, newEntry))
                 return false;
 
             _runtime.CommitVirtualEntry(_runtime.CurrentVirtualEntry);

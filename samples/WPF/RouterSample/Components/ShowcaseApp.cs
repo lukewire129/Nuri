@@ -1,5 +1,6 @@
 using Nuri.UI.Controls;
 using Nuri.UI.Dsl;
+using Nuri.UI.Navigation;
 using Nuri.UI.Values;
 
 namespace RouterSample.Components
@@ -8,18 +9,18 @@ namespace RouterSample.Components
     {
         public override IElement Render()
         {
-            var (route, setRoute) = useState("counter");
-            var (settingsRoute, setSettingsRoute) = useState("profile");
+            var (navigation, navigator) = useNavigation("counter");
 
             return Div(DivTypes.Row,
-                new SampleSidebar(route, setRoute),
+                new SampleSidebar(navigation, navigator),
                 Div(DivTypes.Scroll,
-                    Router(route,
+                    Router(navigation,
                         Route("counter", () => new CounterPage()),
                         Route("form", () => new FormPage()),
                         Route("list", () => new KeyedListPage()),
+                        Route("navigation", () => new NavigationPage()),
                         Route("effects", () => new EffectsPage()),
-                        Route("settings", () => new SettingsPage(settingsRoute, setSettingsRoute))))
+                        Route("settings", () => new SettingsPage())))
                     .Background("#F6F4F0")
                     .Padding(28)
                     .Width(760))
@@ -30,12 +31,12 @@ namespace RouterSample.Components
     internal sealed class SampleSidebar : Component
     {
         private readonly string _selected;
-        private readonly Action<string> _navigate;
+        private readonly Navigator _navigator;
 
-        public SampleSidebar(string selected, Action<string> navigate)
+        public SampleSidebar(NavigationState navigation, Navigator navigator)
         {
-            _selected = selected;
-            _navigate = navigate;
+            _selected = navigation.CurrentRoute;
+            _navigator = navigator;
         }
 
         public override IElement Render()
@@ -43,11 +44,15 @@ namespace RouterSample.Components
             return Div(
                 Text("Nuri").FontSize(26).FontWeight(FontWeightValue.Bold).FontColor("#111827"),
                 Text("WPF-first samples").FontSize(13).FontColor("#6B7280").Margin(top: 4, bottom: 28),
-                new NavButton("counter", "Counter", _selected, _navigate),
-                new NavButton("form", "Form", _selected, _navigate),
-                new NavButton("list", "Keyed List", _selected, _navigate),
-                new NavButton("effects", "Effects", _selected, _navigate),
-                new NavButton("settings", "Nested Router", _selected, _navigate),
+                new NavButton("counter", "Counter", _selected, _navigator),
+                new NavButton("form", "Form", _selected, _navigator),
+                new NavButton("list", "Keyed List", _selected, _navigator),
+                new NavButton("navigation", "useNavigation", _selected, _navigator),
+                new NavButton("effects", "Effects", _selected, _navigator),
+                new NavButton("settings", "Nested Router", _selected, _navigator),
+                new QuietButton("Back", _navigator.GoBack)
+                    .Margin(top: 12)
+                    .Background(_navigator.CanGoBack ? "#F3F4F6" : "#FFFFFF"),
                 Text("Small components, explicit keys, and platform-neutral routing.")
                     .FontSize(12)
                     .FontColor("#6B7280")
@@ -63,20 +68,20 @@ namespace RouterSample.Components
         private readonly string _route;
         private readonly string _label;
         private readonly string _selected;
-        private readonly Action<string> _navigate;
+        private readonly Navigator _navigator;
 
-        public NavButton(string route, string label, string selected, Action<string> navigate)
+        public NavButton(string route, string label, string selected, Navigator navigator)
         {
             _route = route;
             _label = label;
             _selected = selected;
-            _navigate = navigate;
+            _navigator = navigator;
         }
 
         public override IElement Render()
         {
             var active = string.Equals(_route, _selected, StringComparison.Ordinal);
-            return Button(_label, () => _navigate(_route))
+            return Button(_label, () => _navigator.Navigate(_route))
                 .Key(_route)
                 .Padding(12)
                 .Margin(bottom: 8)
@@ -211,26 +216,46 @@ namespace RouterSample.Components
         }
     }
 
-    internal sealed class SettingsPage : Component
+    internal sealed class NavigationPage : Component
     {
-        private readonly string _route;
-        private readonly Action<string> _navigate;
-
-        public SettingsPage(string route, Action<string> navigate)
-        {
-            _route = route;
-            _navigate = navigate;
-        }
-
         public override IElement Render()
         {
+            var (navigation, navigator) = useNavigation("overview");
+
+            return new PageFrame("useNavigation", "A local navigation state can drive any Router without platform APIs.",
+                new Card(
+                    new FieldLabel("Current route"),
+                    Text(navigation.CurrentRoute).FontSize(22).FontWeight(FontWeightValue.Bold).FontColor("#111827"),
+                    Text($"Back stack count: {navigation.BackStack.Count}").FontColor("#6B7280").Margin(top: 6, bottom: 18),
+                    Div(DivTypes.Row,
+                        new PrimaryButton("Navigate details", () => navigator.Navigate("details")),
+                        new QuietButton("Replace summary", () => navigator.Replace("summary")),
+                        new QuietButton("Go back", navigator.GoBack)
+                            .Background(navigator.CanGoBack ? "#F3F4F6" : "#FFFFFF"))
+                        .Margin(bottom: 22),
+                    Router(navigation,
+                        Route("overview", () => new NavigationPanel("Overview", "Navigate pushes the current route onto the back stack.")),
+                        Route("details", () => new NavigationPanel("Details", "GoBack returns to the previous route.")),
+                        Route("summary", () => new NavigationPanel("Summary", "Replace changes the current route without adding history."))),
+                    new CodeBlock("var (navigation, navigator) = useNavigation(\"overview\");\n\nRouter(navigation,\n    Route(\"overview\", () => new OverviewPage()),\n    Route(\"details\", () => new DetailsPage()));\n\nnavigator.Navigate(\"details\");\nnavigator.GoBack();")));
+        }
+    }
+
+    internal sealed class SettingsPage : Component
+    {
+        public override IElement Render()
+        {
+            var (navigation, navigator) = useNavigation("profile");
+
             return new PageFrame("Nested Router", "The settings page owns a second router for local navigation.",
                 new Card(
                     Div(DivTypes.Row,
-                        new SmallTab("profile", "Profile", _route, _navigate),
-                        new SmallTab("theme", "Theme", _route, _navigate))
+                        new SmallTab("profile", "Profile", navigation.CurrentRoute, navigator),
+                        new SmallTab("theme", "Theme", navigation.CurrentRoute, navigator),
+                        new QuietButton("Back", navigator.GoBack)
+                            .Background(navigator.CanGoBack ? "#F3F4F6" : "#FFFFFF"))
                         .Margin(bottom: 18),
-                    Router(_route,
+                    Router(navigation,
                         Route("profile", () => new SettingsPanel("Profile", "Nested routes are just component selection.")),
                         Route("theme", () => new SettingsPanel("Theme", "A future platform can reuse the same router.")))));
         }
@@ -396,20 +421,20 @@ namespace RouterSample.Components
         private readonly string _route;
         private readonly string _label;
         private readonly string _selected;
-        private readonly Action<string> _navigate;
+        private readonly Navigator _navigator;
 
-        public SmallTab(string route, string label, string selected, Action<string> navigate)
+        public SmallTab(string route, string label, string selected, Navigator navigator)
         {
             _route = route;
             _label = label;
             _selected = selected;
-            _navigate = navigate;
+            _navigator = navigator;
         }
 
         public override IElement Render()
         {
             var active = string.Equals(_route, _selected, StringComparison.Ordinal);
-            return Button(_label, () => _navigate(_route))
+            return Button(_label, () => _navigator.Navigate(_route))
                 .Padding(10)
                 .Margin(right: 8)
                 .Background(active ? "#E5E7EB" : "#FFFFFF")
@@ -433,6 +458,48 @@ namespace RouterSample.Components
             return Div(
                 Text(_title).FontSize(18).FontWeight(FontWeightValue.Bold).FontColor("#111827"),
                 Text(_body).FontColor("#6B7280").Margin(top: 8));
+        }
+    }
+
+    internal sealed class NavigationPanel : Component
+    {
+        private readonly string _title;
+        private readonly string _body;
+
+        public NavigationPanel(string title, string body)
+        {
+            _title = title;
+            _body = body;
+        }
+
+        public override IElement Render()
+        {
+            return Div(
+                Text(_title).FontSize(18).FontWeight(FontWeightValue.Bold).FontColor("#111827"),
+                Text(_body).FontColor("#6B7280").Margin(top: 8))
+                .Padding(16)
+                .Background("#F9FAFB")
+                .Margin(bottom: 18);
+        }
+    }
+
+    internal sealed class CodeBlock : Component
+    {
+        private readonly string _code;
+
+        public CodeBlock(string code)
+        {
+            _code = code;
+        }
+
+        public override IElement Render()
+        {
+            return Text(_code)
+                .FontFamily("Consolas")
+                .FontSize(13)
+                .FontColor("#111827")
+                .Padding(16)
+                .Background("#F3F4F6");
         }
     }
 

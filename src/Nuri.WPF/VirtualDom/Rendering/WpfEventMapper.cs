@@ -54,6 +54,9 @@ namespace Nuri.WPF
                     wpfEventName = EventKeys.TextChanged;
                     handler = new TextChangedEventHandler((s, e) =>
                     {
+                        if (s is FrameworkElement element && element.AreChangeEventsSuppressed())
+                            return;
+
                         if (s is TextBox textBox)
                             Invoke(virtualEvent.Handler, textBox.Text);
                     });
@@ -70,6 +73,9 @@ namespace Nuri.WPF
                     wpfEventName = eventName;
                     handler = new RoutedEventHandler((s, e) =>
                     {
+                        if (s is FrameworkElement element && element.AreChangeEventsSuppressed())
+                            return;
+
                         if (s is CheckBox checkBox)
                             Invoke(virtualEvent.Handler, checkBox.IsChecked ?? false);
                         else if (s is RadioButton radioButton)

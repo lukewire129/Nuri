@@ -52,11 +52,19 @@ namespace Nuri.WPF
                     rendered.Properties[property.Key] = property.Value;
             }
 
+            var renderedId = GetRenderedRootId(component, rendered);
             rendered.ParentId = component.ParentId;
-            rendered.Id = component.Id;
-            Nuri.UI.ElementTree<Nuri.UI.Dsl.IElement, Nuri.UI.Values.AnimationValue>.AssignDescendantIds(component.Id, rendered);
+            rendered.Id = renderedId;
+            Nuri.UI.ElementTree<Nuri.UI.Dsl.IElement, Nuri.UI.Values.AnimationValue>.AssignDescendantIds(renderedId, rendered);
 
-            return rendered.ToVirtualEntry();
+            return rendered.ToVirtualEntry().WithComponentId(component.Id);
+        }
+
+        private static string GetRenderedRootId(Nuri.UI.Dsl.Component component, Nuri.UI.Dsl.IElement rendered)
+        {
+            return !string.IsNullOrWhiteSpace(rendered.Key)
+                ? component.Id + "#key:" + rendered.Key
+                : component.Id;
         }
 
         private static string? GetKey(string key, string name)

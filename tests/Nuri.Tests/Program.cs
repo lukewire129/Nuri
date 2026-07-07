@@ -17,6 +17,7 @@ internal static class Program
         UseMemoCachesUntilDependenciesChange();
         UseEffectRunsAfterRenderAndCleansUpOnDependencyChange();
         RemovingHooksFromARenderCleansUpTheirState();
+        RouterAssignsSelectedRouteKey();
         TransitionAppliesToAllConfiguredProperties();
         Console.WriteLine("Nuri.Tests passed.");
     }
@@ -176,6 +177,16 @@ internal static class Program
         component.CompleteHooks();
 
         AssertEqual("cleanup:second", component.EffectLog.Last(), "Removing a hook slot should dispose its cleanup immediately.");
+    }
+
+    private static void RouterAssignsSelectedRouteKey()
+    {
+        var router = Component.Router("form",
+            Component.Route("counter", () => Component.Text("Counter")),
+            Component.Route("form", () => new HookProbe()));
+
+        var rendered = router.Render();
+        AssertEqual("form", rendered.Key, "Router should key selected route content by route key.");
     }
 
     private static void TransitionAppliesToAllConfiguredProperties()
