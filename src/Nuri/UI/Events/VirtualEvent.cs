@@ -9,7 +9,13 @@ namespace Nuri.UI.Events
         ContentChanged,
         CheckChanged,
         HoverChanged,
-        KeyDown
+        MouseDown,
+        MouseUp,
+        KeyDown,
+        KeyUp,
+        FocusChanged,
+        Loaded,
+        Unloaded
     }
 
     public enum KeyboardKey
@@ -17,8 +23,14 @@ namespace Nuri.UI.Events
         Unknown,
         Up,
         Down,
+        Left,
+        Right,
         Enter,
-        Escape
+        Escape,
+        Tab,
+        Space,
+        Backspace,
+        Delete
     }
 
     public sealed class VirtualEvent : IEquatable<VirtualEvent>

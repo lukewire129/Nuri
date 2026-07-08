@@ -88,6 +88,14 @@ namespace Nuri.WPF
                     wpfEventName = eventName;
                     handler = new MouseEventHandler((s, e) => Invoke(virtualEvent.Handler, eventName == EventKeys.MouseEnter));
                     return true;
+                case VirtualEventKind.MouseDown:
+                    wpfEventName = EventKeys.MouseLeftButtonDown;
+                    handler = new MouseButtonEventHandler((s, e) => Invoke(virtualEvent.Handler));
+                    return true;
+                case VirtualEventKind.MouseUp:
+                    wpfEventName = EventKeys.MouseLeftButtonUp;
+                    handler = new MouseButtonEventHandler((s, e) => Invoke(virtualEvent.Handler));
+                    return true;
                 case VirtualEventKind.KeyDown:
                     wpfEventName = eventName == EventKeys.PreviewKeyDown ? EventKeys.PreviewKeyDown : EventKeys.KeyDown;
                     handler = new KeyEventHandler((s, e) =>
@@ -101,6 +109,29 @@ namespace Nuri.WPF
                         if (key == KeyboardKey.Up || key == KeyboardKey.Down || key == KeyboardKey.Enter || key == KeyboardKey.Escape)
                             e.Handled = true;
                     });
+                    return true;
+                case VirtualEventKind.KeyUp:
+                    wpfEventName = eventName == EventKeys.PreviewKeyUp ? EventKeys.PreviewKeyUp : EventKeys.KeyUp;
+                    handler = new KeyEventHandler((s, e) =>
+                    {
+                        var key = ToKeyboardKey(e);
+                        if (key == KeyboardKey.Unknown || e.Handled)
+                            return;
+
+                        Invoke(virtualEvent.Handler, key);
+                    });
+                    return true;
+                case VirtualEventKind.FocusChanged:
+                    wpfEventName = eventName == EventKeys.GotFocus ? EventKeys.GotFocus : EventKeys.LostFocus;
+                    handler = new RoutedEventHandler((s, e) => Invoke(virtualEvent.Handler, eventName == EventKeys.GotFocus));
+                    return true;
+                case VirtualEventKind.Loaded:
+                    wpfEventName = EventKeys.Loaded;
+                    handler = new RoutedEventHandler((s, e) => Invoke(virtualEvent.Handler));
+                    return true;
+                case VirtualEventKind.Unloaded:
+                    wpfEventName = EventKeys.Unloaded;
+                    handler = new RoutedEventHandler((s, e) => Invoke(virtualEvent.Handler));
                     return true;
                 default:
                     wpfEventName = string.Empty;
@@ -121,10 +152,22 @@ namespace Nuri.WPF
                 return KeyboardKey.Up;
             if (key == Key.Down)
                 return KeyboardKey.Down;
+            if (key == Key.Left)
+                return KeyboardKey.Left;
+            if (key == Key.Right)
+                return KeyboardKey.Right;
             if (key == Key.Return)
                 return KeyboardKey.Enter;
             if (key == Key.Escape)
                 return KeyboardKey.Escape;
+            if (key == Key.Tab)
+                return KeyboardKey.Tab;
+            if (key == Key.Space)
+                return KeyboardKey.Space;
+            if (key == Key.Back)
+                return KeyboardKey.Backspace;
+            if (key == Key.Delete)
+                return KeyboardKey.Delete;
 
             return KeyboardKey.Unknown;
         }

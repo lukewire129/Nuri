@@ -367,11 +367,50 @@ namespace Nuri.UI.Dsl
             return node;
         }
 
+        public static T OnMouseDown<T>(this T node, Action handler) where T : IElement
+        {
+            node.AddVirtualEvent(EventKeys.MouseLeftButtonDown, new VirtualEvent(VirtualEventKind.MouseDown, handler));
+            return node;
+        }
+
+        public static T OnMouseUp<T>(this T node, Action handler) where T : IElement
+        {
+            node.AddVirtualEvent(EventKeys.MouseLeftButtonUp, new VirtualEvent(VirtualEventKind.MouseUp, handler));
+            return node;
+        }
+
         public static T OnKeyDown<T>(this T node, Action<KeyboardKey> handler) where T : IElement
         {
             var virtualEvent = new VirtualEvent(VirtualEventKind.KeyDown, handler);
             node.AddVirtualEvent(EventKeys.PreviewKeyDown, virtualEvent);
             node.AddVirtualEvent(EventKeys.KeyDown, virtualEvent);
+            return node;
+        }
+
+        public static T OnKeyUp<T>(this T node, Action<KeyboardKey> handler) where T : IElement
+        {
+            var virtualEvent = new VirtualEvent(VirtualEventKind.KeyUp, handler);
+            node.AddVirtualEvent(EventKeys.PreviewKeyUp, virtualEvent);
+            node.AddVirtualEvent(EventKeys.KeyUp, virtualEvent);
+            return node;
+        }
+
+        public static T OnFocus<T>(this T node, Action<bool> handler) where T : IElement
+        {
+            node.AddVirtualEvent(EventKeys.GotFocus, new VirtualEvent(VirtualEventKind.FocusChanged, handler));
+            node.AddVirtualEvent(EventKeys.LostFocus, new VirtualEvent(VirtualEventKind.FocusChanged, handler));
+            return node;
+        }
+
+        public static T OnLoaded<T>(this T node, Action handler) where T : IElement
+        {
+            node.AddVirtualEvent(EventKeys.Loaded, new VirtualEvent(VirtualEventKind.Loaded, handler));
+            return node;
+        }
+
+        public static T OnUnloaded<T>(this T node, Action handler) where T : IElement
+        {
+            node.AddVirtualEvent(EventKeys.Unloaded, new VirtualEvent(VirtualEventKind.Unloaded, handler));
             return node;
         }
 
