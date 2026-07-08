@@ -1,108 +1,146 @@
 # Nuri
 
-Nuri is a C# MVU UI library that keeps application UI descriptions platform-neutral and renders them through adapter projects such as `Nuri.WPF`.
+Nuri is a C# MVU UI library. Components describe UI with platform-neutral virtual elements, and renderer adapters materialize those descriptions into native controls.
 
-Components return virtual UI descriptions from `Render()`. They do not create native WPF controls directly. Native controls are materialized by the renderer layer.
+The current supported renderer path is WPF through `Nuri.WPF`.
+
+## What Nuri Does
+
+- Component `Render()` methods return virtual UI descriptions, not native WPF controls.
+- State changes re-render the dirty component subtree when possible.
+- Virtual trees are diffed into patch operations and applied by the renderer.
+- Keys preserve row/component identity across list insert, remove, move, and replace.
+- Events, values, animation descriptions, routing, and lifecycle hooks live in Core.
+- WPF-specific control creation, property mapping, event mapping, and animation materialization stay in `Nuri.WPF`.
 
 ## Project Layout
 
-- `src/Nuri`: platform-neutral core runtime, virtual UI model, diffing, patch operations, state, events, values, and DSL.
-- `src/Nuri.WPF`: WPF renderer adapter, control registry, property/event mapping, animation/materialization, and application runner.
-- `src/Nuri.Avalonia`: renderer scaffold. It intentionally has no external Avalonia package dependency yet.
-- `src/Nuri.Template`: dotnet template project.
-- `samples`: focused sample apps.
+- `src/Nuri`: platform-neutral runtime, DSL, virtual DOM, diffing, patch operations, values, events, routing, and lifecycle hooks.
+- `src/Nuri.WPF`: WPF renderer adapter, WPF control registry, WPF property/event mapping, WPF animation materialization, and application host.
+- `samples/WPF`: focused WPF samples that exercise concrete behavior.
+- `tests/Nuri.Tests`: lightweight Core behavior tests.
 - `perf`: performance sanity harnesses.
 
-## Basic App
+## Basic WPF App
 
-`App.xaml.cs` owns the WPF application startup and delegates window creation to `NuriApplication`.
+Start a Nuri WPF app through `NuriApplication`:
 
 ```csharp
-using System.Windows;
 using Nuri.WPF;
-using NuriSample.Components;
 
-namespace NuriSample
+namespace NuriSample;
+
+internal static class Program
 {
-    public partial class App : Application
+    [STAThread]
+    private static void Main()
     {
-        protected override void OnStartup(StartupEventArgs e)
-        {
-            base.OnStartup(e);
-            NuriApplication.Run<CounterComponent>("Nuri Sample", width: 400, height: 300);
-        }
+        NuriApplication.Run<CounterComponent>("Nuri Sample", width: 480, height: 320);
     }
 }
 ```
 
-Components use the platform-neutral DSL from `Nuri.UI.Dsl`.
+Create components by inheriting `Component` and returning `IElement` from `Render()`:
 
 ```csharp
 using Nuri.UI.Dsl;
 
-namespace NuriSample.Components
-{
-    public class CounterComponent : Component
-    {
-        public override IElement Render()
-        {
-            var (count, setCount) = useState(0);
+namespace NuriSample;
 
-            return Div(
-                Button($"Count: {count}", () => setCount(count + 1)),
-                Button("Reset", () => setCount(0))
-            );
-        }
+public sealed class CounterComponent : Component
+{
+    public override IElement Render()
+    {
+        var (count, setCount) = useState(0);
+
+        return Div(
+            Text($"Count: {count}"),
+            Button("Increment", () => setCount(count + 1)),
+            Button("Reset", () => setCount(0))
+        ).Padding(16);
     }
 }
 ```
 
-WPF-familiar factory aliases are available while still producing platform-neutral Nuri elements:
+The factories look WPF-friendly, but they create neutral Nuri elements:
 
 ```csharp
 Button("Save", Save);
-TextBox().OnTextChanged(setText);
-CheckBox("Enabled", setEnabled);
-RadioButton("Option A", setSelected);
-ToggleButton("Pinned", setPinned);
+TextBox(name, setName);
+CheckBox("Enabled", setEnabled).Checked(enabled);
+RadioButton("Light", selected => { if (selected) setTheme("light"); }).Group("theme");
+ToggleButton("Pinned", setPinned).Checked(pinned);
 PasswordBox();
 ```
 
-## Subwindows
+## State And Hooks
 
-Use `NuriApplication.Show<TComponent>()` when the renderer should create and show a new native WPF window.
-
-```csharp
-NuriApplication.Show<CounterComponent>("Counter", width: 400, height: 300);
-```
-
-Use `NuriApplication.Attach<TComponent>()` when you already own the native `Window` instance.
+Use `useState` for local component state:
 
 ```csharp
-var window = new Window();
-NuriApplication.Attach<CounterComponent>(window, "Counter", width: 400, height: 300);
-window.Show();
+var (text, setText) = useState(string.Empty);
+
+return TextBox(text, setText);
 ```
 
-Each window gets its own `ApplicationRoot` and virtual tree prefix, so root updates and component subtree updates stay isolated per window.
+Use `useEffect` for post-render effects. Omitting dependencies runs after every render. Passing `[]` runs on mount and cleans up on unmount.
 
-## Keys And Updates
+If no cleanup is needed, use the `Action` overload and do not return anything:
 
-Nuri performs dirty component subtree render/diff/patch when possible, with root rebuild as fallback.
-
-## Samples
-
-Run the Command Palette sample:
-
-```powershell
-dotnet run --project "samples\Nuri.CommandPaletteSample\Nuri.CommandPaletteSample.csproj" -c Release
+```csharp
+useEffect(() =>
+{
+    TrackRender();
+}, [route]);
 ```
 
-The sample exercises controlled `TextBox` input, neutral keyboard events, filtered keyed list rendering, selection styling, Enter execution, Esc reset, and Overlay/Panel composition. See `samples/Nuri.CommandPaletteSample/README.md` for sample-specific Known Issues.
+Return a cleanup action only when the effect owns something that should be disposed or unsubscribed:
+
+```csharp
+useEffect(() =>
+{
+    StartSubscription();
+    return StopSubscription;
+}, []);
+```
+
+Track dependencies with C# collection expressions:
+
+```csharp
+useEffect(() =>
+{
+    Refresh(route);
+    return null;
+}, [route]);
+```
+
+## Routing
+
+Use `useNavigation` when a component owns local navigation state:
+
+```csharp
+var (navigation, navigator) = useNavigation("overview");
+
+return Div(
+    Button("Overview", () => navigator.Navigate("overview")),
+    Button("Details", () => navigator.Navigate("details")),
+    Button("Back", navigator.GoBack),
+    Router(navigation,
+        Route("overview", () => Text("Overview")),
+        Route("details", () => Text("Details")))
+);
+```
+
+`Navigator` supports:
+
+- `Navigate(route)`: push current route and move to `route`.
+- `Replace(route)`: change route without adding history.
+- `GoBack()`: return to the previous route when available.
+- `CanGoBack`: inspect whether the back stack has entries.
 
 ## Layout
 
-Use `Grid(...)` with fluent `.Rows(...)` and `.Columns(...)` when defining grid layout. This keeps layout definitions separate from visual children.
+Use `Grid(...)` with fluent `.Rows(...)` and `.Columns(...)` for layout:
 
 ```csharp
 return Grid(
@@ -114,11 +152,29 @@ return Grid(
     .Columns(Pixels(240), Star);
 ```
 
-The older `Div(Rows(...), Columns(...), children...)` overloads remain available for compatibility, but new code should prefer fluent layout definitions.
+Use `Div(DivTypes.Scroll, ...)` for scrollable vertical content:
+
+```csharp
+return Grid(Rows(Auto, Star),
+    Toolbar().Row(0),
+    Div(DivTypes.Scroll, rows).Row(1));
+```
+
+## Keys
+
+Use explicit keys for rows and components whose identity must survive reorder, filter, edit, or remove operations:
+
+```csharp
+Div(items.Select(item =>
+    (IElement)new TodoItemComponent(item).Key(item.Id)
+).ToArray());
+```
+
+`Name` remains a key fallback for compatibility, but new code should prefer `.Key("...")`.
 
 ## Animation
 
-Call `.Transition(...)` immediately after the property setter that should animate.
+Call `.Transition(...)` after the property setter that should animate:
 
 ```csharp
 Text("Play")
@@ -126,28 +182,40 @@ Text("Play")
     .Transition(500, EasingValue.CubicInOut);
 ```
 
-The older `.Transitions("Margin", ...)` form remains available when the animated property needs to be selected explicitly.
+Use `.Transitions("Margin", ...)` only when the animated property needs to be selected explicitly.
 
-Use explicit keys for reordered lists:
+## WPF Samples
 
-```csharp
-Button("Save")
-    .Key("save-button")
-    .OnClick(Save);
-```
-
-`Name` remains a key fallback for compatibility, but new code should prefer `.Key("...")`.
-
-## Template
+Run samples with `dotnet run --project ... -c Release`.
 
 ```powershell
-dotnet new install Nuri.Template
+dotnet run --project "samples\WPF\Nuri.TodoValidationSample\Nuri.TodoValidationSample.csproj" -c Release
+dotnet run --project "samples\WPF\Nuri.SettingsPreferencesSample\Nuri.SettingsPreferencesSample.csproj" -c Release
+dotnet run --project "samples\WPF\Nuri.ModalDialogSample\Nuri.ModalDialogSample.csproj" -c Release
+dotnet run --project "samples\WPF\Nuri.CommandPaletteSample\Nuri.CommandPaletteSample.csproj" -c Release
+dotnet run --project "samples\WPF\RouterSample\RouterSample.csproj" -c Release
 ```
+
+Sample coverage:
+
+- `Nuri.TodoValidationSample`: controlled input, list diff, filter, item edit, remove, keyed rows, scroll layout.
+- `Nuri.SettingsPreferencesSample`: checkbox, radio, toggle, form grouping, validation.
+- `Nuri.ModalDialogSample`: mount/unmount, effect cleanup, overlay layering.
+- `Nuri.CommandPaletteSample`: controlled search input, keyboard events, filtered keyed list, selection, command execution.
+- `RouterSample`: router, nested router, `useNavigation`, effects, keyed list behavior.
 
 ## Validation
 
+Build the solution after meaningful changes:
+
 ```powershell
 dotnet build "Nuri.sln" -c Release
+```
+
+Run Core tests:
+
+```powershell
+dotnet run --project "tests\Nuri.Tests\Nuri.Tests.csproj" -c Release
 ```
 
 Performance sanity checks:
@@ -157,4 +225,4 @@ dotnet run --project "perf\Nuri.Performance\Nuri.Performance.csproj" -c Release 
 dotnet run --project "perf\Nuri.WPFPerformance\Nuri.WPFPerformance.csproj" -c Release -- --label after
 ```
 
-Patch count is an important metric. For keyed reorder sanity, the expected patch count is `1`.
+Patch count matters, especially for keyed reconciliation and reorder behavior.
