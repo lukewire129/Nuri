@@ -76,6 +76,18 @@ namespace Nuri.WPF
             return element;
         }
 
+        public static FrameworkElement? FindElementById(FrameworkElement root, string id)
+        {
+            if (root == null)
+                throw new ArgumentNullException(nameof(root));
+
+            if (string.IsNullOrWhiteSpace(id))
+                return null;
+
+            var controlIndex = ControlIndexes.GetValue(root, BuildControlIndex);
+            return controlIndex.TryGetValue(id, out var element) ? element : null;
+        }
+
         private static FrameworkElement CreateElement(VirtualEntry entry)
         {
             var element = WpfControlRegistry.Create(entry);

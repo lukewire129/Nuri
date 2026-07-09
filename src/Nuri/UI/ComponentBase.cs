@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Nuri.Runtime;
+using Nuri.Runtime.Diagnostics;
 using Nuri.UI.Events;
 
 namespace Nuri.UI
@@ -11,6 +12,7 @@ namespace Nuri.UI
         private static readonly object HookSyncRoot = new object();
         private static readonly Dictionary<string, Dictionary<int, MemoHookState>> MemoStore = new Dictionary<string, Dictionary<int, MemoHookState>>();
         private static readonly Dictionary<string, Dictionary<int, EffectHookState>> EffectStore = new Dictionary<string, Dictionary<int, EffectHookState>>();
+        private static readonly Dictionary<string, Dictionary<int, IStoreSubscription>> StoreHookStore = new Dictionary<string, Dictionary<int, IStoreSubscription>>();
         private static readonly Dictionary<string, HashSet<int>> PendingEffects = new Dictionary<string, HashSet<int>>();
         private int _stateIndex;
         private bool _hasUsedHooks;
@@ -88,6 +90,7 @@ namespace Nuri.UI
             var componentId = Id;
             var index = _stateIndex;
             var state = StateStore.GetOrCreateState(componentId, index, initialValue);
+            RecordHook(componentId, index, HookKind.State, typeof(T).Name, DiagnosticsValueFormatter.Summary(state));
 
             void SetState(T newValue)
             {
@@ -113,6 +116,7 @@ namespace Nuri.UI
             var componentId = Id;
             var index = _stateIndex;
             var state = StateStore.GetOrCreateState(componentId, index, initialState);
+            RecordHook(componentId, index, HookKind.Reducer, typeof(TState).Name, DiagnosticsValueFormatter.Summary(state));
 
             void Dispatch(TAction action)
             {
@@ -136,6 +140,7 @@ namespace Nuri.UI
             var componentId = Id;
             var index = _stateIndex;
             var reference = StateStore.GetOrCreateState(componentId, index, new Ref<T>(initialValue));
+            RecordHook(componentId, index, HookKind.Ref, typeof(T).Name, DiagnosticsValueFormatter.Summary(reference.Current));
             _stateIndex++;
             return reference;
         }
@@ -145,6 +150,44 @@ namespace Nuri.UI
             var reference = useRef(value);
             reference.Current = value;
             return reference;
+        }
+
+        protected T useStore<T>(Store<T> store)
+        {
+            return useStore(store, value => value);
+        }
+
+        protected TResult useStore<T, TResult>(Store<T> store, Func<T, TResult> selector)
+        {
+            if (store == null)
+                throw new ArgumentNullException(nameof(store));
+
+            if (selector == null)
+                throw new ArgumentNullException(nameof(selector));
+
+            _hasUsedHooks = true;
+            var componentId = Id;
+            var index = _stateIndex;
+            var selectedValue = selector(store.Value);
+
+            lock (HookSyncRoot)
+            {
+                var hooks = GetOrCreateHooks(StoreHookStore, componentId);
+                if (!hooks.TryGetValue(index, out var subscription)
+                    || !ReferenceEquals(subscription.Store, store))
+                {
+                    subscription?.Dispose();
+                    hooks[index] = store.SubscribeComponent(componentId, index, selector, OnStateChanged);
+                }
+                else
+                {
+                    hooks[index] = store.SubscribeComponent(componentId, index, selector, OnStateChanged);
+                }
+            }
+
+            RecordHook(componentId, index, HookKind.Store, typeof(TResult).Name, DiagnosticsValueFormatter.Summary(selectedValue));
+            _stateIndex++;
+            return selectedValue;
         }
 
         protected T useMemo<T>(Func<T> factory, params object?[] dependencies)
@@ -166,6 +209,7 @@ namespace Nuri.UI
                     hooks[index] = typedHook;
                 }
 
+                RecordHook(Id, index, HookKind.Memo, typeof(T).Name, DiagnosticsValueFormatter.Summary(typedHook.Value));
                 _stateIndex++;
                 return typedHook.Value;
             }
@@ -220,6 +264,8 @@ namespace Nuri.UI
                     };
                     GetOrCreatePendingEffects(Id).Add(index);
                 }
+
+                RecordHook(Id, index, HookKind.Effect, "Effect", DiagnosticsValueFormatter.DependenciesSummary(dependencies));
             }
 
             _stateIndex++;
@@ -237,6 +283,9 @@ namespace Nuri.UI
 
         protected void CompleteHookRender()
         {
+            if (NuriDiagnostics.IsEnabled)
+                NuriDiagnostics.RecordComponentRendered(Id, GetType().Name);
+
             if (_hasUsedHooks || _stateIndex > 0)
                 TrimHookStateForComponent(Id, _stateIndex);
         }
@@ -296,19 +345,31 @@ namespace Nuri.UI
             {
                 cleanups = new List<Action?>();
 
-                foreach (var componentId in new List<string>(EffectStore.Keys))
+                var componentIds = new HashSet<string>(EffectStore.Keys);
+                componentIds.UnionWith(MemoStore.Keys);
+                componentIds.UnionWith(StoreHookStore.Keys);
+                componentIds.Add(rootComponentId);
+
+                foreach (var componentId in componentIds)
                 {
                     if (!IsInSubtree(componentId, rootComponentId))
                         continue;
 
-                    foreach (var hook in EffectStore[componentId].Values)
-                        cleanups.Add(hook.Cleanup);
+                    if (EffectStore.TryGetValue(componentId, out var effectHooks))
+                    {
+                        foreach (var hook in effectHooks.Values)
+                            cleanups.Add(hook.Cleanup);
 
-                    EffectStore.Remove(componentId);
+                        EffectStore.Remove(componentId);
+                    }
+
                     PendingEffects.Remove(componentId);
                     MemoStore.Remove(componentId);
+                    DisposeStoreHooks(componentId);
                     StateStore.RemoveComponentState(componentId);
                 }
+
+                NuriDiagnostics.DisposeComponentSubtree(rootComponentId);
             }
 
             foreach (var cleanup in cleanups)
@@ -327,6 +388,8 @@ namespace Nuri.UI
                 cleanups = new List<Action?>();
                 StateStore.TrimComponentState(componentId, usedHookCount);
                 TrimStateIndexes(MemoStore, componentId, usedHookCount);
+                TrimStoreHooks(componentId, usedHookCount);
+                NuriDiagnostics.TrimHooks(componentId, usedHookCount);
 
                 if (EffectStore.TryGetValue(componentId, out var effectHooks))
                 {
@@ -357,6 +420,12 @@ namespace Nuri.UI
 
         protected virtual void OnStateChanged()
         {
+        }
+
+        private static void RecordHook(string componentId, int index, HookKind kind, string displayType, string summary)
+        {
+            if (NuriDiagnostics.IsEnabled)
+                NuriDiagnostics.RecordHook(componentId, index, kind, displayType, summary);
         }
 
         private static Dictionary<int, THook> GetOrCreateHooks<THook>(Dictionary<string, Dictionary<int, THook>> store, string componentId)
@@ -427,6 +496,35 @@ namespace Nuri.UI
 
             if (hooks.Count == 0)
                 store.Remove(componentId);
+        }
+
+        private static void TrimStoreHooks(string componentId, int usedHookCount)
+        {
+            if (!StoreHookStore.TryGetValue(componentId, out var hooks))
+                return;
+
+            foreach (var index in new List<int>(hooks.Keys))
+            {
+                if (index < usedHookCount)
+                    continue;
+
+                hooks[index].Dispose();
+                hooks.Remove(index);
+            }
+
+            if (hooks.Count == 0)
+                StoreHookStore.Remove(componentId);
+        }
+
+        private static void DisposeStoreHooks(string componentId)
+        {
+            if (!StoreHookStore.TryGetValue(componentId, out var hooks))
+                return;
+
+            foreach (var hook in hooks.Values)
+                hook.Dispose();
+
+            StoreHookStore.Remove(componentId);
         }
 
         public abstract void Dispose();

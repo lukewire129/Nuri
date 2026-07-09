@@ -4,12 +4,14 @@ using System.Windows.Threading;
 using System.Threading;
 using Nuri.Platform.Abstractions;
 using Nuri.Runtime;
+using Nuri.Runtime.Diagnostics;
 using Nuri.Runtime.Invalidation;
 using Nuri.Runtime.Lifecycle;
 using Nuri.UI;
 using Nuri.UI.Dsl;
 using Nuri.UI.Values;
 using Nuri.VirtualDom;
+using Nuri.WPF.Diagnostics;
 
 namespace Nuri.WPF
 {
@@ -76,6 +78,8 @@ namespace Nuri.WPF
                 _host.ApplyWindowProperties);
 
             Coordinator.Initialize();
+            NuriDiagnostics.RegisterRoot(_treePrefix, "WPF", () => _runtime?.CurrentVirtualEntry);
+            WpfDevToolsRuntime.RegisterRoot(_treePrefix, () => _currentRootVisual, () => _runtime?.CurrentVirtualEntry);
         }
 
         public void ScheduleComponentRebuild(Component component)
@@ -84,6 +88,7 @@ namespace Nuri.WPF
                 return;
 
             _invalidations.Enqueue(component);
+            NuriDiagnostics.Log(RuntimeLogKind.ComponentInvalidated, _treePrefix, component.Id, "Component scheduled for rebuild.");
 
             if (_rebuildScheduled)
                 return;
@@ -101,13 +106,17 @@ namespace Nuri.WPF
                 return;
 
             foreach (var invalidation in dirtyComponents)
+            {
+                NuriDiagnostics.Log(RuntimeLogKind.SubtreeRebuild, _treePrefix, invalidation.ComponentId, "Subtree rebuild scheduled.");
                 Rebuild(invalidation.Component, invalidation.ComponentId);
+            }
         }
 
         private void Rebuild(Component component, string componentId)
         {
             if (string.Equals(componentId, Runtime.CurrentVirtualEntry.Id, StringComparison.Ordinal))
             {
+                NuriDiagnostics.Log(RuntimeLogKind.FullRebuild, _treePrefix, componentId, "Dirty root requested full rebuild.");
                 Rebuild();
                 return;
             }
@@ -116,6 +125,7 @@ namespace Nuri.WPF
                 ?? Runtime.CurrentVirtualEntry.FindById(componentId);
             if (oldEntry == null)
             {
+                NuriDiagnostics.Log(RuntimeLogKind.FullRebuild, _treePrefix, componentId, "Dirty subtree was not found.");
                 Rebuild();
                 return;
             }
@@ -124,6 +134,7 @@ namespace Nuri.WPF
             var newEntry = newVisual.ToVirtualEntry();
             if (!Coordinator.RebuildSubtree(oldEntry, newEntry, componentId))
             {
+                NuriDiagnostics.Log(RuntimeLogKind.FullRebuild, _treePrefix, componentId, "Subtree replacement failed.");
                 Rebuild();
             }
         }
@@ -168,6 +179,8 @@ namespace Nuri.WPF
                 return;
 
             ComponentLifecycle.DisposeSubtree(_treePrefix + "_0");
+            NuriDiagnostics.UnregisterRoot(_treePrefix);
+            WpfDevToolsRuntime.UnregisterRoot(_treePrefix);
             _disposed = true;
         }
     }

@@ -1,4 +1,5 @@
 using System;
+using Nuri.Runtime.Diagnostics;
 using Nuri.UI.Values;
 
 namespace Nuri.UI.Dsl
@@ -13,6 +14,7 @@ namespace Nuri.UI.Dsl
 
         protected override void OnStateChanged()
         {
+            NuriDiagnostics.RecordComponentInvalidated(Id, "Component state changed.");
             StateChanged?.Invoke(this, EventArgs.Empty);
             AnyStateChanged?.Invoke(this, this);
         }

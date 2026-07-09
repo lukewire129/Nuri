@@ -1,4 +1,5 @@
 using Nuri.VirtualDom;
+using Nuri.Runtime;
 using Nuri.UI;
 using Nuri.UI.Dsl;
 using Nuri.UI.Values;
@@ -17,6 +18,10 @@ internal static class Program
         UseMemoCachesUntilDependenciesChange();
         UseEffectRunsAfterRenderAndCleansUpOnDependencyChange();
         RemovingHooksFromARenderCleansUpTheirState();
+        StoreSetInvalidatesOnlySubscribedComponents();
+        StoreCleanupPreventsUnmountedComponentInvalidation();
+        StoreSelectorInvalidatesOnlyWhenSelectedValueChanges();
+        StoreSelectorInvalidatesComponentOnlyOnceWhenMultipleSelectionsChange();
         RouterAssignsSelectedRouteKey();
         TransitionAppliesToAllConfiguredProperties();
         Console.WriteLine("Nuri.Tests passed.");
@@ -179,6 +184,134 @@ internal static class Program
         AssertEqual("cleanup:second", component.EffectLog.Last(), "Removing a hook slot should dispose its cleanup immediately.");
     }
 
+    private static void StoreSetInvalidatesOnlySubscribedComponents()
+    {
+        var store = new Store<string>("Guest");
+        var subscribed = new StoreProbe { Id = "store-subscribed" };
+        var notSubscribed = new StoreProbe { Id = "store-not-subscribed" };
+        var invalidated = new List<string>();
+
+        subscribed.UseSharedStore(store);
+        subscribed.CompleteHooks();
+        notSubscribed.RenderWithoutStore();
+        notSubscribed.CompleteHooks();
+
+        void OnAnyStateChanged(object? _, Component component)
+        {
+            invalidated.Add(component.Id);
+        }
+
+        Component.AnyStateChanged += OnAnyStateChanged;
+        try
+        {
+            store.Set("Dana");
+        }
+        finally
+        {
+            Component.AnyStateChanged -= OnAnyStateChanged;
+            Component.DisposeHookState(subscribed.Id);
+            Component.DisposeHookState(notSubscribed.Id);
+        }
+
+        AssertEqual(1, invalidated.Count, "Store.Set should invalidate only components that called useStore.");
+        AssertEqual(subscribed.Id, invalidated[0], "Store.Set should invalidate the subscribed component.");
+    }
+
+    private static void StoreCleanupPreventsUnmountedComponentInvalidation()
+    {
+        var store = new Store<string>("Guest");
+        var component = new StoreProbe { Id = "store-unmounted" };
+        var invalidated = new List<string>();
+
+        component.UseSharedStore(store);
+        component.CompleteHooks();
+        Component.DisposeHookState(component.Id);
+
+        void OnAnyStateChanged(object? _, Component dirtyComponent)
+        {
+            invalidated.Add(dirtyComponent.Id);
+        }
+
+        Component.AnyStateChanged += OnAnyStateChanged;
+        try
+        {
+            store.Set("Dana");
+        }
+        finally
+        {
+            Component.AnyStateChanged -= OnAnyStateChanged;
+        }
+
+        AssertEqual(0, invalidated.Count, "Unmounted store subscribers should not be invalidated.");
+    }
+
+    private static void StoreSelectorInvalidatesOnlyWhenSelectedValueChanges()
+    {
+        var store = new Store<StoreTestState>(new StoreTestState("Guest", "User", 0));
+        var nameComponent = new StoreProbe { Id = "store-selector-name" };
+        var roleComponent = new StoreProbe { Id = "store-selector-role" };
+        var countComponent = new StoreProbe { Id = "store-selector-count" };
+        var invalidated = new List<string>();
+
+        nameComponent.UseSharedStore(store, state => state.Name);
+        nameComponent.CompleteHooks();
+        roleComponent.UseSharedStore(store, state => state.Role);
+        roleComponent.CompleteHooks();
+        countComponent.UseSharedStore(store, state => state.LoginCount);
+        countComponent.CompleteHooks();
+
+        void OnAnyStateChanged(object? _, Component component)
+        {
+            invalidated.Add(component.Id);
+        }
+
+        Component.AnyStateChanged += OnAnyStateChanged;
+        try
+        {
+            store.Set(new StoreTestState("Dana", "User", 0));
+        }
+        finally
+        {
+            Component.AnyStateChanged -= OnAnyStateChanged;
+            Component.DisposeHookState(nameComponent.Id);
+            Component.DisposeHookState(roleComponent.Id);
+            Component.DisposeHookState(countComponent.Id);
+        }
+
+        AssertEqual(1, invalidated.Count, "Store selector should invalidate only changed selected values.");
+        AssertEqual(nameComponent.Id, invalidated[0], "Changing Name should invalidate only the Name subscriber.");
+    }
+
+    private static void StoreSelectorInvalidatesComponentOnlyOnceWhenMultipleSelectionsChange()
+    {
+        var store = new Store<StoreTestState>(new StoreTestState("Guest", "User", 0));
+        var component = new StoreProbe { Id = "store-selector-multi" };
+        var invalidated = new List<string>();
+
+        component.UseSharedStore(store, state => state.Name);
+        component.UseSharedStore(store, state => state.Role);
+        component.CompleteHooks();
+
+        void OnAnyStateChanged(object? _, Component dirtyComponent)
+        {
+            invalidated.Add(dirtyComponent.Id);
+        }
+
+        Component.AnyStateChanged += OnAnyStateChanged;
+        try
+        {
+            store.Set(new StoreTestState("Dana", "Admin", 0));
+        }
+        finally
+        {
+            Component.AnyStateChanged -= OnAnyStateChanged;
+            Component.DisposeHookState(component.Id);
+        }
+
+        AssertEqual(1, invalidated.Count, "A component with multiple dirty store selectors should be invalidated once.");
+        AssertEqual(component.Id, invalidated[0], "The component with changed selectors should be invalidated.");
+    }
+
     private static void RouterAssignsSelectedRouteKey()
     {
         var router = Component.Router("form",
@@ -303,4 +436,33 @@ internal static class Program
             return Div();
         }
     }
+
+    private sealed class StoreProbe : Component
+    {
+        public string UseSharedStore(Store<string> store)
+        {
+            return useStore(store);
+        }
+
+        public TResult UseSharedStore<TState, TResult>(Store<TState> store, Func<TState, TResult> selector)
+        {
+            return useStore(store, selector);
+        }
+
+        public void RenderWithoutStore()
+        {
+        }
+
+        public void CompleteHooks()
+        {
+            CompleteHookRender();
+        }
+
+        public override IElement Render()
+        {
+            return Div();
+        }
+    }
+
+    private sealed record StoreTestState(string Name, string Role, int LoginCount);
 }
