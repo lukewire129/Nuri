@@ -42,6 +42,17 @@ namespace Nuri.WPF
             return instance;
         }
 
+        public static ApplicationRoot Initialize(
+            IElement rootElement,
+            IHostAdapter<FrameworkElement> host,
+            Func<Dispatcher?> dispatcherProvider,
+            Action<IElement>? applyHostProperties = null)
+        {
+            var instance = new ApplicationRoot();
+            instance.InitializeInternal(rootElement, host, dispatcherProvider, applyHostProperties ?? (_ => { }));
+            return instance;
+        }
+
         public void Rebuild()
         {
             if (_disposed)
@@ -57,6 +68,23 @@ namespace Nuri.WPF
 
         private void InitializeInternal(IElement rootElement, Window mainWindow)
         {
+            InitializeInternal(
+                rootElement,
+                new WpfApplicationHost(mainWindow),
+                () => _currentRootVisual?.Dispatcher ?? mainWindow.Dispatcher ?? Application.Current?.Dispatcher,
+                element =>
+                {
+                    if (_host is not null)
+                        _host.ApplyWindowProperties(element);
+                });
+        }
+
+        private void InitializeInternal(
+            IElement rootElement,
+            IHostAdapter<FrameworkElement> host,
+            Func<Dispatcher?> dispatcherProvider,
+            Action<IElement> applyHostProperties)
+        {
             var treePrefix = $"window{Interlocked.Increment(ref _nextTreeIndex)}";
             _treePrefix = treePrefix;
             rootElement.LoadNodeNumber(treePrefix, 0);
@@ -67,15 +95,15 @@ namespace Nuri.WPF
                 return rootElement;
             }, element => element.ToVirtualEntry());
 
-            _host = new WpfApplicationHost(mainWindow);
-            _scheduler = new WpfScheduler(() => _currentRootVisual?.Dispatcher ?? mainWindow.Dispatcher ?? Application.Current?.Dispatcher);
+            _host = host as WpfApplicationHost;
+            _scheduler = new WpfScheduler(dispatcherProvider);
             _coordinator = new RenderCoordinator<IElement, FrameworkElement>(
                 Runtime,
                 new WpfRendererAdapter(),
-                _host,
+                host,
                 () => _currentRootVisual,
                 root => _currentRootVisual = root,
-                _host.ApplyWindowProperties);
+                applyHostProperties);
 
             Coordinator.Initialize();
             NuriDiagnostics.RegisterRoot(_treePrefix, "WPF", () => _runtime?.CurrentVirtualEntry);
