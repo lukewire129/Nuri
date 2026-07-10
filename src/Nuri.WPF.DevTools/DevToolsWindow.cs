@@ -6,36 +6,44 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Threading;
+using MaterialDesignThemes.Wpf;
 using Nuri.Runtime.Diagnostics;
 
 namespace Nuri.WPF.DevTools
 {
     public sealed class DevToolsWindow : Window
     {
-        private readonly DispatcherTimer _timer;
         private readonly TreeView _componentTree = new TreeView();
+        private readonly TextBlock _selectedComponentTitle = new TextBlock();
+        private readonly TextBlock _selectedComponentMetadata = new TextBlock();
         private readonly TextBlock _componentDetails = new TextBlock { TextWrapping = TextWrapping.Wrap };
         private readonly ListBox _hookList = new ListBox();
         private readonly ListBox _storeList = new ListBox();
         private readonly ListView _applicationLogList = new ListView();
         private readonly ListBox _consoleLogList = new ListBox();
         private readonly TextBlock _consoleDetails = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        private readonly TextBlock _applicationLogStatus = new TextBlock();
         private readonly ColumnDefinition _visualTreeColumn = new ColumnDefinition { Width = new GridLength(320) };
         private readonly ColumnDefinition _visualTreeSplitterColumn = new ColumnDefinition { Width = new GridLength(5) };
+        private readonly HashSet<string> _collapsedTreeNodeIds = new HashSet<string>(StringComparer.Ordinal);
         private RuntimeSnapshot _snapshot = NuriDiagnostics.GetSnapshot();
         private string? _selectedComponentId;
         private string? _highlightComponentId;
         private bool _isRefreshingTree;
         private bool _visualTreeCollapsed;
+        private Border? _componentTreePanel;
+        private Button? _collapsedTreeToggle;
 
         public DevToolsWindow()
         {
             Title = "Nuri Runtime DevTools";
             Width = 1180;
             Height = 760;
+            MinWidth = 920;
+            MinHeight = 620;
             FontFamily = new FontFamily("Segoe UI");
             FontSize = 13;
+            ApplyMaterialTheme();
             Content = BuildLayout();
             ConfigureApplicationLogList();
             ConfigureConsoleLogList();
@@ -47,7 +55,7 @@ namespace Nuri.WPF.DevTools
 
                 if (args.NewValue is TreeViewItem item && item.Tag is ComponentSnapshot component)
                 {
-                    SelectComponent(component, highlight: true);
+                    SelectComponent(component);
                 }
                 else
                 {
@@ -64,8 +72,19 @@ namespace Nuri.WPF.DevTools
                 }
 
                 if (item.Tag is ComponentSnapshot component)
-                    SelectComponent(component, highlight: true);
+                    SelectComponent(component);
             };
+            _componentTree.PreviewMouseMove += (_, args) =>
+            {
+                var item = FindAncestor<TreeViewItem>(args.OriginalSource as DependencyObject);
+                if (item?.Tag is ComponentSnapshot component)
+                    HighlightComponent(component.ComponentId);
+                else
+                    ClearHighlight();
+            };
+            _componentTree.MouseLeave += (_, __) => ClearHighlight();
+            _componentTree.AddHandler(TreeViewItem.ExpandedEvent, new RoutedEventHandler(OnTreeItemExpanded));
+            _componentTree.AddHandler(TreeViewItem.CollapsedEvent, new RoutedEventHandler(OnTreeItemCollapsed));
             PreviewKeyDown += (_, args) =>
             {
                 if (args.Key != Key.Escape)
@@ -75,14 +94,9 @@ namespace Nuri.WPF.DevTools
                 args.Handled = true;
             };
 
-            _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
-            _timer.Tick += (_, __) => RefreshSnapshot();
-            _timer.Start();
-
             NuriDiagnostics.Changed += OnDiagnosticsChanged;
             Closed += (_, __) =>
             {
-                _timer.Stop();
                 NuriDiagnostics.Changed -= OnDiagnosticsChanged;
                 WpfElementHighlighter.Clear();
             };
@@ -92,28 +106,79 @@ namespace Nuri.WPF.DevTools
 
         private UIElement BuildLayout()
         {
-            var tabs = new TabControl();
+            var root = new Grid();
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+            var toolbar = new Border
+            {
+                Background = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(225, 227, 230)),
+                BorderThickness = new Thickness(0, 0, 0, 1),
+                Padding = new Thickness(20, 12, 20, 10)
+            };
+            var toolbarContent = new DockPanel();
+            var status = new TextBlock
+            {
+                Text = "F12 to focus  •  Hover a component to highlight it",
+                Foreground = new SolidColorBrush(Color.FromRgb(91, 95, 102)),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            DockPanel.SetDock(status, Dock.Right);
+            toolbarContent.Children.Add(status);
+
+            var title = new StackPanel { Orientation = Orientation.Horizontal };
+            title.Children.Add(new TextBlock
+            {
+                Text = "Nuri DevTools",
+                FontSize = 19,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(Color.FromRgb(31, 31, 36))
+            });
+            title.Children.Add(new TextBlock
+            {
+                Text = "Runtime inspector",
+                Margin = new Thickness(10, 4, 0, 0),
+                Foreground = new SolidColorBrush(Color.FromRgb(91, 95, 102))
+            });
+            toolbarContent.Children.Add(title);
+            toolbar.Child = toolbarContent;
+            root.Children.Add(toolbar);
+
+            var tabs = new TabControl { Margin = new Thickness(14, 10, 14, 14) };
+            tabs.Items.Add(CreateTab("Inspector", BuildApplicationLayout()));
             tabs.Items.Add(CreateTab("Console", BuildConsoleLayout()));
-            tabs.Items.Add(CreateTab("Application", BuildApplicationLayout()));
-            return tabs;
+            Grid.SetRow(tabs, 1);
+            root.Children.Add(tabs);
+            return root;
         }
 
         private UIElement BuildApplicationLayout()
         {
-            var root = new Grid { Margin = new Thickness(12) };
+            var root = new Grid { Margin = new Thickness(2) };
             root.ColumnDefinitions.Add(_visualTreeColumn);
             root.ColumnDefinitions.Add(_visualTreeSplitterColumn);
             root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(5) });
-            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(230) });
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(190) });
 
-            var treePanel = CreatePanel("Component Tree", _componentTree);
-            treePanel.Header = CreateVisualTreeHeader();
-            Grid.SetColumn(treePanel, 0);
-            Grid.SetRow(treePanel, 0);
-            Grid.SetRowSpan(treePanel, 3);
-            root.Children.Add(treePanel);
+            var treeHost = new Grid();
+            _componentTreePanel = CreateSurface(CreateVisualTreeHeader(), _componentTree);
+            treeHost.Children.Add(_componentTreePanel);
+
+            _collapsedTreeToggle = CreateIconButton(PackIconKind.Menu, "Show component tree");
+            _collapsedTreeToggle.HorizontalAlignment = HorizontalAlignment.Center;
+            _collapsedTreeToggle.VerticalAlignment = VerticalAlignment.Top;
+            _collapsedTreeToggle.Margin = new Thickness(0, 6, 0, 0);
+            _collapsedTreeToggle.Visibility = Visibility.Collapsed;
+            _collapsedTreeToggle.Click += (_, __) => ToggleComponentTree();
+            treeHost.Children.Add(_collapsedTreeToggle);
+
+            Grid.SetColumn(treeHost, 0);
+            Grid.SetRow(treeHost, 0);
+            Grid.SetRowSpan(treeHost, 3);
+            root.Children.Add(treeHost);
 
             var verticalSplitter = new GridSplitter
             {
@@ -127,27 +192,45 @@ namespace Nuri.WPF.DevTools
             Grid.SetRowSpan(verticalSplitter, 3);
             root.Children.Add(verticalSplitter);
 
-            var detailTabs = new TabControl();
-            detailTabs.Items.Add(CreateTab("Component", new ScrollViewer { Content = _componentDetails }));
+            var detailTabs = new TabControl { Margin = new Thickness(0, 10, 0, 0) };
+            detailTabs.Items.Add(CreateTab("Details", new ScrollViewer { Content = _componentDetails }));
             detailTabs.Items.Add(CreateTab("Hooks", _hookList));
             detailTabs.Items.Add(CreateTab("Stores", _storeList));
-            Grid.SetColumn(detailTabs, 2);
-            Grid.SetRow(detailTabs, 0);
-            root.Children.Add(detailTabs);
 
-            var horizontalSplitter = new GridSplitter
+            var detailContent = new Grid();
+            detailContent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            detailContent.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            var summary = new StackPanel { Margin = new Thickness(0, 0, 0, 2) };
+            _selectedComponentTitle.Text = "Select a component";
+            _selectedComponentTitle.FontSize = 18;
+            _selectedComponentTitle.FontWeight = FontWeights.SemiBold;
+            _selectedComponentTitle.Foreground = new SolidColorBrush(Color.FromRgb(31, 31, 36));
+            _selectedComponentMetadata.Text = "Click a node to inspect it. Hover to find it in the application.";
+            _selectedComponentMetadata.Margin = new Thickness(0, 4, 0, 0);
+            _selectedComponentMetadata.Foreground = new SolidColorBrush(Color.FromRgb(91, 95, 102));
+            summary.Children.Add(_selectedComponentTitle);
+            summary.Children.Add(_selectedComponentMetadata);
+            detailContent.Children.Add(summary);
+            Grid.SetRow(detailTabs, 1);
+            detailContent.Children.Add(detailTabs);
+
+            var detailPanel = CreateSurface("Component inspector", detailContent);
+            Grid.SetColumn(detailPanel, 2);
+            Grid.SetRow(detailPanel, 0);
+            root.Children.Add(detailPanel);
+
+            var applicationLogSplitter = new GridSplitter
             {
                 Height = 5,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Stretch,
                 Background = Brushes.Transparent
             };
-            Grid.SetColumn(horizontalSplitter, 2);
-            Grid.SetRow(horizontalSplitter, 1);
-            root.Children.Add(horizontalSplitter);
+            Grid.SetColumn(applicationLogSplitter, 2);
+            Grid.SetRow(applicationLogSplitter, 1);
+            root.Children.Add(applicationLogSplitter);
 
-            var logPanel = CreatePanel("Application Logs", _applicationLogList);
-            logPanel.Header = CreateLogHeader("Application Logs");
+            var logPanel = CreateSurface(CreateApplicationLogHeader(), _applicationLogList);
             Grid.SetColumn(logPanel, 2);
             Grid.SetRow(logPanel, 2);
             root.Children.Add(logPanel);
@@ -157,13 +240,12 @@ namespace Nuri.WPF.DevTools
 
         private UIElement BuildConsoleLayout()
         {
-            var root = new Grid { Margin = new Thickness(12) };
+            var root = new Grid { Margin = new Thickness(2) };
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(5) });
             root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(170) });
 
-            var logPanel = CreatePanel("Console", _consoleLogList);
-            logPanel.Header = CreateLogHeader("Console");
+            var logPanel = CreateSurface("Console output", _consoleLogList);
             Grid.SetRow(logPanel, 0);
             root.Children.Add(logPanel);
 
@@ -177,88 +259,139 @@ namespace Nuri.WPF.DevTools
             Grid.SetRow(splitter, 1);
             root.Children.Add(splitter);
 
-            var detailPanel = CreatePanel("Details", new ScrollViewer { Content = _consoleDetails });
+            var detailPanel = CreateSurface("Selected entry", new ScrollViewer { Content = _consoleDetails });
             Grid.SetRow(detailPanel, 2);
             root.Children.Add(detailPanel);
 
             return root;
         }
 
-        private static GroupBox CreatePanel(string header, UIElement content)
+        private static Border CreateSurface(string title, UIElement content)
         {
-            return new GroupBox
+            return CreateSurface(CreateSectionHeader(title), content);
+        }
+
+        private static Border CreateSurface(UIElement header, UIElement content)
+        {
+            var layout = new Grid();
+            layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            layout.Children.Add(header);
+            Grid.SetRow(content, 1);
+            layout.Children.Add(content);
+
+            return new Border
             {
-                Header = header,
-                Margin = new Thickness(6),
-                Padding = new Thickness(8),
-                Content = content
+                Background = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(225, 227, 230)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6),
+                Margin = new Thickness(4),
+                Padding = new Thickness(12),
+                Child = layout
             };
+        }
+
+        private void ApplyMaterialTheme()
+        {
+            Resources.MergedDictionaries.Add(new ResourceDictionary
+            {
+                Source = new Uri(
+                    "pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Light.xaml",
+                    UriKind.Absolute)
+            });
+            Resources.MergedDictionaries.Add(new ResourceDictionary
+            {
+                Source = new Uri(
+                    "pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesignTheme.Defaults.xaml",
+                    UriKind.Absolute)
+            });
         }
 
         private UIElement CreateVisualTreeHeader()
         {
             var panel = new DockPanel();
-            var clear = new Button
-            {
-                Content = "Clear Highlight",
-                MinWidth = 108,
-                Height = 26,
-                Padding = new Thickness(10, 0, 10, 0),
-                Margin = new Thickness(0, 0, 6, 0)
-            };
-            clear.Click += (_, __) => ClearHighlight();
-
-            var toggle = new Button
-            {
-                Content = "Hide",
-                MinWidth = 60,
-                Height = 26,
-                Padding = new Thickness(10, 0, 10, 0)
-            };
-            toggle.Click += (_, __) =>
-            {
-                _visualTreeCollapsed = !_visualTreeCollapsed;
-                _visualTreeColumn.Width = _visualTreeCollapsed ? new GridLength(96) : new GridLength(320);
-                _visualTreeSplitterColumn.Width = _visualTreeCollapsed ? new GridLength(0) : new GridLength(5);
-                _componentTree.Visibility = _visualTreeCollapsed ? Visibility.Collapsed : Visibility.Visible;
-                toggle.Content = _visualTreeCollapsed ? "Show" : "Hide";
-            };
-
-            DockPanel.SetDock(toggle, Dock.Right);
-            DockPanel.SetDock(clear, Dock.Right);
+            var toggle = CreateIconButton(PackIconKind.Menu, "Hide component tree");
+            toggle.Margin = new Thickness(0, 0, 8, 0);
+            toggle.Click += (_, __) => ToggleComponentTree();
+            DockPanel.SetDock(toggle, Dock.Left);
             panel.Children.Add(toggle);
-            panel.Children.Add(clear);
+
             panel.Children.Add(new TextBlock
             {
-                Text = "Visual Tree",
+                Text = "Component tree",
                 FontWeight = FontWeights.SemiBold,
                 VerticalAlignment = VerticalAlignment.Center
             });
             return panel;
         }
 
-        private UIElement CreateLogHeader(string titleText)
+        private void ToggleComponentTree()
+        {
+            _visualTreeCollapsed = !_visualTreeCollapsed;
+            _visualTreeColumn.Width = _visualTreeCollapsed ? new GridLength(42) : new GridLength(320);
+            _visualTreeSplitterColumn.Width = _visualTreeCollapsed ? new GridLength(0) : new GridLength(5);
+
+            if (_componentTreePanel != null)
+                _componentTreePanel.Visibility = _visualTreeCollapsed ? Visibility.Collapsed : Visibility.Visible;
+
+            if (_collapsedTreeToggle != null)
+                _collapsedTreeToggle.Visibility = _visualTreeCollapsed ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private UIElement CreateApplicationLogHeader()
         {
             var panel = new DockPanel();
-            var title = new TextBlock
+            _applicationLogStatus.Text = "Runtime events";
+            _applicationLogStatus.FontWeight = FontWeights.SemiBold;
+            _applicationLogStatus.VerticalAlignment = VerticalAlignment.Center;
+
+            var clear = CreateActionButton("Clear");
+            clear.Margin = new Thickness(0, 0, 6, 0);
+            clear.Click += (_, __) => NuriDiagnostics.ClearLogs();
+            DockPanel.SetDock(clear, Dock.Right);
+            panel.Children.Add(clear);
+            panel.Children.Add(_applicationLogStatus);
+            return panel;
+        }
+
+        private static TextBlock CreateSectionHeader(string titleText)
+        {
+            return new TextBlock
             {
                 Text = titleText,
                 FontWeight = FontWeights.SemiBold,
-                VerticalAlignment = VerticalAlignment.Center
+                Foreground = new SolidColorBrush(Color.FromRgb(61, 65, 72)),
+                Margin = new Thickness(0, 0, 0, 10)
             };
-            var clear = new Button
+        }
+
+        private static Button CreateActionButton(string label)
+        {
+            return new Button
             {
-                Content = "Clear",
-                MinWidth = 70,
-                Height = 26,
+                Content = label,
+                MinWidth = 64,
+                Height = 28,
                 Padding = new Thickness(10, 0, 10, 0)
             };
-            clear.Click += (_, __) => NuriDiagnostics.ClearLogs();
+        }
 
-            DockPanel.SetDock(clear, Dock.Right);
-            panel.Children.Add(clear);
-            panel.Children.Add(title);
-            return panel;
+        private static Button CreateIconButton(PackIconKind kind, string toolTip)
+        {
+            return new Button
+            {
+                Content = new PackIcon
+                {
+                    Kind = kind,
+                    Width = 18,
+                    Height = 18
+                },
+                Width = 34,
+                Height = 28,
+                Padding = new Thickness(0),
+                ToolTip = toolTip
+            };
         }
 
         private void ConfigureApplicationLogList()
@@ -385,11 +518,15 @@ namespace Nuri.WPF.DevTools
 
                 foreach (var root in _snapshot.Roots)
                 {
-                    var rootItem = new TreeViewItem { Header = root.RootId + " (" + root.Renderer + ")" };
+                    var rootItem = new TreeViewItem
+                    {
+                        Header = root.RootId + " (" + root.Renderer + ")",
+                        Uid = GetRootTreeNodeId(root.RootId),
+                        IsExpanded = IsTreeNodeExpanded(GetRootTreeNodeId(root.RootId))
+                    };
                     if (root.RootComponent != null)
                         rootItem.Items.Add(CreateComponentItem(root.RootComponent, selectedComponentId));
 
-                    rootItem.IsExpanded = true;
                     _componentTree.Items.Add(rootItem);
                 }
             }
@@ -409,7 +546,8 @@ namespace Nuri.WPF.DevTools
             {
                 Header = header,
                 Tag = component,
-                IsExpanded = true
+                Uid = GetComponentTreeNodeId(component.ComponentId),
+                IsExpanded = IsTreeNodeExpanded(GetComponentTreeNodeId(component.ComponentId))
             };
 
             foreach (var child in component.Children)
@@ -421,25 +559,63 @@ namespace Nuri.WPF.DevTools
             return item;
         }
 
+        private void OnTreeItemExpanded(object sender, RoutedEventArgs args)
+        {
+            if (_isRefreshingTree || args.OriginalSource is not TreeViewItem item || string.IsNullOrEmpty(item.Uid))
+                return;
+
+            _collapsedTreeNodeIds.Remove(item.Uid);
+        }
+
+        private void OnTreeItemCollapsed(object sender, RoutedEventArgs args)
+        {
+            if (_isRefreshingTree || args.OriginalSource is not TreeViewItem item || string.IsNullOrEmpty(item.Uid))
+                return;
+
+            _collapsedTreeNodeIds.Add(item.Uid);
+        }
+
+        private bool IsTreeNodeExpanded(string nodeId)
+        {
+            return !_collapsedTreeNodeIds.Contains(nodeId);
+        }
+
+        private static string GetRootTreeNodeId(string rootId)
+        {
+            return "root:" + rootId;
+        }
+
+        private static string GetComponentTreeNodeId(string componentId)
+        {
+            return "component:" + componentId;
+        }
+
         private string? GetSelectedComponentId()
         {
             return _selectedComponentId;
         }
 
-        private void SelectComponent(ComponentSnapshot component, bool highlight)
+        private void SelectComponent(ComponentSnapshot component)
         {
             _selectedComponentId = component.ComponentId;
             ShowComponent(component);
+        }
 
-            if (!highlight)
+        private void HighlightComponent(string componentId)
+        {
+            if (string.Equals(_highlightComponentId, componentId, StringComparison.Ordinal))
                 return;
 
-            _highlightComponentId = component.ComponentId;
-            WpfElementHighlighter.Highlight(component.ComponentId);
+            _highlightComponentId = componentId;
+            WpfElementHighlighter.Highlight(componentId);
         }
 
         private void ShowComponent(ComponentSnapshot component)
         {
+            _selectedComponentTitle.Text = component.TypeName;
+            _selectedComponentMetadata.Text = component.ComponentId
+                + "  •  " + component.EntryType
+                + "  •  renders " + component.RenderCount;
             _componentDetails.Text =
                 "ComponentId: " + component.ComponentId + Environment.NewLine +
                 "Type: " + component.TypeName + Environment.NewLine +
@@ -464,6 +640,8 @@ namespace Nuri.WPF.DevTools
         {
             _selectedComponentId = null;
             _highlightComponentId = null;
+            _selectedComponentTitle.Text = "Select a component";
+            _selectedComponentMetadata.Text = "Click a node to inspect it. Hover to find it in the application.";
             _componentDetails.Text = string.Empty;
             _hookList.Items.Clear();
             WpfElementHighlighter.Clear();
@@ -504,10 +682,14 @@ namespace Nuri.WPF.DevTools
 
         private void RefreshApplicationLogs()
         {
-            _applicationLogList.ItemsSource = _snapshot.RecentLogs
+            var logs = _snapshot.RecentLogs
                 .Where(IsApplicationLog)
                 .Reverse()
                 .ToArray();
+            _applicationLogList.ItemsSource = logs;
+            _applicationLogStatus.Text = logs.Length == 0
+                ? "Runtime events"
+                : "Runtime events  •  " + logs.Length + " recent";
         }
 
         private void RefreshConsoleLogs()
