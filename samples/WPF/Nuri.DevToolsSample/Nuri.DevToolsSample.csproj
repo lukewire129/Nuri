@@ -9,8 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Nuri.WPF\Nuri.WPF.csproj" />
-    <ProjectReference Include="..\..\..\src\Nuri.WPF.DevTools\Nuri.WPF.DevTools.csproj" />
+    <ProjectReference Include="..\..\..\src\Nuri.WPF\Nuri.WPF.csproj" SetTargetFramework="TargetFramework=net8.0-windows" />
   </ItemGroup>
 
 </Project>

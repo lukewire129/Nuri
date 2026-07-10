@@ -47,4 +47,11 @@
     <ProjectReference Include="..\Nuri\Nuri.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Nuri.WPF.DevTools\DiagnosticsConsoleWriter.cs" Link="DevTools\DiagnosticsConsoleWriter.cs" />
+    <Compile Include="..\Nuri.WPF.DevTools\DevToolsWindow.cs" Link="DevTools\DevToolsWindow.cs" />
+    <Compile Include="..\Nuri.WPF.DevTools\NuriDevTools.cs" Link="DevTools\NuriDevTools.cs" />
+    <Compile Include="..\Nuri.WPF.DevTools\WpfElementHighlighter.cs" Link="DevTools\WpfElementHighlighter.cs" />
+  </ItemGroup>
+
 </Project>

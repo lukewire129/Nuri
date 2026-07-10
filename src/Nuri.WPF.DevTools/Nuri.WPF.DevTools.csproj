@@ -8,8 +8,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Nuri\Nuri.csproj" />
-    <ProjectReference Include="..\Nuri.WPF\Nuri.WPF.csproj" />
+    <ProjectReference Include="..\Nuri.WPF\Nuri.WPF.csproj" SetTargetFramework="TargetFramework=net8.0-windows" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="DevToolsWindow.cs" />
+    <Compile Remove="DiagnosticsConsoleWriter.cs" />
+    <Compile Remove="NuriDevTools.cs" />
+    <Compile Remove="WpfElementHighlighter.cs" />
   </ItemGroup>
 
 </Project>

@@ -11,7 +11,9 @@ namespace Nuri.WPF
     {
         private static readonly object SyncRoot = new object();
         private static readonly List<ApplicationRoot> Roots = new List<ApplicationRoot>();
+        private static NuriApplicationOptions Options = new NuriApplicationOptions();
         private static bool _hotReloadAttached;
+        private static bool _configurationLocked;
 
         public static void Run<TComponent>(string title, double width = 800, double height = 600)
             where TComponent : Component, new()
@@ -72,6 +74,33 @@ namespace Nuri.WPF
         public static void Configure()
         {
             EnsureHotReloadAttached();
+        }
+
+        public static void Configure(Action<NuriApplicationOptions> configure)
+        {
+            if (configure == null)
+                throw new ArgumentNullException(nameof(configure));
+
+            lock (SyncRoot)
+            {
+                if (_configurationLocked)
+                    throw new InvalidOperationException("NuriApplication must be configured before the first application root is created.");
+
+                var configuredOptions = Options.Clone();
+                configure(configuredOptions);
+                Options = configuredOptions;
+            }
+
+            EnsureHotReloadAttached();
+        }
+
+        internal static DevToolsConfiguration LockDevToolsConfiguration()
+        {
+            lock (SyncRoot)
+            {
+                _configurationLocked = true;
+                return new DevToolsConfiguration(Options.DevTools.Enabled, Options.DevTools.ToggleKey);
+            }
         }
 
         internal static void Register(ApplicationRoot root)
