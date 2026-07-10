@@ -1,0 +1,72 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <OutputType>Library</OutputType>
+    <RootNamespace>Nuri.VisualStudioPreview</RootNamespace>
+    <AssemblyName>Nuri.VisualStudioPreview</AssemblyName>
+    <UseWPF>true</UseWPF>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <UseCodebase>true</UseCodebase>
+    <RestoreBuildInParallel>false</RestoreBuildInParallel>
+    <GeneratePkgDefFile>true</GeneratePkgDefFile>
+    <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
+    <IncludeDebugSymbolsInVSIXContainer>true</IncludeDebugSymbolsInVSIXContainer>
+    <IncludeDebugSymbolsInLocalVSIXDeployment>true</IncludeDebugSymbolsInLocalVSIXDeployment>
+    <DeployExtension>false</DeployExtension>
+    <CopyVsixManifestToOutput>false</CopyVsixManifestToOutput>
+    <TargetVsixContainer>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\$(AssemblyName).vsix</TargetVsixContainer>
+    <VsixIntermediateOutputPath>$(MSBuildProjectDirectory)\obj\$(Configuration)\$(TargetFramework)</VsixIntermediateOutputPath>
+    <FileManifest>$(VsixIntermediateOutputPath)\files.json</FileManifest>
+    <TemplateFileManifest>$(VsixIntermediateOutputPath)\templateFiles.json</TemplateFileManifest>
+    <ResourceManifest>$(VsixIntermediateOutputPath)\resources.json</ResourceManifest>
+    <CtoFileManifest>$(VsixIntermediateOutputPath)\ctoFiles.json</CtoFileManifest>
+    <CtoCacheFile>$(VsixIntermediateOutputPath)\mergeCto.cache</CtoCacheFile>
+    <CreateTemplateManifestsCacheFile>$(VsixIntermediateOutputPath)\createTemplateManifests.cache</CreateTemplateManifestsCacheFile>
+    <TemplateOutputDirectory>$(VsixIntermediateOutputPath)\Templates</TemplateOutputDirectory>
+    <CreatePkgDefAssemblyToProcess>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\$(AssemblyName).dll</CreatePkgDefAssemblyToProcess>
+    <CreateVsixContainerDependsOn>Build;GeneratePkgDef;$(CreateVsixContainerDependsOn)</CreateVsixContainerDependsOn>
+    <DeployVSTemplates>false</DeployVSTemplates>
+    <PreviewHostProject>$(MSBuildProjectDirectory)\..\Nuri.WPF.PreviewHost\Nuri.WPF.PreviewHost.csproj</PreviewHostProject>
+    <PreviewHostOutputDirectory>$(MSBuildProjectDirectory)\..\Nuri.WPF.PreviewHost\bin\$(Configuration)\net8.0-windows</PreviewHostOutputDirectory>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.0.31902.203" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.9.3168" PrivateAssets="all" GeneratePathProperty="true" />
+    <ProjectReference Include="$(PreviewHostProject)" ReferenceOutputAssembly="false" Private="false" SetTargetFramework="TargetFramework=net8.0-windows" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Design" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="WindowsFormsIntegration" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="source.extension.vsixmanifest">
+      <SubType>Designer</SubType>
+    </None>
+    <VSCTCompile Include="source.extension.vsct">
+      <ResourceName>Menus.ctmenu</ResourceName>
+    </VSCTCompile>
+  </ItemGroup>
+
+  <Import Project="$(PkgMicrosoft_VSSDK_BuildTools)\tools\vssdk\Microsoft.VsSDK.targets" Condition="'$(PkgMicrosoft_VSSDK_BuildTools)' != '' and Exists('$(PkgMicrosoft_VSSDK_BuildTools)\tools\vssdk\Microsoft.VsSDK.targets')" />
+  <Import Project="$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets" Condition="'$(PkgMicrosoft_VSSDK_BuildTools)' == '' and Exists('$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets')" />
+
+  <Target Name="IncludePreviewHostInVsix" BeforeTargets="GetVsixSourceItems">
+    <ItemGroup>
+      <Content Include="$(PreviewHostOutputDirectory)\**\*" Exclude="$(PreviewHostOutputDirectory)\**\*.pdb;$(PreviewHostOutputDirectory)\**\*.resources.dll">
+        <IncludeInVSIX>true</IncludeInVSIX>
+        <VSIXSubPath>PreviewHost\%(RecursiveDir)</VSIXSubPath>
+      </Content>
+    </ItemGroup>
+  </Target>
+
+  <Target Name="CreateVsixAfterBuild" AfterTargets="Build" Condition="'$(VsSdkTargetsImported)' == 'true'">
+    <CallTarget Targets="CreateVsixContainer" />
+  </Target>
+
+</Project>

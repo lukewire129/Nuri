@@ -1,16 +1,10 @@
-using System;
-using System.Collections.Generic;
+using Nuri.UI.Dsl;
 using System.IO;
-using System.Linq;
-using System.Reflection;
-using System.Runtime.Loader;
-using System.Threading;
-using System.Threading.Tasks;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Threading;
-using Nuri.UI.Dsl;
-using Nuri.WPF;
 
 namespace Nuri.WPF.PreviewHost;
 
@@ -18,117 +12,219 @@ internal sealed class PreviewWindow : Window
 {
     private readonly PreviewOptions _options;
     private readonly PreviewBuildService _buildService;
-    private readonly ListBox _componentList = new();
     private readonly ContentControl _previewSurface = new();
-    private readonly TextBox _statusText = new();
     private readonly DispatcherTimer _reloadTimer;
-    private readonly FileSystemWatcher _watcher;
-    private IReadOnlyList<ComponentDescriptor> _components = Array.Empty<ComponentDescriptor>();
+    private readonly FileSystemWatcher? _commandWatcher;
+    private readonly List<PreviewAssemblyLoadContext> _retiredLoadContexts = new();
     private ApplicationRoot? _currentRoot;
     private PreviewAssemblyLoadContext? _loadContext;
-    private string? _selectedComponentName;
+    private string? _rootComponentFullName;
     private bool _isReloading;
     private bool _reloadAgain;
-    private bool _suppressSelectionChanged;
+    private bool _pendingFullReload;
+    private bool _pendingPartialReload;
+    [StructLayout (LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
 
+    [DllImport ("user32.dll")]
+    private static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
+    [DllImport ("user32.dll")]
+    private static extern IntPtr SetParent(IntPtr hWndChild, IntPtr hWndNewParent);
+    [DllImport ("user32.dll", EntryPoint = "GetWindowLongPtr", SetLastError = true)]
+    private static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int nIndex);
+
+    [DllImport ("user32.dll", EntryPoint = "SetWindowLongPtr", SetLastError = true)]
+    private static extern IntPtr SetWindowLongPtr64(
+        IntPtr hWnd,
+        int nIndex,
+        IntPtr dwNewLong);
+
+    [DllImport ("user32.dll", EntryPoint = "GetWindowLong", SetLastError = true)]
+    private static extern IntPtr GetWindowLongPtr32(IntPtr hWnd, int nIndex);
+
+    [DllImport ("user32.dll", EntryPoint = "SetWindowLong", SetLastError = true)]
+    private static extern IntPtr SetWindowLongPtr32(
+        IntPtr hWnd,
+        int nIndex,
+        IntPtr dwNewLong);
+    private const int GWL_STYLE = -16;
+    private const long WS_CHILD = 0x40000000L;
+    private const long WS_POPUP = 0x80000000L;
+    private const long WS_CAPTION = 0x00C00000L;
+    private const long WS_THICKFRAME = 0x00040000L;
+    private const long WS_SYSMENU = 0x00080000L;
+    private const long WS_MINIMIZEBOX = 0x00020000L;
+    private const long WS_MAXIMIZEBOX = 0x00010000L;
+    private const uint SWP_NOZORDER = 0x0004;
+    private const uint SWP_NOACTIVATE = 0x0010;
+    private const uint SWP_FRAMECHANGED = 0x0020;
+    private const uint SWP_SHOWWINDOW = 0x0040;
+
+    [DllImport ("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(
+        IntPtr hWnd,
+        IntPtr hWndInsertAfter,
+        int x,
+        int y,
+        int cx,
+        int cy,
+        uint uFlags);
     public PreviewWindow(PreviewOptions options)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _buildService = new PreviewBuildService(options.ProjectPath);
-        _selectedComponentName = options.ComponentName;
 
-        Title = "Nuri Preview Host";
-        Width = 1200;
-        Height = 800;
-        Content = CreateLayout();
+        Title = "Nuri Preview Renderer";
+        Background = System.Windows.Media.Brushes.White;
+        Content = _previewSurface;
+
+        if (options.Embedded)
+        {
+            WindowStyle = WindowStyle.None;
+            ResizeMode = ResizeMode.NoResize;
+            ShowInTaskbar = false;
+        }
 
         _reloadTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
-        _reloadTimer.Tick += async (_, _) =>
+        _reloadTimer.Tick += (_, _) =>
         {
             _reloadTimer.Stop();
-            await ReloadAsync();
+            OnReloadTimerTick();
         };
 
-        _watcher = CreateWatcher(options.ProjectPath);
+        _commandWatcher = CreateCommandWatcher(options.CommandFilePath);
+
         Loaded += async (_, _) =>
         {
             Component.AnyStateChanged += OnAnyComponentStateChanged;
-            _watcher.EnableRaisingEvents = true;
-            await ReloadAsync();
+            if (_commandWatcher != null)
+                _commandWatcher.EnableRaisingEvents = true;
+
+            await ReloadAsync(resetState: true);
         };
         Closed += (_, _) => Cleanup();
     }
-
-    private UIElement CreateLayout()
+    private static IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex)
     {
-        var root = new Grid();
-        root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(280) });
-        root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(140) });
-
-        _componentList.Margin = new Thickness(8);
-        _componentList.SelectionChanged += (_, _) =>
-        {
-            if (_suppressSelectionChanged)
-                return;
-
-            if (_componentList.SelectedItem is not ComponentDescriptor selected)
-                return;
-
-            _selectedComponentName = selected.FullName;
-            RenderSelectedComponent();
-        };
-        Grid.SetRowSpan(_componentList, 2);
-        root.Children.Add(_componentList);
-
-        var previewBorder = new Border
-        {
-            BorderThickness = new Thickness(1),
-            BorderBrush = System.Windows.Media.Brushes.LightGray,
-            Margin = new Thickness(0, 8, 8, 4),
-            Child = _previewSurface
-        };
-        Grid.SetColumn(previewBorder, 1);
-        root.Children.Add(previewBorder);
-
-        _statusText.IsReadOnly = true;
-        _statusText.TextWrapping = TextWrapping.Wrap;
-        _statusText.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
-        _statusText.Margin = new Thickness(0, 4, 8, 8);
-        Grid.SetColumn(_statusText, 1);
-        Grid.SetRow(_statusText, 1);
-        root.Children.Add(_statusText);
-
-        return root;
+        return IntPtr.Size == 8
+            ? GetWindowLongPtr64 (hWnd, nIndex)
+            : GetWindowLongPtr32 (hWnd, nIndex);
+    }
+    private static IntPtr SetWindowLongPtr(
+        IntPtr hWnd,
+        int nIndex,
+        IntPtr value)
+    {
+        return IntPtr.Size == 8
+            ? SetWindowLongPtr64 (hWnd, nIndex, value)
+            : SetWindowLongPtr32 (hWnd, nIndex, value);
     }
 
-    private FileSystemWatcher CreateWatcher(string projectPath)
+    protected override void OnSourceInitialized(EventArgs e)
     {
-        var projectDirectory = Path.GetDirectoryName(projectPath) ?? Directory.GetCurrentDirectory();
-        var watcher = new FileSystemWatcher(projectDirectory)
+        base.OnSourceInitialized (e);
+
+        if (!_options.Embedded || _options.ParentHandle == IntPtr.Zero)
+            return;
+
+        var childHandle = new WindowInteropHelper (this).Handle;
+
+        // 1. 먼저 자식 창 스타일로 변경
+        var style = GetWindowLongPtr (childHandle, GWL_STYLE).ToInt64 ();
+
+        style &= ~WS_POPUP;
+        style |= WS_CHILD;
+
+        SetWindowLongPtr (
+        childHandle,
+        GWL_STYLE,
+        new IntPtr (style));
+
+        SetParent (childHandle, _options.ParentHandle);
+
+        if (GetClientRect (_options.ParentHandle, out var rect))
         {
-            IncludeSubdirectories = true,
-            NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.CreationTime
+            var width = rect.Right - rect.Left;
+            var height = rect.Bottom - rect.Top;
+
+            SetWindowPos (
+                childHandle,
+                IntPtr.Zero,
+                0,
+                0,
+                width,
+                height,
+                SWP_NOZORDER |
+                SWP_NOACTIVATE |
+                SWP_FRAMECHANGED |
+                SWP_SHOWWINDOW);
+        }
+    }
+
+    private FileSystemWatcher? CreateCommandWatcher(string? commandFilePath)
+    {
+        if (string.IsNullOrWhiteSpace(commandFilePath))
+            return null;
+
+        var directory = Path.GetDirectoryName(commandFilePath);
+        var fileName = Path.GetFileName(commandFilePath);
+        if (string.IsNullOrWhiteSpace(directory) || string.IsNullOrWhiteSpace(fileName))
+            return null;
+
+        Directory.CreateDirectory(directory);
+        var watcher = new FileSystemWatcher(directory, fileName)
+        {
+            IncludeSubdirectories = false,
+            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.CreationTime | NotifyFilters.Size
         };
 
-        watcher.Changed += OnFileChanged;
-        watcher.Created += OnFileChanged;
-        watcher.Deleted += OnFileChanged;
-        watcher.Renamed += OnFileChanged;
+        watcher.Changed += OnCommandFileChanged;
+        watcher.Created += OnCommandFileChanged;
         return watcher;
     }
 
-    private void OnFileChanged(object sender, FileSystemEventArgs args)
+    private void OnCommandFileChanged(object sender, FileSystemEventArgs args)
     {
-        if (!ShouldReloadFor(args.FullPath))
-            return;
-
         Dispatcher.Invoke(() =>
         {
+            var command = ReadCommand(args.FullPath);
+            if (string.Equals(command, "full", StringComparison.OrdinalIgnoreCase))
+            {
+                _pendingFullReload = true;
+                _pendingPartialReload = false;
+            }
+            else
+            {
+                _pendingPartialReload = true;
+            }
+
             _reloadTimer.Stop();
             _reloadTimer.Start();
         });
+    }
+
+    private async void OnReloadTimerTick()
+    {
+        if (_pendingFullReload)
+        {
+            _pendingFullReload = false;
+            _pendingPartialReload = false;
+            _rootComponentFullName = null;
+            await ReloadAsync(resetState: true);
+            return;
+        }
+
+        if (_pendingPartialReload)
+        {
+            _pendingPartialReload = false;
+            await ReloadAsync(resetState: false);
+        }
     }
 
     private void OnAnyComponentStateChanged(object? sender, Component component)
@@ -136,124 +232,189 @@ internal sealed class PreviewWindow : Window
         _currentRoot?.ScheduleComponentRebuild(component);
     }
 
-    private static bool ShouldReloadFor(string path)
-    {
-        if (path.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-            || path.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-            return false;
-
-        var extension = Path.GetExtension(path);
-        return extension.Equals(".cs", StringComparison.OrdinalIgnoreCase)
-            || extension.Equals(".xaml", StringComparison.OrdinalIgnoreCase)
-            || extension.Equals(".csproj", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private async Task ReloadAsync()
+    private async Task ReloadAsync(bool resetState)
     {
         if (_isReloading)
         {
             _reloadAgain = true;
+            _pendingFullReload |= resetState;
             return;
         }
 
         _isReloading = true;
         try
         {
-            SetStatus("Building " + _options.ProjectPath);
-            var result = await _buildService.BuildAsync(CancellationToken.None);
+            ReportStatus(resetState ? "Rendering preview..." : "Applying preview changes...");
+            ShowMessage(resetState ? "Rendering preview..." : "Applying preview changes...");
+
+            var result = await _buildService.BuildAsync(CancellationToken.None, preferRoslyn: true);
             if (!result.Succeeded || result.AssemblyPath == null)
             {
-                SetStatus("Build failed." + Environment.NewLine + result.Log);
+                ReportStatus("Preview build failed." + Environment.NewLine + result.Log);
+                ShowMessage("Preview build failed." + Environment.NewLine + result.Log);
                 return;
             }
 
-            LoadComponents(result.AssemblyPath);
-            SetStatus("Build succeeded." + Environment.NewLine + result.Log);
+            var renderSession = CreateRenderSession(result.AssemblyPath);
+            ApplyRenderSession(renderSession, resetState || _currentRoot == null);
+            RetirePreviousLoadContext(renderSession.LoadContext);
         }
         catch (Exception ex)
         {
-            SetStatus(ex.ToString());
+            ReportStatus(ex.ToString());
+            ShowMessage(ex.ToString());
         }
         finally
         {
             _isReloading = false;
             if (_reloadAgain)
             {
+                var resetAgain = _pendingFullReload;
                 _reloadAgain = false;
+                _pendingFullReload = false;
+                _pendingPartialReload = true;
                 _reloadTimer.Stop();
                 _reloadTimer.Start();
+                if (resetAgain)
+                {
+                    _pendingPartialReload = false;
+                    _pendingFullReload = true;
+                }
             }
         }
     }
 
-    private void LoadComponents(string assemblyPath)
+    private RenderSession CreateRenderSession(string assemblyPath)
     {
-        DisposeCurrentRoot();
-        ClearComponentList();
-        UnloadCurrentAssembly();
-
         var shadowAssemblyPath = PreviewAssemblyLoadContext.ShadowCopy(assemblyPath);
-        _loadContext = new PreviewAssemblyLoadContext(shadowAssemblyPath);
-        var assembly = _loadContext.LoadFromAssemblyPath(shadowAssemblyPath);
-        _components = ComponentDiscovery.Discover(assembly);
+        var loadContext = new PreviewAssemblyLoadContext(shadowAssemblyPath);
+        var assembly = loadContext.LoadFromAssemblyPath(shadowAssemblyPath);
+        var root = ResolveRootComponent(assembly);
+        var rootElement = CreateRootElement(root);
+        return new RenderSession(loadContext, root, rootElement);
+    }
 
-        _suppressSelectionChanged = true;
-        _componentList.ItemsSource = _components;
-
-        if (_components.Count == 0)
+    private ComponentDescriptor ResolveRootComponent(System.Reflection.Assembly assembly)
+    {
+        if (!string.IsNullOrWhiteSpace(_rootComponentFullName))
         {
-            _suppressSelectionChanged = false;
-            _previewSurface.Content = new TextBlock
-            {
-                Text = "No previewable Nuri components were found.",
-                Margin = new Thickness(20)
-            };
-            return;
+            var type = assembly.GetType(_rootComponentFullName!, throwOnError: false);
+            if (type != null && ComponentDiscovery.IsPreviewableComponent(type))
+                return new ComponentDescriptor(type);
         }
 
-        var selected = SelectComponent(_components);
-        _componentList.SelectedItem = selected;
-        _suppressSelectionChanged = false;
-        RenderSelectedComponent();
+        var components = ComponentDiscovery.Discover(assembly);
+        var root = RootComponentDiscovery.ResolveRoot(_options.ProjectPath, components);
+        _rootComponentFullName = root.FullName;
+        return root;
     }
 
-    private ComponentDescriptor SelectComponent(IReadOnlyList<ComponentDescriptor> components)
+    private static IElement CreateRootElement(ComponentDescriptor root)
     {
-        var selected = components.FirstOrDefault(component =>
-            string.Equals(component.FullName, _selectedComponentName, StringComparison.Ordinal)
-            || string.Equals(component.ComponentType.Name, _selectedComponentName, StringComparison.Ordinal));
-
-        selected ??= components[0];
-        _selectedComponentName = selected.FullName;
-        return selected;
+        var component = (Component)Activator.CreateInstance(root.ComponentType)!;
+        return new WindowView(component)
+            .WithTitle(root.DisplayName)
+            .WithSize(1000, 700);
     }
 
-    private void RenderSelectedComponent()
+    private void ApplyRenderSession(RenderSession session, bool resetState)
     {
-        if (_componentList.SelectedItem is not ComponentDescriptor selected)
+        if (resetState || _currentRoot == null)
+        {
+            DisposeCurrentRoot();
+            _currentRoot = ApplicationRoot.Initialize(
+                session.RootElement,
+                new ContentControlHost(_previewSurface),
+                () => _previewSurface.Dispatcher,
+                _ => { });
+        }
+        else
+        {
+            _currentRoot.ReplaceRoot(session.RootElement, resetState: false);
+        }
+
+        ReportStatus("Previewing " + session.Root.FullName);
+        ShowMessageIfSurfaceIsEmpty("Previewing " + session.Root.FullName);
+    }
+
+    private void RetirePreviousLoadContext(PreviewAssemblyLoadContext nextLoadContext)
+    {
+        if (_loadContext != null)
+            _retiredLoadContexts.Add(_loadContext);
+
+        _loadContext = nextLoadContext;
+        CollectRetiredLoadContexts();
+    }
+
+    private void CollectRetiredLoadContexts()
+    {
+        for (var i = _retiredLoadContexts.Count - 1; i >= 0; i--)
+        {
+            _retiredLoadContexts[i].Unload();
+            _retiredLoadContexts.RemoveAt(i);
+        }
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+    }
+
+    private void ShowMessageIfSurfaceIsEmpty(string message)
+    {
+        if (_previewSurface.Content == null)
+            ShowMessage(message);
+    }
+
+    private void ShowMessage(string message)
+    {
+        if (_currentRoot != null && _previewSurface.Content != null)
+            return;
+
+        _previewSurface.Content = new TextBlock
+        {
+            Text = message,
+            Margin = new Thickness(16),
+            TextWrapping = TextWrapping.Wrap
+        };
+    }
+
+    private void ReportStatus(string message)
+    {
+        if (string.IsNullOrWhiteSpace(_options.StatusFilePath))
             return;
 
         try
         {
-            DisposeCurrentRoot();
-            var component = (Component)Activator.CreateInstance(selected.ComponentType)!;
-            component.SetProperty(Nuri.Constants.PropertyKeys.Title, selected.DisplayName);
-            _currentRoot = ApplicationRoot.Initialize(
-                component,
-                new ContentControlHost(_previewSurface),
-                () => _previewSurface.Dispatcher,
-                _ => { });
-            SetStatus("Previewing " + selected.FullName);
+            var directory = Path.GetDirectoryName(_options.StatusFilePath);
+            if (!string.IsNullOrWhiteSpace(directory))
+                Directory.CreateDirectory(directory);
+
+            File.WriteAllText(_options.StatusFilePath, message);
         }
-        catch (Exception ex)
+        catch
         {
-            SetStatus(ex.ToString());
         }
     }
 
-    private void SetStatus(string message)
+    private static string ReadCommand(string path)
     {
-        _statusText.Text = message;
+        for (var i = 0; i < 5; i++)
+        {
+            try
+            {
+                if (!File.Exists(path))
+                    return "partial";
+
+                var text = File.ReadAllText(path).Trim();
+                var firstSpace = text.IndexOf(' ');
+                return firstSpace < 0 ? text : text.Substring(0, firstSpace);
+            }
+            catch (IOException)
+            {
+                Thread.Sleep(50);
+            }
+        }
+
+        return "partial";
     }
 
     private void DisposeCurrentRoot()
@@ -263,35 +424,38 @@ internal sealed class PreviewWindow : Window
         _previewSurface.Content = null;
     }
 
-    private void ClearComponentList()
-    {
-        _suppressSelectionChanged = true;
-        _componentList.ItemsSource = null;
-        _components = Array.Empty<ComponentDescriptor>();
-        _suppressSelectionChanged = false;
-    }
-
     private void UnloadCurrentAssembly()
     {
-        if (_loadContext == null)
-            return;
-
-        var weakReference = new WeakReference(_loadContext, trackResurrection: false);
-        _loadContext.Unload();
-        _loadContext = null;
-
-        for (var i = 0; weakReference.IsAlive && i < 2; i++)
+        if (_loadContext != null)
         {
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
+            _loadContext.Unload();
+            _loadContext = null;
         }
+
+        CollectRetiredLoadContexts();
     }
 
     private void Cleanup()
     {
         Component.AnyStateChanged -= OnAnyComponentStateChanged;
-        _watcher.Dispose();
+        _commandWatcher?.Dispose();
         DisposeCurrentRoot();
         UnloadCurrentAssembly();
+    }
+
+    private sealed class RenderSession
+    {
+        public RenderSession(PreviewAssemblyLoadContext loadContext, ComponentDescriptor root, IElement rootElement)
+        {
+            LoadContext = loadContext ?? throw new ArgumentNullException(nameof(loadContext));
+            Root = root ?? throw new ArgumentNullException(nameof(root));
+            RootElement = rootElement ?? throw new ArgumentNullException(nameof(rootElement));
+        }
+
+        public PreviewAssemblyLoadContext LoadContext { get; }
+
+        public ComponentDescriptor Root { get; }
+
+        public IElement RootElement { get; }
     }
 }

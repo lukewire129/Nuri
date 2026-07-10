@@ -19,6 +19,7 @@ namespace Nuri.WPF
     {
         private static int _nextTreeIndex;
         private FrameworkElement? _currentRootVisual;
+        private IElement? _rootElement;
         private ApplicationRuntime<IElement>? _runtime;
         private RenderCoordinator<IElement, FrameworkElement>? _coordinator;
         private WpfApplicationHost? _host;
@@ -61,6 +62,22 @@ namespace Nuri.WPF
             Coordinator.RebuildAll();
         }
 
+        public void ReplaceRoot(IElement rootElement, bool resetState)
+        {
+            if (_disposed)
+                return;
+
+            if (rootElement == null)
+                throw new ArgumentNullException(nameof(rootElement));
+
+            if (resetState)
+                ComponentLifecycle.DisposeSubtree(_treePrefix + "_0");
+
+            PrepareRoot(rootElement, _treePrefix);
+            _rootElement = rootElement;
+            Coordinator.RebuildAll();
+        }
+
         public void DispatchRebuild()
         {
             Scheduler.Schedule(Rebuild);
@@ -87,12 +104,12 @@ namespace Nuri.WPF
         {
             var treePrefix = $"window{Interlocked.Increment(ref _nextTreeIndex)}";
             _treePrefix = treePrefix;
-            rootElement.LoadNodeNumber(treePrefix, 0);
-            Nuri.UI.ElementTree<IElement, AnimationValue>.AssignDescendantIds(rootElement.Id, rootElement);
+            PrepareRoot(rootElement, treePrefix);
+            _rootElement = rootElement;
 
             _runtime = new ApplicationRuntime<IElement>(() =>
             {
-                return rootElement;
+                return _rootElement ?? throw new InvalidOperationException("Application root element is not initialized.");
             }, element => element.ToVirtualEntry());
 
             _host = host as WpfApplicationHost;
@@ -108,6 +125,12 @@ namespace Nuri.WPF
             Coordinator.Initialize();
             NuriDiagnostics.RegisterRoot(_treePrefix, "WPF", () => _runtime?.CurrentVirtualEntry);
             WpfDevToolsRuntime.RegisterRoot(_treePrefix, () => _currentRootVisual, () => _runtime?.CurrentVirtualEntry);
+        }
+
+        private static void PrepareRoot(IElement rootElement, string treePrefix)
+        {
+            rootElement.LoadNodeNumber(treePrefix, 0);
+            Nuri.UI.ElementTree<IElement, AnimationValue>.AssignDescendantIds(rootElement.Id, rootElement);
         }
 
         public void ScheduleComponentRebuild(Component component)

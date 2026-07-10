@@ -25,33 +25,60 @@ internal static class Program
 
 internal sealed class PreviewOptions
 {
-    private PreviewOptions(string projectPath, string? componentName)
+    private PreviewOptions(string projectPath, string? commandFilePath, string? statusFilePath, bool embedded, IntPtr parentHandle)
     {
         ProjectPath = projectPath;
-        ComponentName = componentName;
+        CommandFilePath = commandFilePath;
+        StatusFilePath = statusFilePath;
+        Embedded = embedded;
+        ParentHandle = parentHandle;
     }
 
     public string ProjectPath { get; }
 
-    public string? ComponentName { get; }
+    public string? CommandFilePath { get; }
 
+    public string? StatusFilePath { get; }
+
+    public bool Embedded { get; }
+    public IntPtr ParentHandle { get; }
     public static PreviewOptions Parse(string[] args)
     {
         string? projectPath = null;
-        string? componentName = null;
+        string? commandFilePath = null;
+        string? statusFilePath = null;
+        var embedded = false;
+        IntPtr parentHandle = IntPtr.Zero;
 
         for (var i = 0; i < args.Length; i++)
         {
             var arg = args[i];
+            if (string.Equals(arg, "--embedded", StringComparison.OrdinalIgnoreCase))
+            {
+                embedded = true;
+                continue;
+            }
+            if (string.Equals (arg, "--parent-hwnd", StringComparison.OrdinalIgnoreCase))
+            {
+                parentHandle = new IntPtr (long.Parse (args[++i]));
+                continue;
+            }
+
             if (string.Equals(arg, "--project", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
             {
                 projectPath = args[++i];
                 continue;
             }
 
-            if (string.Equals(arg, "--component", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            if (string.Equals(arg, "--command-file", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
             {
-                componentName = args[++i];
+                commandFilePath = args[++i];
+                continue;
+            }
+
+            if (string.Equals(arg, "--status-file", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            {
+                statusFilePath = args[++i];
                 continue;
             }
 
@@ -67,6 +94,6 @@ internal sealed class PreviewOptions
         if (!File.Exists(fullPath))
             throw new FileNotFoundException("Project file was not found.", fullPath);
 
-        return new PreviewOptions(fullPath, componentName);
+        return new PreviewOptions(fullPath, commandFilePath, statusFilePath, embedded, parentHandle);
     }
 }

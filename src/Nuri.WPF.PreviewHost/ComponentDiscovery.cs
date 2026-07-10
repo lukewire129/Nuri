@@ -29,7 +29,7 @@ internal static class ComponentDiscovery
         }
     }
 
-    private static bool IsPreviewableComponent(Type type)
+    public static bool IsPreviewableComponent(Type type)
     {
         return typeof(Component).IsAssignableFrom(type)
             && type is { IsAbstract: false, IsGenericTypeDefinition: false }

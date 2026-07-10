@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable">
+  <Extern href="stdidcmd.h" />
+  <Extern href="vsshlids.h" />
+
+  <Commands package="guidNuriPreviewPackage">
+    <Groups>
+      <Group guid="guidNuriPreviewPackageCmdSet" id="NuriPreviewViewGroup" priority="0x0600">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_VIEW" />
+      </Group>
+      <Group guid="guidNuriPreviewPackageCmdSet" id="NuriPreviewToolsGroup" priority="0x0600">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_MENU_TOOLS" />
+      </Group>
+      <Group guid="guidNuriPreviewPackageCmdSet" id="NuriPreviewCodeWindowGroup" priority="0x0600">
+        <Parent guid="guidSHLMainMenu" id="IDM_VS_CTXT_CODEWIN" />
+      </Group>
+    </Groups>
+    <Buttons>
+      <Button guid="guidNuriPreviewPackageCmdSet" id="NuriPreviewCommandId" priority="0x0100" type="Button">
+        <Parent guid="guidNuriPreviewPackageCmdSet" id="NuriPreviewViewGroup" />
+        <Strings>
+          <ButtonText>Nuri Preview</ButtonText>
+          <CommandName>NuriPreview.View</CommandName>
+        </Strings>
+      </Button>
+      <Button guid="guidNuriPreviewPackageCmdSet" id="NuriPreviewCommandIdTools" priority="0x0100" type="Button">
+        <Parent guid="guidNuriPreviewPackageCmdSet" id="NuriPreviewToolsGroup" />
+        <Strings>
+          <ButtonText>Nuri Preview</ButtonText>
+          <CommandName>NuriPreview.Tools</CommandName>
+        </Strings>
+      </Button>
+      <Button guid="guidNuriPreviewPackageCmdSet" id="NuriPreviewCommandIdCodeWindow" priority="0x0100" type="Button">
+        <Parent guid="guidNuriPreviewPackageCmdSet" id="NuriPreviewCodeWindowGroup" />
+        <Strings>
+          <ButtonText>Nuri Preview</ButtonText>
+          <CommandName>NuriPreview.CodeWindow</CommandName>
+        </Strings>
+      </Button>
+    </Buttons>
+  </Commands>
+
+  <Symbols>
+    <GuidSymbol name="guidNuriPreviewPackage" value="{1cb9d1ed-4f3d-4dd7-bf9d-8cf526062de7}" />
+    <GuidSymbol name="guidNuriPreviewPackageCmdSet" value="{95fbb680-ad86-4e65-b8da-7fbd7e5f397f}">
+      <IDSymbol name="NuriPreviewCommandId" value="0x0100" />
+      <IDSymbol name="NuriPreviewCommandIdTools" value="0x0101" />
+      <IDSymbol name="NuriPreviewCommandIdCodeWindow" value="0x0102" />
+      <IDSymbol name="NuriPreviewViewGroup" value="0x1020" />
+      <IDSymbol name="NuriPreviewToolsGroup" value="0x1021" />
+      <IDSymbol name="NuriPreviewCodeWindowGroup" value="0x1022" />
+    </GuidSymbol>
+  </Symbols>
+</CommandTable>
