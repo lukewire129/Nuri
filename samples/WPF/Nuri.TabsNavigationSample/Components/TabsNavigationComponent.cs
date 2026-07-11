@@ -17,7 +17,7 @@ public sealed class TabsNavigationComponent : Component
         {
             var next = new[] { $"{DateTime.Now:HH:mm:ss} {message}" }.Concat(logsRef.Current).Take(12).ToArray();
             logsRef.Current = next;
-            setLogs(next);
+            setLogs(_ => next);
         }
 
         var panels = keepMounted
@@ -34,10 +34,10 @@ public sealed class TabsNavigationComponent : Component
                     Text("Tabs / Navigation").FontSize(26).FontWeight(FontWeightValue.Bold),
                     Text("tab mount 유지 여부, unmount cleanup, nested state, route key 검증").FontColor("#6b7280").Margin(top: 6, bottom: 16),
                     Div(DivTypes.Row,
-                        Tab("Profile", "profile", active, setActive),
-                        Tab("Billing", "billing", active, setActive),
-                        Tab("Security", "security", active, setActive),
-                        ToggleButton(keepMounted ? "Keep mounted" : "Unmount inactive", setKeepMounted).Checked(keepMounted).Height(34).Margin(left: 16))
+                        Tab("Profile", "profile", active, value => setActive(_ => value)),
+                        Tab("Billing", "billing", active, value => setActive(_ => value)),
+                        Tab("Security", "security", active, value => setActive(_ => value)),
+                        ToggleButton(keepMounted ? "Keep mounted" : "Unmount inactive", value => setKeepMounted(_ => value)).Checked(keepMounted).Height(34).Margin(left: 16))
                 ).Row(0),
                 Grid(
                         Div(panels).Column(0),
@@ -95,7 +95,7 @@ internal sealed class TabPanel : Component
 
         return Div(
                 Text(_visible ? _key.ToUpperInvariant() : _key + " (hidden but mounted)").FontSize(20).FontWeight(FontWeightValue.Bold),
-                TextBox(draft, setDraft).Key("draft-" + _key).Height(36).Padding(10, 0, 10, 0).TextStart().TextVCenter().Margin(top: 14),
+                TextBox(draft, value => setDraft(_ => value)).Key("draft-" + _key).Height(36).Padding(10, 0, 10, 0).TextStart().TextVCenter().Margin(top: 14),
                 Text("Switch tabs and check whether this state survives.").FontColor("#6b7280").Margin(top: 10))
             .Padding(20)
             .Margin(bottom: _visible ? 0 : 8, right: 16)

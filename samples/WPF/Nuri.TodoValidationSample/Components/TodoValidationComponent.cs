@@ -24,7 +24,7 @@ public sealed class TodoValidationComponent : Component
         {
             var next = change(stateRef.Current);
             stateRef.Current = next;
-            setState(next);
+            setState(_ => next);
         }
 
         void AddItem()

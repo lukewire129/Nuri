@@ -22,7 +22,7 @@ public sealed class TodoNotesComponent : Component
         {
             var nextState = update(stateRef.Current);
             stateRef.Current = nextState;
-            setState(nextState);
+            setState(_ => nextState);
         }
 
         void SetDraft(string draft)

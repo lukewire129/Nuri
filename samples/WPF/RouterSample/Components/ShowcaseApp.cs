@@ -98,7 +98,7 @@ namespace RouterSample.Components
             var (count, setCount) = useState(0);
 
             return new PageFrame("Counter", "State lives in the page. Display and actions are separate components.",
-                new CounterCard(count, () => setCount(count - 1), () => setCount(0), () => setCount(count + 1)));
+                new CounterCard(count, () => setCount(current => current - 1), () => setCount(_ => 0), () => setCount(current => current + 1)));
         }
     }
 
@@ -140,15 +140,15 @@ namespace RouterSample.Components
             return new PageFrame("Form", "Controlled inputs keep form state visible and predictable.",
                 new Card(
                     new FieldLabel("Name"),
-                    TextBox(name, setName).Padding(10).Margin(bottom: 16).Width(320),
-                    CheckBox("Send occasional updates", setNewsletter)
+                    TextBox(name, value => setName(_ => value)).Padding(10).Margin(bottom: 16).Width(320),
+                    CheckBox("Send occasional updates", value => setNewsletter(_ => value))
                         .Checked(newsletter)
                         .Margin(bottom: 16),
                     new FieldLabel("Plan"),
                     Div(DivTypes.Row,
-                        RadioButton("Solo", selected => { if (selected) setPlan("solo"); }).Group("plan").Checked(plan == "solo").Margin(right: 16),
-                        RadioButton("Team", selected => { if (selected) setPlan("team"); }).Group("plan").Checked(plan == "team").Margin(right: 16),
-                        RadioButton("Enterprise", selected => { if (selected) setPlan("enterprise"); }).Group("plan").Checked(plan == "enterprise")),
+                        RadioButton("Solo", selected => { if (selected) setPlan(_ => "solo"); }).Group("plan").Checked(plan == "solo").Margin(right: 16),
+                        RadioButton("Team", selected => { if (selected) setPlan(_ => "team"); }).Group("plan").Checked(plan == "team").Margin(right: 16),
+                        RadioButton("Enterprise", selected => { if (selected) setPlan(_ => "enterprise"); }).Group("plan").Checked(plan == "enterprise")),
                     Text($"Preview: {name}, {plan}, updates {(newsletter ? "on" : "off")}")
                         .FontColor("#374151")
                         .Margin(top: 22)));
@@ -169,8 +169,8 @@ namespace RouterSample.Components
 
             void AddItem()
             {
-                setItems(items.Concat(new[] { new TaskItem($"new-{next}", $"New task {next}") }).ToList());
-                setNext(next + 1);
+                setItems(current => current.Concat(new[] { new TaskItem($"new-{next}", $"New task {next}") }).ToList());
+                setNext(current => current + 1);
             }
 
             void MoveFirstToEnd()
@@ -178,7 +178,7 @@ namespace RouterSample.Components
                 if (items.Count < 2)
                     return;
 
-                setItems(items.Skip(1).Concat(items.Take(1)).ToList());
+                setItems(current => current.Skip(1).Concat(current.Take(1)).ToList());
             }
 
             return new PageFrame("Keyed List", "Explicit keys preserve subtree identity during add, remove, and move.",
@@ -187,7 +187,7 @@ namespace RouterSample.Components
                         new PrimaryButton("Add", AddItem),
                         new QuietButton("Move first to end", MoveFirstToEnd))
                         .Margin(bottom: 16),
-                    Div(items.Select(item => (IElement)new TaskRow(item, () => setItems(items.Where(candidate => candidate.Id != item.Id).ToList())).Key(item.Id)).ToArray())));
+                    Div(items.Select(item => (IElement)new TaskRow(item, () => setItems(current => current.Where(candidate => candidate.Id != item.Id).ToList())).Key(item.Id)).ToArray())));
         }
     }
 
@@ -201,14 +201,14 @@ namespace RouterSample.Components
 
             void AddLog(string message)
             {
-                setLog(new[] { message }.Concat(log).Take(5).ToList());
+                setLog(current => new[] { message }.Concat(current).Take(5).ToList());
             }
 
             return new PageFrame("Effects", "Effect setup runs after commit. Cleanup runs before rerun and on unmount.",
                 new Card(
                     Div(DivTypes.Row,
-                        new QuietButton(visible ? "Unmount probe" : "Mount probe", () => setVisible(!visible)),
-                        new PrimaryButton("Change dependency", () => setVersion(version + 1)))
+                        new QuietButton(visible ? "Unmount probe" : "Mount probe", () => setVisible(current => !current)),
+                        new PrimaryButton("Change dependency", () => setVersion(current => current + 1)))
                         .Margin(bottom: 16),
                     visible ? new EffectProbe(version, AddLog) : Text("Probe is unmounted.").FontColor("#6B7280"),
                     Div(log.Select(entry => (IElement)Text(entry).FontSize(13).FontColor("#374151").Margin(top: 8)).ToArray())

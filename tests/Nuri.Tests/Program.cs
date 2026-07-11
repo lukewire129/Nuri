@@ -2,6 +2,7 @@ using Nuri.VirtualDom;
 using Nuri.Runtime;
 using Nuri.UI;
 using Nuri.UI.Dsl;
+using Nuri.UI.Navigation;
 using Nuri.UI.Values;
 
 namespace Nuri.Tests;
@@ -22,6 +23,9 @@ internal static class Program
         StoreCleanupPreventsUnmountedComponentInvalidation();
         StoreSelectorInvalidatesOnlyWhenSelectedValueChanges();
         StoreSelectorInvalidatesComponentOnlyOnceWhenMultipleSelectionsChange();
+        NavigationUsesLatestStateForConsecutiveUpdates();
+        MultipleNavigationHooksKeepIndependentState();
+        NestedNavigationComponentsKeepIndependentState();
         RouterAssignsSelectedRouteKey();
         TransitionAppliesToAllConfiguredProperties();
         Console.WriteLine("Nuri.Tests passed.");
@@ -322,6 +326,65 @@ internal static class Program
         AssertEqual("form", rendered.Key, "Router should key selected route content by route key.");
     }
 
+    private static void NavigationUsesLatestStateForConsecutiveUpdates()
+    {
+        var component = new NavigationProbe { Id = "navigation-consecutive" };
+        var (_, navigator) = component.UseNavigation("home");
+
+        navigator.Navigate("details");
+        navigator.Navigate("summary");
+        navigator.Replace("confirmation");
+        navigator.GoBack();
+
+        component.ResetStateIndexForRender();
+        var (state, _) = component.UseNavigation("home");
+
+        AssertEqual("details", state.CurrentRoute, "Consecutive navigation updates should use the latest state.");
+        AssertEqual(1, state.BackStack.Count, "GoBack should remove only the latest history entry.");
+        AssertEqual("home", state.BackStack[0], "Navigation history should retain the initial route.");
+        Component.DisposeHookState(component.Id);
+    }
+
+    private static void MultipleNavigationHooksKeepIndependentState()
+    {
+        var component = new NavigationProbe { Id = "navigation-multiple" };
+        var (_, primaryNavigator) = component.UseNavigation("primary-home");
+        var (_, secondaryNavigator) = component.UseNavigation("secondary-home");
+
+        primaryNavigator.Navigate("primary-details");
+        secondaryNavigator.Navigate("secondary-settings");
+
+        component.ResetStateIndexForRender();
+        var (primaryState, _) = component.UseNavigation("primary-home");
+        var (secondaryState, _) = component.UseNavigation("secondary-home");
+
+        AssertEqual("primary-details", primaryState.CurrentRoute, "The first navigation hook should retain its own route.");
+        AssertEqual("secondary-settings", secondaryState.CurrentRoute, "The second navigation hook should retain its own route.");
+        AssertEqual("primary-home", primaryState.BackStack[0], "The first navigation hook should retain its own history.");
+        AssertEqual("secondary-home", secondaryState.BackStack[0], "The second navigation hook should retain its own history.");
+        Component.DisposeHookState(component.Id);
+    }
+
+    private static void NestedNavigationComponentsKeepIndependentState()
+    {
+        var parent = new NavigationProbe { Id = "navigation-parent" };
+        var child = new NavigationProbe { Id = "navigation-parent_0" };
+        var (_, parentNavigator) = parent.UseNavigation("parent-home");
+        var (_, childNavigator) = child.UseNavigation("child-home");
+
+        parentNavigator.Navigate("parent-details");
+        childNavigator.Navigate("child-settings");
+
+        parent.ResetStateIndexForRender();
+        child.ResetStateIndexForRender();
+        var (parentState, _) = parent.UseNavigation("parent-home");
+        var (childState, _) = child.UseNavigation("child-home");
+
+        AssertEqual("parent-details", parentState.CurrentRoute, "Parent navigation should not be changed by its child router.");
+        AssertEqual("child-settings", childState.CurrentRoute, "Child navigation should not be changed by its parent router.");
+        Component.DisposeHookState(parent.Id);
+    }
+
     private static void TransitionAppliesToAllConfiguredProperties()
     {
         var element = Component.Grid()
@@ -456,6 +519,19 @@ internal static class Program
         public void CompleteHooks()
         {
             CompleteHookRender();
+        }
+
+        public override IElement Render()
+        {
+            return Div();
+        }
+    }
+
+    private sealed class NavigationProbe : Component
+    {
+        public (NavigationState state, Navigator navigator) UseNavigation(string initialRoute)
+        {
+            return useNavigation(initialRoute);
         }
 
         public override IElement Render()

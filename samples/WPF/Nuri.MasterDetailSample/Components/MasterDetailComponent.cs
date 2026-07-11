@@ -22,7 +22,7 @@ public sealed class MasterDetailComponent : Component
         {
             var next = change(stateRef.Current);
             stateRef.Current = next;
-            setState(next);
+            setState(_ => next);
         }
 
         var selected = state.Items.FirstOrDefault(item => item.Id == state.SelectedId);

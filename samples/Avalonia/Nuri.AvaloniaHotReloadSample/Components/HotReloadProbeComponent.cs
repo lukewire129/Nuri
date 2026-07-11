@@ -32,7 +32,7 @@ public sealed class HotReloadProbeComponent : Component
                             .FontSize(13)
                             .FontColor("#94a3b8")
                             .Margin(top: 10),
-                        Button("Increment", () => setCount(count + 1))
+                        Button("Increment", () => setCount(current => current + 1))
                             .Height(44)
                             .Padding(18, 0, 18, 0)
                             .Margin(top: 18)
@@ -40,7 +40,7 @@ public sealed class HotReloadProbeComponent : Component
                             .FontColor("#ffffff")
                             .Brush("#1d4ed8")
                             .Thickness(1),
-                        Button ("Increment1", () => setCount2 (count2 + 1))
+                        Button ("Increment1", () => setCount2(current => current + 1))
                             .Height (44)
                             .Padding (18, 0, 18, 0)
                             .Margin (top: 18)

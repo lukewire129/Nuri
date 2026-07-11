@@ -20,7 +20,7 @@ public sealed class DevToolsSampleComponent : Component
                     .Row(0),
                 Grid(
                         Div(
-                                Button(expanded ? "Collapse detail" : "Expand detail", () => setExpanded(!expanded)).Height(36).Margin(bottom: 10),
+                                Button(expanded ? "Collapse detail" : "Expand detail", () => setExpanded(current => !current)).Height(36).Margin(bottom: 10),
                                 Button("Change name", SampleActions.ChangeName).Height(36).Margin(bottom: 10),
                                 Button("Change role", SampleActions.ChangeRole).Height(36).Margin(bottom: 10),
                                 Button("Increment login", SampleActions.IncrementLoginCount).Height(36))

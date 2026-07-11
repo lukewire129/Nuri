@@ -19,7 +19,7 @@ public sealed class LargeListComponent : Component
         {
             var next = change(stateRef.Current);
             stateRef.Current = next;
-            setState(next);
+            setState(_ => next);
         }
 
         var filtered = useMemo(() => state.Items

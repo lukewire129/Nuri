@@ -15,7 +15,7 @@ public sealed class ModalDialogComponent : Component
         {
             var next = change(stateRef.Current);
             stateRef.Current = next;
-            setState(next);
+            setState(_ => next);
         }
 
         void AddLog(string message)

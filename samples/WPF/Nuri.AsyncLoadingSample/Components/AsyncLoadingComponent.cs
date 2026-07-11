@@ -16,7 +16,7 @@ public sealed class AsyncLoadingComponent : Component
             var next = new[] { $"{DateTime.Now:HH:mm:ss} {message}" }.Concat(stateRef.Current.Logs).Take(10).ToArray();
             var updated = stateRef.Current with { Logs = next };
             stateRef.Current = updated;
-            setState(updated);
+            setState(_ => updated);
         }
 
         useEffect(() =>
@@ -27,7 +27,7 @@ public sealed class AsyncLoadingComponent : Component
             var cancelled = false;
             var loading = stateRef.Current with { Loading = true, Result = $"Loading request #{requestId}..." };
             stateRef.Current = loading;
-            setState(loading);
+            setState(_ => loading);
             AddLog($"request #{requestId} started");
 
             _ = Task.Run(async () =>
@@ -38,7 +38,7 @@ public sealed class AsyncLoadingComponent : Component
 
                 var done = stateRef.Current with { Loading = false, Result = $"Request #{requestId} completed" };
                 stateRef.Current = done;
-                setState(done);
+                setState(_ => done);
             });
 
             return () =>
@@ -55,8 +55,8 @@ public sealed class AsyncLoadingComponent : Component
                         Text(state.Result).FontSize(18).FontWeight(FontWeightValue.Bold),
                         Text(state.Loading ? "Loading..." : "Ready").FontColor(state.Loading ? "#b45309" : "#047857").Margin(top: 8),
                         Grid(
-                                Button("Start request", () => setRequestId(requestId + 1)).Height(36).Column(0),
-                                Button("Start next quickly", () => setRequestId(requestId + 2)).Height(36).Column(1)
+                                Button("Start request", () => setRequestId(current => current + 1)).Height(36).Column(0),
+                                Button("Start next quickly", () => setRequestId(current => current + 2)).Height(36).Column(1)
                             )
                             .Columns(Pixels(130), Pixels(150))
                             .Margin(top: 18)
