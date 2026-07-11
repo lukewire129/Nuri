@@ -10,10 +10,10 @@ namespace Template.Project.Components
             var (count2, setCount2) = useState (0);
 
             return Div (
-                        Button ($"Count1: {count}", () => setCount (count + 1)),
-                        Button ("Reset1", () => setCount (0)),
-                        Button ($"Count2: {count2}", () => setCount2 (count2 + 1)),
-                        Button ("Reset2", () => setCount2 (0))
+                        Button ($"Count1: {count}", () => setCount (current => current + 1)),
+                        Button ("Reset1", () => setCount (_ => 0)),
+                        Button ($"Count2: {count2}", () => setCount2 (current => current + 1)),
+                        Button ("Reset2", () => setCount2 (_ => 0))
                    );
         }
     }

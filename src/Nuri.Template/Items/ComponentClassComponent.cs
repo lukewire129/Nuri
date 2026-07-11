@@ -10,12 +10,12 @@ public class ComponentClassComponent : Component
 
 
         return Grid (
-                    Button ($"Count: {count}", () => setCount (count + 1))
+                    Button ($"Count: {count}", () => setCount (current => current + 1))
                         .Size(100, 50)
                         .Start()
                         .Row(0),
 
-                    Button ("Reset", () => setCount (0))
+                    Button ("Reset", () => setCount (_ => 0))
                         .Row (1)
                 )
                 .Rows (Pixels(100), Pixels(100), Pixels(300));

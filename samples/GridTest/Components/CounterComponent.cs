@@ -17,12 +17,12 @@ namespace GridTest.Components
                     Div(DivTypes.Row,
                         Button($"Count: {count}")
                             .Key("count-increment")
-                            .OnClick(() => setCount(count + 1))
+                            .OnClick(() => setCount(current => current + 1))
                             .Size(120, 50)
                             .Background("#e8b8FFFF"),
                         Button("Reset")
                             .Key("count-reset")
-                            .OnClick(() => setCount(0))
+                            .OnClick(() => setCount(_ => 0))
                             .Margin(12, 0, 0, 0)
                     ).Row(0),
 
@@ -31,7 +31,7 @@ namespace GridTest.Components
                             .FontSize(20)
                             .FontColor(ColorValue.FromRgb(255, 0, 0)),
                         TextBox()
-                            .OnTextChanged(setText)
+                            .OnTextChanged(value => setText(_ => value))
                             .FontColor(ColorValue.FromRgb(0, 0, 255))
                             .Size(160, 50)
                     ).Row(1),
@@ -41,15 +41,15 @@ namespace GridTest.Components
                             .FontSize(20)
                             .FontColor(ColorValue.FromRgb(255, 0, 0)),
                         CheckBox()
-                            .OnCheckChanged(setCheckedValue)
+                            .OnCheckChanged(value => setCheckedValue(_ => value))
                             .Size(100, 50)
                     ).Row(2),
 
                     Div(DivTypes.Column,
                         RadioButton($"Radio 1: {radioValue}")
-                            .OnCheckChanged(setRadioValue),
+                            .OnCheckChanged(value => setRadioValue(_ => value)),
                         RadioButton($"Radio 2: {!radioValue}")
-                            .OnCheckChanged(value => setRadioValue(!value))
+                            .OnCheckChanged(value => setRadioValue(_ => !value))
                     ).Row(3)
                 )
                 .Rows(Auto, Auto, Auto, Auto)

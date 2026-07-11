@@ -77,14 +77,15 @@ namespace Nuri.UI
             return (TElement)(object)this;
         }
 
-        protected (T state, Action<T> setState) useState<T>(T initialValue)
+        protected (T state, Action<Func<T, T>> setState) useState<T>(T initialValue)
         {
             var index = _stateIndex;
             var state = StateStore.GetOrCreateState(Id, index, initialValue);
 
-            void SetState(T newValue)
+            void SetState(Func<T, T> update)
             {
                 var currentState = StateStore.GetOrCreateState(Id, index, initialValue);
+                var newValue = update(currentState);
                 if (EqualityComparer<T>.Default.Equals(currentState, newValue))
                     return;
 

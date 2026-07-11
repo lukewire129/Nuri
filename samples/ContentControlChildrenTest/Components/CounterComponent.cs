@@ -45,8 +45,8 @@ namespace ContentControlChildrenTest.Components
                             .Transition(500, EasingValue.CubicInOut)
                     )
                 )
-                .OnHover(setIsHover)
-                .OnClick(() => setIsToggle(!isToggle))
+                .OnHover(value => setIsHover(_ => value))
+                .OnClick(() => setIsToggle(current => !current))
                 .Size(165, 38)
                 .Cursor(isHover ? CursorValue.Hand : CursorValue.Arrow)
                 .Background(ColorValue.FromArgb(0, 0, 0, 0));

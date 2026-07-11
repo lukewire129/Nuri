@@ -49,22 +49,24 @@ namespace NuriSample.Components
             var (count, setCount) = useState(0);
 
             return Div(
-                Button($"Count: {count}", () => setCount(count + 1)),
-                Button("Reset", () => setCount(0))
+                Button($"Count: {count}", () => setCount(current => current + 1)),
+                Button("Reset", () => setCount(_ => 0))
             );
         }
     }
 }
 ```
 
+`useState` setters receive the current stored value. Use `setCount(current => current + 1)` for updates based on existing state, and `_ => value` to assign a specific value.
+
 WPF-familiar factory aliases are available while still producing platform-neutral Nuri elements:
 
 ```csharp
 Button("Save", Save);
-TextBox().OnTextChanged(setText);
-CheckBox("Enabled", setEnabled);
-RadioButton("Option A", setSelected);
-ToggleButton("Pinned", setPinned);
+TextBox().OnTextChanged(value => setText(_ => value));
+CheckBox("Enabled", value => setEnabled(_ => value));
+RadioButton("Option A", value => setSelected(_ => value));
+ToggleButton("Pinned", value => setPinned(_ => value));
 PasswordBox();
 ```
 

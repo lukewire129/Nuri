@@ -9,7 +9,7 @@ namespace DiffingEngineTest.Components
             var (visible, setVisible) = useState (true);
 
             return Div (
-                        Button ($"Count1: {visible}", () => setVisible (!visible)),
+                        Button ($"Count1: {visible}", () => setVisible (current => !current)),
                         visible? new CounterComponent1 () : null!
                    );
         }
