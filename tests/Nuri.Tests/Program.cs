@@ -1,5 +1,6 @@
 using Nuri.VirtualDom;
 using Nuri.Runtime;
+using Nuri.Runtime.Invalidation;
 using Nuri.UI;
 using Nuri.UI.Dsl;
 using Nuri.UI.Navigation;
@@ -19,6 +20,7 @@ internal static class Program
         UseMemoCachesUntilDependenciesChange();
         UseEffectRunsAfterRenderAndCleansUpOnDependencyChange();
         KeyedComponentsKeepDistinctHookLifetimesAtTheSamePosition();
+        RuntimeAncestryCleansAndCoalescesKeyedSubtrees();
         RemovingHooksFromARenderCleansUpTheirState();
         StoreSetInvalidatesOnlySubscribedComponents();
         StoreCleanupPreventsUnmountedComponentInvalidation();
@@ -348,6 +350,28 @@ internal static class Program
         AssertEqual("cleanup:profile", log[1], "Replacing a keyed component should clean up the previous component.");
         AssertEqual("mount:billing", log[2], "The replacement keyed component should mount with a distinct hook identity.");
         Component.DisposeHookState(billing.Id);
+    }
+
+    private static void RuntimeAncestryCleansAndCoalescesKeyedSubtrees()
+    {
+        var log = new List<string>();
+        var parent = new LifecycleProbe("parent", log);
+        parent.LoadNodeNumber("runtime-tree", 1);
+        var child = new LifecycleProbe("child", log).Key("value#key:with_separator");
+        child.LoadNodeNumber(parent.Id, 1);
+        child.RegisterMountEffect();
+        child.FlushEffects();
+
+        var queue = new ComponentInvalidationQueue();
+        queue.Enqueue(child);
+        queue.Enqueue(parent);
+        var invalidations = queue.DrainCoveredByParents();
+
+        AssertEqual(1, invalidations.Count, "A parent invalidation should cover keyed descendants using runtime ancestry.");
+        AssertEqual(parent.Id, invalidations[0].ComponentId, "The parent should be the retained subtree invalidation.");
+
+        Component.DisposeHookState(parent.Id);
+        AssertEqual("cleanup:child", log.Last(), "Disposing a parent subtree should clean up keyed descendants without parsing their ids.");
     }
 
     private static void NavigationUsesLatestStateForConsecutiveUpdates()

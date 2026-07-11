@@ -59,6 +59,7 @@ namespace Nuri.UI
             Id = string.IsNullOrWhiteSpace(Key)
                 ? $"{parentId}_{myId}"
                 : $"{parentId}#key:{Key}";
+            RuntimeTreeIdentity.Register(Id, parentId);
         }
 
         public TElement SetProperty(string name, object value)
@@ -355,7 +356,7 @@ namespace Nuri.UI
 
                 foreach (var componentId in componentIds)
                 {
-                    if (!IsInSubtree(componentId, rootComponentId))
+                    if (!RuntimeTreeIdentity.IsDescendantOrSelf(componentId, rootComponentId))
                         continue;
 
                     if (EffectStore.TryGetValue(componentId, out var effectHooks))
@@ -373,6 +374,7 @@ namespace Nuri.UI
                 }
 
                 NuriDiagnostics.DisposeComponentSubtree(rootComponentId);
+                RuntimeTreeIdentity.RemoveSubtree(rootComponentId);
             }
 
             foreach (var cleanup in cleanups)
@@ -478,12 +480,6 @@ namespace Nuri.UI
             }
 
             return false;
-        }
-
-        private static bool IsInSubtree(string componentId, string rootComponentId)
-        {
-            return string.Equals(componentId, rootComponentId, StringComparison.Ordinal)
-                || componentId.StartsWith(rootComponentId + "_", StringComparison.Ordinal);
         }
 
         private static void TrimStateIndexes<T>(Dictionary<string, Dictionary<int, T>> store, string componentId, int usedHookCount)

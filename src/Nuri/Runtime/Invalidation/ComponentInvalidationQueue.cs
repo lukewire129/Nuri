@@ -24,7 +24,7 @@ namespace Nuri.Runtime.Invalidation
         {
             var ordered = _dirtyComponents
                 .Where(component => !string.IsNullOrEmpty(component.ComponentId))
-                .OrderBy(component => component.ComponentId.Length)
+                .OrderBy(component => RuntimeTreeIdentity.GetDepth(component.ComponentId))
                 .ToList();
 
             _dirtyComponents.Clear();
@@ -32,18 +32,13 @@ namespace Nuri.Runtime.Invalidation
             var result = new List<ComponentInvalidation>();
             foreach (var component in ordered)
             {
-                if (!result.Any(parent => IsDescendantId(component.ComponentId, parent.ComponentId)))
+                if (!result.Any(parent => RuntimeTreeIdentity.IsDescendantOrSelf(component.ComponentId, parent.ComponentId)))
                     result.Add(component);
             }
 
             return result;
         }
 
-        private static bool IsDescendantId(string childId, string parentId)
-        {
-            return childId.Length > parentId.Length
-                && childId.StartsWith(parentId + "_", StringComparison.Ordinal);
-        }
     }
 
     public sealed class ComponentInvalidation

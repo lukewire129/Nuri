@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Nuri.UI.Events;
+using Nuri.Runtime;
 
 namespace Nuri.UI
 {
@@ -46,6 +47,7 @@ namespace Nuri.UI
         {
             ParentId = parentId;
             Id = $"{parentId}_{myId}";
+            RuntimeTreeIdentity.Register(Id, parentId);
         }
 
         public TElement SetProperty(string name, object value)

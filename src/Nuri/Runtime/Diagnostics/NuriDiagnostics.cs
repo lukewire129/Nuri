@@ -152,7 +152,7 @@ namespace Nuri.Runtime.Diagnostics
             {
                 foreach (var componentId in Components.Keys.ToArray())
                 {
-                    if (IsInSubtree(componentId, rootComponentId))
+                    if (RuntimeTreeIdentity.IsDescendantOrSelf(componentId, rootComponentId))
                         Components.Remove(componentId);
                 }
 
@@ -160,7 +160,7 @@ namespace Nuri.Runtime.Diagnostics
                 {
                     foreach (var key in store.Subscriptions.Keys.ToArray())
                     {
-                        if (IsInSubtree(key.ComponentId, rootComponentId))
+                        if (RuntimeTreeIdentity.IsDescendantOrSelf(key.ComponentId, rootComponentId))
                             store.Subscriptions.Remove(key);
                     }
                 }
@@ -364,12 +364,6 @@ namespace Nuri.Runtime.Diagnostics
             }
 
             return record;
-        }
-
-        private static bool IsInSubtree(string componentId, string rootComponentId)
-        {
-            return string.Equals(componentId, rootComponentId, StringComparison.Ordinal)
-                || componentId.StartsWith(rootComponentId + "_", StringComparison.Ordinal);
         }
 
         private sealed class RootRecord
