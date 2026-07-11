@@ -122,7 +122,7 @@ namespace Nuri.UI
             var componentNode = GetRuntimeNode();
             var index = _stateIndex;
             var state = StateStore.GetOrCreateState(componentNode, index, initialValue);
-            RecordHook(componentId, index, HookKind.State, typeof(T).Name, DiagnosticsValueFormatter.Summary(state));
+            RecordHookValue(componentId, index, HookKind.State, typeof(T).Name, state);
 
             void SetState(Func<T, T> update)
             {
@@ -150,7 +150,7 @@ namespace Nuri.UI
             var componentNode = GetRuntimeNode();
             var index = _stateIndex;
             var state = StateStore.GetOrCreateState(componentNode, index, initialState);
-            RecordHook(componentId, index, HookKind.Reducer, typeof(TState).Name, DiagnosticsValueFormatter.Summary(state));
+            RecordHookValue(componentId, index, HookKind.Reducer, typeof(TState).Name, state);
 
             void Dispatch(TAction action)
             {
@@ -175,7 +175,7 @@ namespace Nuri.UI
             var componentNode = GetRuntimeNode();
             var index = _stateIndex;
             var reference = StateStore.GetOrCreateState(componentNode, index, new Ref<T>(initialValue));
-            RecordHook(componentId, index, HookKind.Ref, typeof(T).Name, DiagnosticsValueFormatter.Summary(reference.Current));
+            RecordHookValue(componentId, index, HookKind.Ref, typeof(T).Name, reference.Current);
             _stateIndex++;
             return reference;
         }
@@ -221,7 +221,7 @@ namespace Nuri.UI
                 }
             }
 
-            RecordHook(componentId, index, HookKind.Store, typeof(TResult).Name, DiagnosticsValueFormatter.Summary(selectedValue));
+            RecordHookValue(componentId, index, HookKind.Store, typeof(TResult).Name, selectedValue);
             _stateIndex++;
             return selectedValue;
         }
@@ -246,7 +246,7 @@ namespace Nuri.UI
                     hooks[index] = typedHook;
                 }
 
-                RecordHook(Id, index, HookKind.Memo, typeof(T).Name, DiagnosticsValueFormatter.Summary(typedHook.Value));
+                RecordHookValue(Id, index, HookKind.Memo, typeof(T).Name, typedHook.Value);
                 _stateIndex++;
                 return typedHook.Value;
             }
@@ -303,7 +303,7 @@ namespace Nuri.UI
                     GetOrCreatePendingEffects(componentNode).Add(index);
                 }
 
-                RecordHook(Id, index, HookKind.Effect, "Effect", DiagnosticsValueFormatter.DependenciesSummary(dependencies));
+                RecordEffectHook(Id, index, dependencies);
             }
 
             _stateIndex++;
@@ -467,10 +467,16 @@ namespace Nuri.UI
         {
         }
 
-        private static void RecordHook(string componentId, int index, HookKind kind, string displayType, string summary)
+        private static void RecordHookValue<T>(string componentId, int index, HookKind kind, string displayType, T value)
         {
             if (NuriDiagnostics.IsEnabled)
-                NuriDiagnostics.RecordHook(componentId, index, kind, displayType, summary);
+                NuriDiagnostics.RecordHook(componentId, index, kind, displayType, DiagnosticsValueFormatter.Summary(value));
+        }
+
+        private static void RecordEffectHook(string componentId, int index, object?[]? dependencies)
+        {
+            if (NuriDiagnostics.IsEnabled)
+                NuriDiagnostics.RecordHook(componentId, index, HookKind.Effect, "Effect", DiagnosticsValueFormatter.DependenciesSummary(dependencies));
         }
 
         private static Dictionary<int, THook> GetOrCreateHooks<THook>(Dictionary<RuntimeTreeIdentity.RuntimeTreeNode, Dictionary<int, THook>> store, RuntimeTreeIdentity.RuntimeTreeNode component)

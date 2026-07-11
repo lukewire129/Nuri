@@ -25,6 +25,7 @@ internal static class Program
         InvalidationQueuePreservesOrderingIndependentCoverage();
         RuntimeAncestryRegistryReleasesDisposedSubtrees();
         ComponentCachesAndRefreshesItsRuntimeNode();
+        DiagnosticsPreserveHookSummaryWhenEnabled();
         DuplicateComponentKeysUseIndependentHookIdentity();
         RemovingHooksFromARenderCleansUpTheirState();
         StoreSetInvalidatesOnlySubscribedComponents();
@@ -439,6 +440,35 @@ internal static class Program
         var refreshedNode = component.RuntimeNode;
         AssertEqual(false, ReferenceEquals(initialNode, refreshedNode), "A disposed component object must not reuse its detached runtime node.");
         Component.DisposeHookState(component.Id);
+    }
+
+    private static void DiagnosticsPreserveHookSummaryWhenEnabled()
+    {
+        const string rootId = "diagnostics-hook-root";
+        var component = new HookProbe();
+        component.LoadNodeNumber(rootId, 1);
+        var entry = Parent().WithIdentity(rootId, null).WithComponentId(component.Id);
+
+        NuriDiagnostics.Enable();
+        NuriDiagnostics.RegisterRoot(rootId, "Test", () => entry);
+        try
+        {
+            component.UseNumberRef();
+            component.CompleteHooks();
+
+            var hook = NuriDiagnostics.GetSnapshot()
+                .Roots.Single(root => root.RootId == rootId)
+                .RootComponent!.Hooks.Single();
+            AssertEqual(HookKind.Ref, hook.Kind, "Diagnostics should preserve the hook kind.");
+            AssertEqual(nameof(Int32), hook.DisplayType, "Diagnostics should preserve the hook display type.");
+            AssertEqual("1", hook.Summary, "Diagnostics should preserve the hook value summary.");
+        }
+        finally
+        {
+            Component.DisposeHookState(component.Id);
+            NuriDiagnostics.UnregisterRoot(rootId);
+            NuriDiagnostics.Disable();
+        }
     }
 
     private static void DuplicateComponentKeysUseIndependentHookIdentity()

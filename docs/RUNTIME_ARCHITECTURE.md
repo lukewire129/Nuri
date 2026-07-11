@@ -81,6 +81,16 @@ Timing improved by about 76x in the confirmation run and allocation fell by abou
 
 Runtime-node caching was measured separately with 100,000 stable render iterations. Current focused results were 0.0005 ms for 1 state hook, 0.0022 ms for 10 hooks, and 0.0046 ms for 50 hooks. Hook-render allocation stayed at 0.25 KB, 1.48 KB, and 6.95 KB because caching removes registry lookup rather than hook-value allocation. The cached reference adds about 8 bytes per transient component object; the 1,000-component mount scenario increased by about 7.8 KB. Short standard runs remain noise-sensitive, so this change is justified primarily by removing per-hook registry locking and simplifying ownership, not by claiming a fixed speedup ratio.
 
+Disabled-diagnostics hook formatting was optimized on 2026-07-12. The before and after values are medians from 7 independent Release processes, each using 10 warmups and 100 measured iterations. Value and dependency summaries are now formatted only when `NuriDiagnostics.IsEnabled` is `true`; enabled diagnostics retain the same hook kind, display type, and summary.
+
+| Scenario | Before alloc KB | Expected alloc KB | After alloc KB | Required result |
+|---|---:|---:|---:|---:|
+| Stable render with state hooks | 1: 0.25 | 0.18-0.22 | 0.23 | 1 hook |
+| Stable render with state hooks | 10: 1.48 | 0.95-1.15 | 1.24 | 10 hooks |
+| Stable render with state hooks | 50: 6.95 | 4.40-5.40 | 5.78 | 50 hooks |
+
+The 50-hook allocation fell by about 16.8%, but did not reach the expected upper bound of 5.40 KB. The result indicates that the change removed about 24 bytes per hook from disabled summary formatting while setter delegates, closures, and other hook costs remain. Treat this as a measured partial success rather than evidence for a broader hook-store rewrite.
+
 ## Measurement Scenarios
 
 The Core performance harness covers:
