@@ -2,6 +2,8 @@
 
 Nuri lifecycle work is driven by virtual tree render, diff, patch, commit, then effect flush.
 
+Runtime identity, key, and required regression-test contracts are defined in [RUNTIME_IDENTITY.md](RUNTIME_IDENTITY.md). Lifecycle changes must preserve those contracts.
+
 ## Mount
 
 - A root render builds an `IElement` tree and converts it to a `VirtualEntry` tree.
@@ -30,6 +32,14 @@ Nuri lifecycle work is driven by virtual tree render, diff, patch, commit, then 
 - Replacing an entry disposes hook state for the replaced entry subtree.
 - Effect cleanups are invoked when hook state is disposed.
 - `DisposeHookState` removes effect, memo, pending effect, and state entries for the component subtree.
+- Subtree membership comes from the in-memory runtime ancestry registry, not from parsing component ID strings.
+- Changing a component key is an unmount of the previous logical component followed by a mount of the replacement.
+
+## Duplicate Keys
+
+- Duplicate sibling component keys emit `RuntimeLogKind.DuplicateKey`.
+- Duplicate keyed components use position-based hook identity so they cannot share state or effects.
+- State preservation during duplicate-key reorder is intentionally not guaranteed.
 
 ## Hook Trimming
 

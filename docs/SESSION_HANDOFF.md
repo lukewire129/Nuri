@@ -15,13 +15,16 @@ Move Nuri from WPF-direct UI creation toward a platform-neutral Core virtual UI/
 - Core DSL state changes are batched by `ApplicationRoot`; non-root component hooks render/diff/patch only that component subtree when the current virtual entry can be found, with root rebuild as fallback.
 - Keyed reconciliation is implemented with `MoveChildPatch` and WPF move support.
 - A simple perf harness exists under `perf/` for basic before/after measurements.
-- Release build currently passes with 0 warnings and 0 errors.
+- Release build currently passes with 0 errors. Existing Visual Studio preview threading analyzer warnings may still be reported.
 
 ## Recent Feature Additions
 
 - Explicit `.Key("...")` API added.
 - `Name` still works as a key fallback for compatibility.
-- Duplicate virtual keys are diagnosed with `Debug.WriteLine` and fall back to index diff.
+- Duplicate virtual keys are diagnosed and fall back to index diff. Duplicate component keys also emit `RuntimeLogKind.DuplicateKey` and use position-based hook identity so state/effects cannot collide.
+- Keyed component lifecycle uses explicit component keys. Key changes clean up the old logical component and mount the replacement.
+- Runtime subtree cleanup, diagnostics cleanup, and dirty-component coalescing use the in-memory `RuntimeTreeIdentity` ancestry registry instead of parsing ID delimiters.
+- The authoritative identity/key/hook invariants and regression checklist are in `docs/RUNTIME_IDENTITY.md`.
 - Core-neutral event foundation added:
   - `VirtualEvent`
   - `VirtualEventKind`
@@ -48,7 +51,7 @@ Move Nuri from WPF-direct UI creation toward a platform-neutral Core virtual UI/
 - `WindowView` remains the internal virtual root wrapper for window title/size/content, but samples do not expose it directly.
 - Each native window gets its own `ApplicationRoot` instance and unique tree prefix, so separate windows build separate virtual trees instead of sharing ids.
 - Component cleanup is stronger now: removed and replaced component subtrees are disposed.
-- `src/Nuri.Avalonia` scaffold exists without external Avalonia NuGet dependency yet.
+- `src/Nuri.Avalonia` contains the Avalonia renderer and references Avalonia desktop packages.
 - `samples/GridTest` demonstrates `.Key(...)`, neutral `.OnClick(Action)`, and the preferred `Grid(...).Rows(...).Columns(...)` layout style.
 - Legacy `Div(Rows(...), Columns(...), children...)` overloads remain for compatibility, but new code should prefer fluent layout definitions so row/column definitions do not look like child controls.
 - Core DSL now exposes WPF-familiar factory aliases such as `Button`, `TextBox`, `CheckBox`, `RadioButton`, `ToggleButton`, and `PasswordBox`. These are semantic aliases over Nuri virtual input descriptions, not WPF types in Core.
@@ -62,6 +65,8 @@ Move Nuri from WPF-direct UI creation toward a platform-neutral Core virtual UI/
 - `src/Nuri/UI/IElement.cs`
 - `src/Nuri/UI/Element.cs`
 - `src/Nuri/UI/ComponentBase.cs`
+- `src/Nuri/Runtime/RuntimeTreeIdentity.cs`
+- `docs/RUNTIME_IDENTITY.md`
 - `src/Nuri/UI/Dsl/IElement.cs`
 - `src/Nuri/UI/Dsl/Component.cs`
 - `src/Nuri/UI/Dsl/SemanticElements.cs`
@@ -114,9 +119,7 @@ Expected baseline sanity for keyed reorder:
    - Move more effect lifecycle behavior into Core.
    - Ensure mount/update/unmount cleanup is deterministic.
 
-5. Flesh out Avalonia renderer.
-   - Add actual Avalonia package only when package policy is decided.
-   - Start with `Text`, `Button`, `StackPanel`, `Border`, `TextBox`.
+5. Continue fleshing out the Avalonia renderer while keeping materialization outside Core.
 
 6. Add diagnostics only where useful.
    - Patch count

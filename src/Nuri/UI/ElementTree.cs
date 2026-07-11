@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Diagnostics;
+using Nuri.Runtime.Diagnostics;
 
 namespace Nuri.UI
 {
@@ -61,13 +63,44 @@ namespace Nuri.UI
 
         public static void AssignDescendantIds(string parentId, TElement element)
         {
+            var duplicateComponentKeys = FindDuplicateComponentKeys(element.Children);
+            foreach (var key in duplicateComponentKeys)
+            {
+                var message = $"Duplicate component key '{key}' under parent '{parentId}'. Falling back to position-based hook identity.";
+                Debug.WriteLine(message);
+                NuriDiagnostics.Log(RuntimeLogKind.DuplicateKey, null, null, message);
+            }
+
             var childIndex = 1;
             foreach (var child in element.Children)
             {
-                child.LoadNodeNumber(parentId, childIndex);
+                if (child is ComponentBase<TElement, TAnimation> component
+                    && !string.IsNullOrWhiteSpace(child.Key)
+                    && duplicateComponentKeys.Contains(child.Key))
+                    component.LoadNodeNumberByPosition(parentId, childIndex);
+                else
+                    child.LoadNodeNumber(parentId, childIndex);
+
                 AssignDescendantIds(child.Id, child);
                 childIndex++;
             }
+        }
+
+        private static HashSet<string> FindDuplicateComponentKeys(IEnumerable<TElement> children)
+        {
+            var keys = new HashSet<string>(System.StringComparer.Ordinal);
+            var duplicates = new HashSet<string>(System.StringComparer.Ordinal);
+            foreach (var child in children)
+            {
+                if (child is not ComponentBase<TElement, TAnimation>
+                    || string.IsNullOrWhiteSpace(child.Key))
+                    continue;
+
+                if (!keys.Add(child.Key))
+                    duplicates.Add(child.Key);
+            }
+
+            return duplicates;
         }
     }
 }

@@ -1,6 +1,7 @@
 using Nuri.VirtualDom;
 using Nuri.Runtime;
 using Nuri.Runtime.Invalidation;
+using Nuri.Runtime.Diagnostics;
 using Nuri.UI;
 using Nuri.UI.Dsl;
 using Nuri.UI.Navigation;
@@ -21,6 +22,7 @@ internal static class Program
         UseEffectRunsAfterRenderAndCleansUpOnDependencyChange();
         KeyedComponentsKeepDistinctHookLifetimesAtTheSamePosition();
         RuntimeAncestryCleansAndCoalescesKeyedSubtrees();
+        DuplicateComponentKeysUseIndependentHookIdentity();
         RemovingHooksFromARenderCleansUpTheirState();
         StoreSetInvalidatesOnlySubscribedComponents();
         StoreCleanupPreventsUnmountedComponentInvalidation();
@@ -372,6 +374,34 @@ internal static class Program
 
         Component.DisposeHookState(parent.Id);
         AssertEqual("cleanup:child", log.Last(), "Disposing a parent subtree should clean up keyed descendants without parsing their ids.");
+    }
+
+    private static void DuplicateComponentKeysUseIndependentHookIdentity()
+    {
+        var log = new List<string>();
+        var first = new LifecycleProbe("first", log).Key("duplicate");
+        var second = new LifecycleProbe("second", log).Key("duplicate");
+        var parent = Component.Div(first, second);
+
+        NuriDiagnostics.Enable();
+        NuriDiagnostics.ClearLogs();
+        ElementTree<IElement, AnimationValue>.AssignDescendantIds("duplicate-parent", parent);
+
+        AssertNotEqual(first.Id, second.Id, "Duplicate component keys must not share hook identity.");
+        AssertEqual("duplicate-parent_1", first.Id, "The first duplicate key should fall back to its position.");
+        AssertEqual("duplicate-parent_2", second.Id, "The second duplicate key should fall back to its position.");
+        AssertEqual(true, NuriDiagnostics.GetSnapshot().RecentLogs.Any(logEntry => logEntry.Kind == RuntimeLogKind.DuplicateKey), "Duplicate keys should emit a diagnostics entry.");
+
+        first.RegisterMountEffect();
+        second.RegisterMountEffect();
+        first.FlushEffects();
+        Component.DisposeHookState("duplicate-parent");
+
+        AssertEqual(true, log.Contains("mount:first"), "The first duplicate component should mount independently.");
+        AssertEqual(true, log.Contains("mount:second"), "The second duplicate component should mount independently.");
+        AssertEqual(true, log.Contains("cleanup:first"), "The first duplicate component should clean up independently.");
+        AssertEqual(true, log.Contains("cleanup:second"), "The second duplicate component should clean up independently.");
+        NuriDiagnostics.Disable();
     }
 
     private static void NavigationUsesLatestStateForConsecutiveUpdates()

@@ -62,6 +62,13 @@ namespace Nuri.UI
             RuntimeTreeIdentity.Register(Id, parentId);
         }
 
+        internal void LoadNodeNumberByPosition(string parentId, int myId)
+        {
+            ParentId = parentId;
+            Id = $"{parentId}_{myId}";
+            RuntimeTreeIdentity.Register(Id, parentId);
+        }
+
         public TElement SetProperty(string name, object value)
         {
             Properties[name] = value;
