@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Nuri.Constants;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -12,8 +13,8 @@ namespace Nuri.WPF
        {
             "Opacity",
             "Margin",
-            "Background",
-            "Foreground",
+             PropertyKeys.Background,
+             PropertyKeys.Foreground,
             "Rotate"
        };
 
@@ -23,8 +24,8 @@ namespace Nuri.WPF
             {
                 "Opacity" => UIElement.OpacityProperty,
                 "Margin" => FrameworkElement.MarginProperty,
-                "Background" => Control.BackgroundProperty,
-                "Foreground" => Control.ForegroundProperty,
+                PropertyKeys.Background => Control.BackgroundProperty,
+                PropertyKeys.Foreground => Control.ForegroundProperty,
                 "Rotate" => RotateTransform.AngleProperty, 
                 _ => null
             };

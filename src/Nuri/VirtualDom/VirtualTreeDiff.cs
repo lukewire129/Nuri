@@ -167,6 +167,13 @@ namespace Nuri.VirtualDom
                     operations.Add(new RemoveChildPatch(oldEntry, oldChild, oldIndex));
             }
 
+            var reusableRemovedIds = new Queue<string>(oldEntry.Children
+                .Where(child => !newKeys.Contains(child.Key!))
+                .Select(child => child.Id));
+            var retainedIds = new HashSet<string>(oldEntry.Children
+                .Where(child => newKeys.Contains(child.Key!))
+                .Select(child => child.Id), StringComparer.Ordinal);
+
             var hasReorder = false;
             for (var newIndex = 0; newIndex < newEntry.Children.Count; newIndex++)
             {
@@ -174,10 +181,16 @@ namespace Nuri.VirtualDom
 
                 if (!oldByKey.TryGetValue(newChild.Key!, out var oldMatch))
                 {
+                    var childId = reusableRemovedIds.Count > 0
+                        ? reusableRemovedIds.Dequeue()
+                        : CreateKeyedChildId(oldEntry.Id, newChild.Key!, retainedIds);
+                    newChild.RewriteIdentity(childId, oldEntry.Id);
+                    retainedIds.Add(childId);
                     operations.Add(new AddChildPatch(newEntry, newChild, newIndex));
                     continue;
                 }
 
+                newChild.RewriteIdentity(oldMatch.Entry.Id, oldMatch.Entry.ParentId);
                 DiffInto(oldMatch.Entry, newChild, operations);
                 hasReorder |= oldMatch.Index != newIndex;
             }
@@ -200,6 +213,19 @@ namespace Nuri.VirtualDom
                 if (!stablePositions[i] && retainedChild.OldIndex != retainedChild.NewIndex)
                     operations.Add(new MoveChildPatch(newEntry, retainedChild.OldChild, retainedChild.OldIndex, retainedChild.NewIndex));
             }
+        }
+
+        private static string CreateKeyedChildId(string parentId, string key, HashSet<string> usedIds)
+        {
+            var id = $"{parentId}#key:{key}";
+            if (usedIds.Add(id))
+                return id;
+
+            var index = 1;
+            while (!usedIds.Add($"{id}:{index}"))
+                index++;
+
+            return $"{id}:{index}";
         }
 
         private static bool[] FindStablePositions(IReadOnlyList<(VirtualEntry OldChild, int OldIndex, int NewIndex)> children)

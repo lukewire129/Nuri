@@ -1,11 +1,11 @@
 using Nuri.VirtualDom;
-using Nuri.VirtualDom.Rendering;
+using Nuri.Platform.Abstractions;
 using System.Collections.Generic;
 using System.Windows;
 
 namespace Nuri.WPF
 {
-    public sealed class WpfRendererAdapter : IVirtualEntryRenderer<FrameworkElement>
+    public sealed class WpfRendererAdapter : IRendererAdapter<FrameworkElement>
     {
         public FrameworkElement Build(VirtualEntry entry)
         {

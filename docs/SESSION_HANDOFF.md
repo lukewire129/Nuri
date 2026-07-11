@@ -38,7 +38,7 @@ Move Nuri from WPF-direct UI creation toward a platform-neutral Core virtual UI/
   - WPF maps Core alignment values and string image sources during renderer/property materialization.
   - Core `ContentControl`, `VirtualContentControl`, and `VirtualElement` wrapper layers were removed; content is represented as virtual properties/children, not a WPF-style inheritance branch.
   - Core DSL now includes neutral hover, image scaling, font weight helpers, and transition descriptions.
-  - `GridTest`, `NuriSample`, `BorderTest`, `ContentControlChildrenTest`, and template component files were migrated to Core DSL component/render types.
+  - `GridTest`, `RouterSample`, `BorderTest`, `ContentControlChildrenTest`, and template component files were migrated to Core DSL component/render types.
   - `DiffingEngineTest` was migrated after Core nested component expansion was added.
   - `src/Nuri.WPF/Controls` was removed. WPF now provides renderer/adapter/materialization, not a framework-specific DSL/control layer.
   - Component instances remain in the Core virtual element tree until adapter conversion; `VirtualEntryAdapter` renders component boundaries using their final assigned IDs so nested component subtree updates can target the correct virtual entry.

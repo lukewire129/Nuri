@@ -1,3 +1,5 @@
+using Nuri.Constants;
+using Nuri.UI.Controls;
 using Nuri.VirtualDom;
 using Nuri.UI.Values;
 using System;
@@ -67,11 +69,23 @@ namespace Nuri.WPF
         public static FrameworkElement Build(VirtualEntry entry)
         {
             var element = CreateElement(entry);
-            ApplyProperties(element, entry.Properties);
+            ApplyProperties(element, entry);
             ApplyEvents(element, entry);
             ApplyChildren(element, entry);
 
             return element;
+        }
+
+        public static FrameworkElement? FindElementById(FrameworkElement root, string id)
+        {
+            if (root == null)
+                throw new ArgumentNullException(nameof(root));
+
+            if (string.IsNullOrWhiteSpace(id))
+                return null;
+
+            var controlIndex = ControlIndexes.GetValue(root, BuildControlIndex);
+            return controlIndex.TryGetValue(id, out var element) ? element : null;
         }
 
         private static FrameworkElement CreateElement(VirtualEntry entry)
@@ -81,10 +95,13 @@ namespace Nuri.WPF
             return element;
         }
 
-        private static void ApplyProperties(FrameworkElement element, IReadOnlyDictionary<string, object?> properties)
+        private static void ApplyProperties(FrameworkElement element, VirtualEntry entry)
         {
-            foreach (var property in properties)
+            foreach (var property in entry.Properties)
             {
+                if (IsHostOnlyWindowProperty(entry, property.Key))
+                    continue;
+
                 SetProperty(element, property.Key, property.Value);
             }
         }
@@ -130,12 +147,16 @@ namespace Nuri.WPF
             if (!controlIndex.TryGetValue(operation.Target.Id, out var target))
                 return;
 
-            SetProperty(target, operation.PropertyName, operation.Value);
+            if (!IsHostOnlyWindowProperty(operation.Target, operation.PropertyName))
+                SetProperty(target, operation.PropertyName, operation.Value);
         }
 
         private static void RemoveProperty(Dictionary<string, FrameworkElement> controlIndex, RemovePropertyPatch operation)
         {
             if (!controlIndex.TryGetValue(operation.Target.Id, out var target))
+                return;
+
+            if (IsHostOnlyWindowProperty(operation.Target, operation.PropertyName))
                 return;
 
             var propertyTarget = WpfControlRegistry.GetPropertyTarget(target, operation.PropertyName);
@@ -276,6 +297,14 @@ namespace Nuri.WPF
             }
         }
 
+        private static bool IsHostOnlyWindowProperty(VirtualEntry entry, string propertyName)
+        {
+            return entry.Type == VirtualControlTypes.Window
+                && (propertyName == PropertyKeys.Title
+                    || propertyName == PropertyKeys.Width
+                    || propertyName == PropertyKeys.Height);
+        }
+
         private static PropertyInfo? GetCachedProperty(Type type, string propertyName)
         {
             return PropertyCache.GetOrAdd((type, propertyName), key => key.Type.GetProperty(key.PropertyName));
@@ -305,12 +334,12 @@ namespace Nuri.WPF
                 return;
             }
 
-            if (propertyName == "Background" && TryBeginBackgroundAnimation(element, animation))
+            if (propertyName == PropertyKeys.Background && TryBeginBackgroundAnimation(element, animation))
             {
                 return;
             }
 
-            if (propertyName == "Foreground" && TryBeginForegroundAnimation(element, animation))
+            if (propertyName == PropertyKeys.Foreground && TryBeginForegroundAnimation(element, animation))
             {
                 return;
             }

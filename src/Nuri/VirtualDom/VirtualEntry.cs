@@ -36,6 +36,8 @@ namespace Nuri.VirtualDom
 
         public string? ParentId { get; internal set; }
 
+        public string? ComponentId { get; private set; }
+
         public IReadOnlyDictionary<string, object?> Properties { get; }
 
         public IReadOnlyDictionary<string, object?> Events { get; }
@@ -59,6 +61,23 @@ namespace Nuri.VirtualDom
                 Children[i].WithIdentity(childId, childParentId);
             }
 
+            return this;
+        }
+
+        public VirtualEntry RewriteIdentity(string id, string? parentId)
+        {
+            Id = id;
+            ParentId = parentId;
+
+            for (var i = 0; i < Children.Count; i++)
+                Children[i].RewriteIdentity($"{id}.{i}", id);
+
+            return this;
+        }
+
+        public VirtualEntry WithComponentId(string componentId)
+        {
+            ComponentId = componentId;
             return this;
         }
 
@@ -94,6 +113,21 @@ namespace Nuri.VirtualDom
             return null;
         }
 
+        public VirtualEntry? FindByComponentId(string componentId)
+        {
+            if (string.Equals(ComponentId, componentId, StringComparison.Ordinal))
+                return this;
+
+            foreach (var child in _children)
+            {
+                var result = child.FindByComponentId(componentId);
+                if (result != null)
+                    return result;
+            }
+
+            return null;
+        }
+
         public bool ReplaceDescendant(string id, VirtualEntry replacement)
         {
             for (var i = 0; i < _children.Count; i++)
@@ -105,6 +139,23 @@ namespace Nuri.VirtualDom
                 }
 
                 if (_children[i].ReplaceDescendant(id, replacement))
+                    return true;
+            }
+
+            return false;
+        }
+
+        public bool ReplaceDescendantByComponentId(string componentId, VirtualEntry replacement)
+        {
+            for (var i = 0; i < _children.Count; i++)
+            {
+                if (string.Equals(_children[i].ComponentId, componentId, StringComparison.Ordinal))
+                {
+                    _children[i] = replacement;
+                    return true;
+                }
+
+                if (_children[i].ReplaceDescendantByComponentId(componentId, replacement))
                     return true;
             }
 

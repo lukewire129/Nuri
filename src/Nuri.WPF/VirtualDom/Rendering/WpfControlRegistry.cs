@@ -19,7 +19,7 @@ namespace Nuri.WPF
             switch (type)
             {
                 case VirtualControlTypes.Div:
-                    return new DivElement(CreateDivHost(kind));
+                    return CreateDivElement(kind);
                 case VirtualControlTypes.Window:
                     return new DivElement(new Grid());
                 case VirtualControlTypes.Image:
@@ -253,6 +253,24 @@ namespace Nuri.WPF
             }
         }
 
+        private static DivElement CreateDivElement(string kind)
+        {
+            if (kind == DivTypes.Scroll)
+            {
+                var childHost = new StackPanel { Orientation = Orientation.Vertical };
+                var scrollViewer = new ScrollViewer
+                {
+                    Content = childHost,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+                };
+
+                return new DivElement(scrollViewer, childHost);
+            }
+
+            return new DivElement(CreateDivHost(kind));
+        }
+
         private static bool IsHostProperty(string propertyName)
         {
             return propertyName == "Orientation"
@@ -264,9 +282,14 @@ namespace Nuri.WPF
     internal sealed class DivElement : Border
     {
         public DivElement(FrameworkElement childHost)
+            : this(childHost, childHost)
+        {
+        }
+
+        public DivElement(FrameworkElement visualRoot, FrameworkElement childHost)
         {
             ChildHost = childHost;
-            Child = childHost;
+            Child = visualRoot;
         }
 
         public FrameworkElement ChildHost { get; }
