@@ -56,7 +56,7 @@ Core runtime, 100 measured iterations after 10 warmups:
 | Stable render with state hooks | 10 | 0.0018 | 1.48 | 10 hooks |
 | Stable render with state hooks | 50 | 0.0102 | 6.95 | 50 hooks |
 | Keyed component state mount/dispose | 1,000 | 3.1037 | 1596.31 | 1,000 disposed states |
-| Parent/child invalidation coalescing | 1,000 children | 3.9679 | 673.73 | 1 retained parent invalidation |
+| Parent/child invalidation coalescing | 1,000 children | 0.3749 | 226.81 | 1 retained parent invalidation |
 | Effect mount/unmount | 1,000 | 2.1434 | 1895.83 | 1,000 cleanups |
 
 WPF renderer, 100 measured iterations after 10 warmups:
@@ -66,7 +66,16 @@ WPF renderer, 100 measured iterations after 10 warmups:
 | Initial native build | 1,000 | 10.0946 | 1393.99 | 0 |
 | Keyed native reorder | 1,000 | 6.1023 | 1603.84 | 1 |
 
-The current optimization candidate is invalidation coalescing for large sibling groups. It produces the correct single parent invalidation, but its time and allocation should be watched before increasing scheduling complexity.
+Invalidation coalescing uses constant-time enqueue deduplication and runtime-parent traversal. The 1,000-child result improved from 3.9679 ms / 673.73 KB to 0.3749 ms / 226.81 KB while retaining exactly one parent invalidation.
+
+The 10,000-child stress comparison used 10 iterations before optimization and 30 confirmation iterations after optimization:
+
+| Version | Mean ms | Alloc KB | Retained invalidations |
+|---|---:|---:|---:|
+| Before | 232.4499 | 6820.32 | 1 |
+| After | 3.0302 | 2224.42 | 1 |
+
+Timing improved by about 76x in the confirmation run and allocation fell by about 67%. Treat result count `1` as the correctness invariant; timing remains environment-dependent.
 
 ## Measurement Scenarios
 

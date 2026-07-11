@@ -111,6 +111,29 @@ namespace Nuri.Runtime
             }
         }
 
+        public static bool HasAncestorInSet(string id, HashSet<string> candidateAncestorIds)
+        {
+            if (candidateAncestorIds == null || candidateAncestorIds.Count == 0)
+                return false;
+
+            lock (SyncRoot)
+            {
+                var currentId = id;
+                var remaining = Nodes.Count + 1;
+                while (remaining-- > 0
+                    && Nodes.TryGetValue(currentId, out var node)
+                    && !string.IsNullOrWhiteSpace(node.ParentId))
+                {
+                    if (candidateAncestorIds.Contains(node.ParentId!))
+                        return true;
+
+                    currentId = node.ParentId!;
+                }
+
+                return false;
+            }
+        }
+
         public static void RemoveSubtree(string rootId)
         {
             lock (SyncRoot)

@@ -22,6 +22,7 @@ internal static class Program
         UseEffectRunsAfterRenderAndCleansUpOnDependencyChange();
         KeyedComponentsKeepDistinctHookLifetimesAtTheSamePosition();
         RuntimeAncestryCleansAndCoalescesKeyedSubtrees();
+        InvalidationQueuePreservesOrderingIndependentCoverage();
         RuntimeAncestryRegistryReleasesDisposedSubtrees();
         DuplicateComponentKeysUseIndependentHookIdentity();
         RemovingHooksFromARenderCleansUpTheirState();
@@ -375,6 +376,37 @@ internal static class Program
 
         Component.DisposeHookState(parent.Id);
         AssertEqual("cleanup:child", log.Last(), "Disposing a parent subtree should clean up keyed descendants without parsing their ids.");
+    }
+
+    private static void InvalidationQueuePreservesOrderingIndependentCoverage()
+    {
+        var firstRoot = new HookProbe();
+        firstRoot.LoadNodeNumber("invalidation-roots", 1);
+        var firstChild = new HookProbe().Key("first-child");
+        firstChild.LoadNodeNumber(firstRoot.Id, 1);
+        var sibling = new HookProbe().Key("sibling");
+        sibling.LoadNodeNumber(firstRoot.Id, 2);
+        var secondRoot = new HookProbe();
+        secondRoot.LoadNodeNumber("invalidation-roots", 2);
+
+        var parentFirst = new ComponentInvalidationQueue();
+        parentFirst.Enqueue(firstRoot);
+        parentFirst.Enqueue(firstChild);
+        parentFirst.Enqueue(firstRoot);
+        var parentFirstResult = parentFirst.DrainCoveredByParents();
+        AssertEqual(1, parentFirstResult.Count, "A parent enqueued first should cover its child and ignore duplicate enqueue.");
+        AssertEqual(firstRoot.Id, parentFirstResult[0].ComponentId, "The parent should be retained regardless of enqueue order.");
+        AssertEqual(false, parentFirst.HasPending, "Draining should clear queue membership state.");
+
+        var independent = new ComponentInvalidationQueue();
+        independent.Enqueue(firstChild);
+        independent.Enqueue(sibling);
+        independent.Enqueue(secondRoot);
+        var independentResult = independent.DrainCoveredByParents();
+        AssertEqual(3, independentResult.Count, "Siblings and separate roots must remain independent invalidations.");
+
+        Component.DisposeHookState(firstRoot.Id);
+        Component.DisposeHookState(secondRoot.Id);
     }
 
     private static void RuntimeAncestryRegistryReleasesDisposedSubtrees()

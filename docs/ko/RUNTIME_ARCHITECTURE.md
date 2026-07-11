@@ -56,7 +56,7 @@ Core runtime, warmup 10회 이후 100회 측정:
 | State hook 안정 렌더 | 10 | 0.0018 | 1.48 | hook 10개 |
 | State hook 안정 렌더 | 50 | 0.0102 | 6.95 | hook 50개 |
 | Keyed component state mount/dispose | 1,000 | 3.1037 | 1596.31 | state 1,000개 정리 |
-| 부모/자식 invalidation 병합 | 자식 1,000개 | 3.9679 | 673.73 | 부모 invalidation 1개 |
+| 부모/자식 invalidation 병합 | 자식 1,000개 | 0.3749 | 226.81 | 부모 invalidation 1개 |
 | Effect mount/unmount | 1,000 | 2.1434 | 1895.83 | cleanup 1,000개 |
 
 WPF renderer, warmup 10회 이후 100회 측정:
@@ -66,7 +66,16 @@ WPF renderer, warmup 10회 이후 100회 측정:
 | 초기 native build | 1,000 | 10.0946 | 1393.99 | 0 |
 | Keyed native reorder | 1,000 | 6.1023 | 1603.84 | 1 |
 
-현재 최적화 후보는 많은 sibling이 포함된 invalidation 병합입니다. 부모 invalidation 하나로 정확히 병합되지만 시간과 할당량은 계속 관찰해야 합니다.
+Invalidation 병합은 O(1) 중복 enqueue 검사와 runtime parent 순회를 사용합니다. 자식 1,000개 결과는 부모 invalidation 1개를 유지하면서 `3.9679 ms / 673.73 KB`에서 `0.3749 ms / 226.81 KB`로 개선됐습니다.
+
+자식 10,000개 stress 비교는 최적화 전 10회, 최적화 후 확인 측정 30회를 사용했습니다.
+
+| 버전 | 평균 ms | 할당 KB | 유지된 invalidation |
+|---|---:|---:|---:|
+| 최적화 전 | 232.4499 | 6820.32 | 1 |
+| 최적화 후 | 3.0302 | 2224.42 | 1 |
+
+확인 측정에서 시간은 약 76배 개선됐고 할당량은 약 67% 감소했습니다. 결과 수 `1`은 정확성 불변식이며 시간은 실행 환경에 따라 달라질 수 있습니다.
 
 ## 최적화 순서
 
