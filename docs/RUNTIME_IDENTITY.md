@@ -2,6 +2,8 @@
 
 This document defines the runtime contracts that must remain stable when changing components, hooks, keys, diffing, or lifecycle behavior.
 
+The broader implementation direction and measured performance baseline are defined in [RUNTIME_ARCHITECTURE.md](RUNTIME_ARCHITECTURE.md).
+
 ## Identity Layers
 
 Nuri has three related but distinct identities:
@@ -49,7 +51,7 @@ Ancestry entries must be registered when node numbers are assigned and removed w
 - Removing a parent cleans keyed and unkeyed descendants in the subtree.
 - Effect callbacks run after commit; cleanup runs before a changed effect, on hook trimming, and on unmount.
 
-Hook storage is currently keyed by `Component.Id`. Runtime ancestry is already memory-based. Moving hook storage onto persistent runtime component nodes is a future migration and must preserve the public DSL and the behaviors above.
+Hook storage is keyed by persistent in-memory runtime nodes. `Component.Id` remains the diagnostic and compatibility identifier associated with the node; it is not the hook store's ownership key.
 
 ## Change Checklist
 

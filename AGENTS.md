@@ -2,6 +2,16 @@
 
 These instructions apply to AI agents working in this repository, including OpenCode and Codex.
 
+## Required Reading Before Work
+
+- English documents under `docs/` are the implementation source of truth for agents.
+- Before changing runtime, hooks, keys, lifecycle, reconciliation, invalidation, or performance code, read:
+  1. `docs/RUNTIME_ARCHITECTURE.md`
+  2. `docs/RUNTIME_IDENTITY.md`
+  3. `docs/LIFECYCLE.md`
+- When resuming work without reliable context, read `docs/SESSION_HANDOFF.md` first, then the relevant reference documents above.
+- Korean translations for the project owner are under `docs/ko/`. Do not use a translation to override or reinterpret the English source of truth.
+
 ## Project Direction
 
 - `Nuri` must stay platform-neutral.
@@ -64,6 +74,9 @@ dotnet run --project "perf\Nuri.WPFPerformance\Nuri.WPFPerformance.csproj" -c Re
 - Use `docs/SESSION_HANDOFF.md` only to recover lost session context.
 - Prefer focused samples over long explanatory docs.
 - When resuming without context, read `docs/SESSION_HANDOFF.md` first, then inspect only relevant source files.
+- Durable English reference documents must have a matching Korean translation under `docs/ko/`.
+- Update the English source and its Korean translation in the same change. Keep code symbols, paths, commands, API names, and measured numbers identical.
+- `docs/SESSION_HANDOFF.md` is an operational recovery file and does not require a full Korean mirror; summarize durable decisions in the paired reference documents instead.
 
 ## Editing Rules
 

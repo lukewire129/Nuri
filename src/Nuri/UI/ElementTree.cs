@@ -66,7 +66,8 @@ namespace Nuri.UI
             var duplicateComponentKeys = FindDuplicateComponentKeys(element.Children);
             foreach (var key in duplicateComponentKeys)
             {
-                var message = $"Duplicate component key '{key}' under parent '{parentId}'. Falling back to position-based hook identity.";
+                var componentTypes = GetComponentTypesForKey(element.Children, key);
+                var message = $"Duplicate component key '{key}' under parent '{parentId}' for [{componentTypes}]. Falling back to position-based hook identity.";
                 Debug.WriteLine(message);
                 NuriDiagnostics.Log(RuntimeLogKind.DuplicateKey, null, null, message);
             }
@@ -101,6 +102,19 @@ namespace Nuri.UI
             }
 
             return duplicates;
+        }
+
+        private static string GetComponentTypesForKey(IEnumerable<TElement> children, string key)
+        {
+            var types = new List<string>();
+            foreach (var child in children)
+            {
+                if (child is ComponentBase<TElement, TAnimation>
+                    && string.Equals(child.Key, key, System.StringComparison.Ordinal))
+                    types.Add(child.GetType().Name);
+            }
+
+            return string.Join(", ", types);
         }
     }
 }

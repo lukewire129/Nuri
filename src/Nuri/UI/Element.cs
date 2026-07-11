@@ -7,6 +7,7 @@ namespace Nuri.UI
 {
     public class Element<TElement, TAnimation> : IElement<TElement, TAnimation>
     {
+        private string? _registeredRuntimeId;
         public string ParentId { get; set; } = "0";
 
         public string Id { get; set; } = "0";
@@ -47,7 +48,10 @@ namespace Nuri.UI
         {
             ParentId = parentId;
             Id = $"{parentId}_{myId}";
+            if (_registeredRuntimeId != null && !string.Equals(_registeredRuntimeId, Id, StringComparison.Ordinal))
+                RuntimeTreeIdentity.Unregister(_registeredRuntimeId);
             RuntimeTreeIdentity.Register(Id, parentId);
+            _registeredRuntimeId = Id;
         }
 
         public TElement SetProperty(string name, object value)

@@ -5,14 +5,18 @@ namespace Nuri.Runtime
 {
     public sealed class StateStore
     {
-        private readonly Dictionary<string, Dictionary<int, object?>> _store = new Dictionary<string, Dictionary<int, object?>>();
+        private readonly Dictionary<RuntimeTreeIdentity.RuntimeTreeNode, Dictionary<int, object?>> _store =
+            new Dictionary<RuntimeTreeIdentity.RuntimeTreeNode, Dictionary<int, object?>>();
 
         public T GetOrCreateState<T>(string componentId, int index, T initialValue)
+            => GetOrCreateState(RuntimeTreeIdentity.GetNode(componentId), index, initialValue);
+
+        internal T GetOrCreateState<T>(RuntimeTreeIdentity.RuntimeTreeNode component, int index, T initialValue)
         {
-            if (!_store.TryGetValue(componentId, out var states))
+            if (!_store.TryGetValue(component, out var states))
             {
                 states = new Dictionary<int, object?>();
-                _store[componentId] = states;
+                _store[component] = states;
             }
 
             if (!states.TryGetValue(index, out var value))
@@ -25,9 +29,12 @@ namespace Nuri.Runtime
         }
 
         public void UpdateState<T>(string componentId, int index, T newValue)
+            => UpdateState(RuntimeTreeIdentity.GetNode(componentId), index, newValue);
+
+        internal void UpdateState<T>(RuntimeTreeIdentity.RuntimeTreeNode component, int index, T newValue)
         {
-            if (!_store.TryGetValue(componentId, out var states))
-                throw new InvalidOperationException($"Component {componentId} not found.");
+            if (!_store.TryGetValue(component, out var states))
+                throw new InvalidOperationException($"Component {component.Id} not found.");
 
             if (states.TryGetValue(index, out var existingValue) && existingValue != null && !(existingValue is T))
                 throw new InvalidOperationException($"Cannot change state type at index {index} from {existingValue.GetType()} to {typeof(T)}.");
@@ -36,13 +43,19 @@ namespace Nuri.Runtime
         }
 
         public void RemoveComponentState(string componentId)
+            => RemoveComponentState(RuntimeTreeIdentity.GetNode(componentId));
+
+        internal void RemoveComponentState(RuntimeTreeIdentity.RuntimeTreeNode component)
         {
-            _store.Remove(componentId);
+            _store.Remove(component);
         }
 
         public void TrimComponentState(string componentId, int usedHookCount)
+            => TrimComponentState(RuntimeTreeIdentity.GetNode(componentId), usedHookCount);
+
+        internal void TrimComponentState(RuntimeTreeIdentity.RuntimeTreeNode component, int usedHookCount)
         {
-            if (!_store.TryGetValue(componentId, out var states))
+            if (!_store.TryGetValue(component, out var states))
                 return;
 
             foreach (var index in new List<int>(states.Keys))
@@ -52,7 +65,7 @@ namespace Nuri.Runtime
             }
 
             if (states.Count == 0)
-                _store.Remove(componentId);
+                _store.Remove(component);
         }
 
         public void Clear()

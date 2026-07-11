@@ -25,6 +25,7 @@ Move Nuri from WPF-direct UI creation toward a platform-neutral Core virtual UI/
 - Keyed component lifecycle uses explicit component keys. Key changes clean up the old logical component and mount the replacement.
 - Runtime subtree cleanup, diagnostics cleanup, and dirty-component coalescing use the in-memory `RuntimeTreeIdentity` ancestry registry instead of parsing ID delimiters.
 - The authoritative identity/key/hook invariants and regression checklist are in `docs/RUNTIME_IDENTITY.md`.
+- The runtime architecture decision, non-goals, performance scenarios, and measured baseline are in `docs/RUNTIME_ARCHITECTURE.md`.
 - Core-neutral event foundation added:
   - `VirtualEvent`
   - `VirtualEventKind`
@@ -67,6 +68,7 @@ Move Nuri from WPF-direct UI creation toward a platform-neutral Core virtual UI/
 - `src/Nuri/UI/ComponentBase.cs`
 - `src/Nuri/Runtime/RuntimeTreeIdentity.cs`
 - `docs/RUNTIME_IDENTITY.md`
+- `docs/RUNTIME_ARCHITECTURE.md`
 - `src/Nuri/UI/Dsl/IElement.cs`
 - `src/Nuri/UI/Dsl/Component.cs`
 - `src/Nuri/UI/Dsl/SemanticElements.cs`

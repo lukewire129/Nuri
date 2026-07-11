@@ -22,6 +22,7 @@ internal static class Program
         UseEffectRunsAfterRenderAndCleansUpOnDependencyChange();
         KeyedComponentsKeepDistinctHookLifetimesAtTheSamePosition();
         RuntimeAncestryCleansAndCoalescesKeyedSubtrees();
+        RuntimeAncestryRegistryReleasesDisposedSubtrees();
         DuplicateComponentKeysUseIndependentHookIdentity();
         RemovingHooksFromARenderCleansUpTheirState();
         StoreSetInvalidatesOnlySubscribedComponents();
@@ -374,6 +375,18 @@ internal static class Program
 
         Component.DisposeHookState(parent.Id);
         AssertEqual("cleanup:child", log.Last(), "Disposing a parent subtree should clean up keyed descendants without parsing their ids.");
+    }
+
+    private static void RuntimeAncestryRegistryReleasesDisposedSubtrees()
+    {
+        var baseline = RuntimeTreeIdentity.RegisteredNodeCount;
+        var root = Component.Div(new HookProbe().Key("registry-child"));
+        root.LoadNodeNumber("registry-test", 1);
+        ElementTree<IElement, AnimationValue>.AssignDescendantIds(root.Id, root);
+
+        AssertEqual(true, RuntimeTreeIdentity.RegisteredNodeCount > baseline, "Building a subtree should register runtime ancestry nodes.");
+        Component.DisposeHookState(root.Id);
+        AssertEqual(baseline, RuntimeTreeIdentity.RegisteredNodeCount, "Disposing a subtree should release all runtime ancestry nodes.");
     }
 
     private static void DuplicateComponentKeysUseIndependentHookIdentity()

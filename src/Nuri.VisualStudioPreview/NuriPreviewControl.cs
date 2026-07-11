@@ -233,10 +233,12 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
 
         ResizeEmbeddedWindow ();
 
-        Dispatcher.BeginInvoke (new Action (() =>
+        ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
         {
-            ResizeEmbeddedWindow ();
-        }));
+            await Task.Yield();
+            await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+            ResizeEmbeddedWindow();
+        }).FileAndForget("NuriPreview/ResizeEmbeddedWindow");
     }
 
     private void ResizeEmbeddedWindow()

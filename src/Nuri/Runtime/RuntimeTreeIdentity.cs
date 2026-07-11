@@ -6,7 +6,16 @@ namespace Nuri.Runtime
     internal static class RuntimeTreeIdentity
     {
         private static readonly object SyncRoot = new object();
-        private static readonly Dictionary<string, Node> Nodes = new Dictionary<string, Node>(StringComparer.Ordinal);
+        private static readonly Dictionary<string, RuntimeTreeNode> Nodes = new Dictionary<string, RuntimeTreeNode>(StringComparer.Ordinal);
+
+        internal static int RegisteredNodeCount
+        {
+            get
+            {
+                lock (SyncRoot)
+                    return Nodes.Count;
+            }
+        }
 
         public static void Register(string id, string? parentId)
         {
@@ -14,7 +23,50 @@ namespace Nuri.Runtime
                 return;
 
             lock (SyncRoot)
-                Nodes[id] = new Node(id, parentId);
+            {
+                if (Nodes.TryGetValue(id, out var existing))
+                    existing.ParentId = parentId;
+                else
+                    Nodes[id] = new RuntimeTreeNode(id, parentId);
+            }
+        }
+
+        public static RuntimeTreeNode GetNode(string id)
+        {
+            lock (SyncRoot)
+            {
+                if (!Nodes.TryGetValue(id, out var node))
+                {
+                    node = new RuntimeTreeNode(id, null);
+                    Nodes[id] = node;
+                }
+
+                return node;
+            }
+        }
+
+        public static void Unregister(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                return;
+
+            lock (SyncRoot)
+                Nodes.Remove(id);
+        }
+
+        public static IReadOnlyList<RuntimeTreeNode> GetSubtreeNodes(string rootId)
+        {
+            lock (SyncRoot)
+            {
+                var result = new List<RuntimeTreeNode>();
+                foreach (var node in Nodes.Values)
+                {
+                    if (IsDescendantOrSelf(node.Id, rootId))
+                        result.Add(node);
+                }
+
+                return result;
+            }
         }
 
         public static bool IsDescendantOrSelf(string id, string rootId)
@@ -75,16 +127,16 @@ namespace Nuri.Runtime
             }
         }
 
-        private sealed class Node
+        internal sealed class RuntimeTreeNode
         {
-            public Node(string id, string? parentId)
+            public RuntimeTreeNode(string id, string? parentId)
             {
                 Id = id;
                 ParentId = parentId;
             }
 
             public string Id { get; }
-            public string? ParentId { get; }
+            public string? ParentId { get; set; }
         }
     }
 }
