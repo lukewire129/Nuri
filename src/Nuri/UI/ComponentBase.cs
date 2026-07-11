@@ -56,7 +56,9 @@ namespace Nuri.UI
         public void LoadNodeNumber(string parentId, int myId)
         {
             ParentId = parentId;
-            Id = $"{parentId}_{myId}";
+            Id = string.IsNullOrWhiteSpace(Key)
+                ? $"{parentId}_{myId}"
+                : $"{parentId}#key:{Key}";
         }
 
         public TElement SetProperty(string name, object value)

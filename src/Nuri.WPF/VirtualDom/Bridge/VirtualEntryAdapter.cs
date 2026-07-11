@@ -52,6 +52,8 @@ namespace Nuri.WPF
                     rendered.Properties[property.Key] = property.Value;
             }
 
+            ApplyComponentKey(component, rendered);
+
             var renderedId = GetRenderedRootId(component, rendered);
             rendered.ParentId = component.ParentId;
             rendered.Id = renderedId;
@@ -62,9 +64,19 @@ namespace Nuri.WPF
 
         private static string GetRenderedRootId(Nuri.UI.Dsl.Component component, Nuri.UI.Dsl.IElement rendered)
         {
+            if (!string.IsNullOrWhiteSpace(component.Key)
+                && string.Equals(component.Key, rendered.Key, System.StringComparison.Ordinal))
+                return component.Id;
+
             return !string.IsNullOrWhiteSpace(rendered.Key)
                 ? component.Id + "#key:" + rendered.Key
                 : component.Id;
+        }
+
+        private static void ApplyComponentKey(Nuri.UI.Dsl.Component component, Nuri.UI.Dsl.IElement rendered)
+        {
+            if (string.IsNullOrWhiteSpace(rendered.Key) && !string.IsNullOrWhiteSpace(component.Key))
+                rendered.Key = component.Key;
         }
 
         private static string? GetKey(string key, string name)

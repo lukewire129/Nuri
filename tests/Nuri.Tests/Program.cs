@@ -18,6 +18,7 @@ internal static class Program
         UseLatestTracksTheCurrentValue();
         UseMemoCachesUntilDependenciesChange();
         UseEffectRunsAfterRenderAndCleansUpOnDependencyChange();
+        KeyedComponentsKeepDistinctHookLifetimesAtTheSamePosition();
         RemovingHooksFromARenderCleansUpTheirState();
         StoreSetInvalidatesOnlySubscribedComponents();
         StoreCleanupPreventsUnmountedComponentInvalidation();
@@ -326,6 +327,29 @@ internal static class Program
         AssertEqual("form", rendered.Key, "Router should key selected route content by route key.");
     }
 
+    private static void KeyedComponentsKeepDistinctHookLifetimesAtTheSamePosition()
+    {
+        var log = new List<string>();
+        var profile = new LifecycleProbe("profile", log).Key("profile");
+        var billing = new LifecycleProbe("billing", log).Key("billing");
+
+        profile.LoadNodeNumber("tabs", 1);
+        billing.LoadNodeNumber("tabs", 1);
+
+        AssertNotEqual(profile.Id, billing.Id, "Different component keys at the same position must produce different hook identities.");
+
+        profile.RegisterMountEffect();
+        profile.FlushEffects();
+        billing.RegisterMountEffect();
+        Component.DisposeHookState(profile.Id);
+        billing.FlushEffects();
+
+        AssertEqual("mount:profile", log[0], "The original keyed component should mount once.");
+        AssertEqual("cleanup:profile", log[1], "Replacing a keyed component should clean up the previous component.");
+        AssertEqual("mount:billing", log[2], "The replacement keyed component should mount with a distinct hook identity.");
+        Component.DisposeHookState(billing.Id);
+    }
+
     private static void NavigationUsesLatestStateForConsecutiveUpdates()
     {
         var component = new NavigationProbe { Id = "navigation-consecutive" };
@@ -532,6 +556,37 @@ internal static class Program
         public (NavigationState state, Navigator navigator) UseNavigation(string initialRoute)
         {
             return useNavigation(initialRoute);
+        }
+
+        public override IElement Render()
+        {
+            return Div();
+        }
+    }
+
+    private sealed class LifecycleProbe : Component
+    {
+        private readonly string _name;
+        private readonly List<string> _log;
+
+        public LifecycleProbe(string name, List<string> log)
+        {
+            _name = name;
+            _log = log;
+        }
+
+        public void RegisterMountEffect()
+        {
+            useEffect(() =>
+            {
+                _log.Add("mount:" + _name);
+                return () => _log.Add("cleanup:" + _name);
+            }, []);
+        }
+
+        public void FlushEffects()
+        {
+            FlushPendingEffectsForRender();
         }
 
         public override IElement Render()
