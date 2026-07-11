@@ -17,6 +17,7 @@ namespace Nuri.UI
         private int _stateIndex;
         private bool _hasUsedHooks;
         private string? _registeredRuntimeId;
+        private RuntimeTreeIdentity.RuntimeTreeNode? _runtimeNode;
 
         public string ParentId { get; set; } = "0";
 
@@ -74,8 +75,19 @@ namespace Nuri.UI
         {
             if (_registeredRuntimeId != null && !string.Equals(_registeredRuntimeId, Id, StringComparison.Ordinal))
                 RuntimeTreeIdentity.Unregister(_registeredRuntimeId);
-            RuntimeTreeIdentity.Register(Id, parentId);
+            _runtimeNode = RuntimeTreeIdentity.Register(Id, parentId);
             _registeredRuntimeId = Id;
+        }
+
+        internal RuntimeTreeIdentity.RuntimeTreeNode RuntimeNode => GetRuntimeNode();
+
+        private RuntimeTreeIdentity.RuntimeTreeNode GetRuntimeNode()
+        {
+            if (_runtimeNode == null
+                || !string.Equals(_runtimeNode.Id, Id, StringComparison.Ordinal))
+                _runtimeNode = RuntimeTreeIdentity.GetNode(Id);
+
+            return _runtimeNode;
         }
 
         public TElement SetProperty(string name, object value)
@@ -107,7 +119,7 @@ namespace Nuri.UI
         {
             _hasUsedHooks = true;
             var componentId = Id;
-            var componentNode = RuntimeTreeIdentity.GetNode(componentId);
+            var componentNode = GetRuntimeNode();
             var index = _stateIndex;
             var state = StateStore.GetOrCreateState(componentNode, index, initialValue);
             RecordHook(componentId, index, HookKind.State, typeof(T).Name, DiagnosticsValueFormatter.Summary(state));
@@ -135,7 +147,7 @@ namespace Nuri.UI
 
             _hasUsedHooks = true;
             var componentId = Id;
-            var componentNode = RuntimeTreeIdentity.GetNode(componentId);
+            var componentNode = GetRuntimeNode();
             var index = _stateIndex;
             var state = StateStore.GetOrCreateState(componentNode, index, initialState);
             RecordHook(componentId, index, HookKind.Reducer, typeof(TState).Name, DiagnosticsValueFormatter.Summary(state));
@@ -160,7 +172,7 @@ namespace Nuri.UI
         {
             _hasUsedHooks = true;
             var componentId = Id;
-            var componentNode = RuntimeTreeIdentity.GetNode(componentId);
+            var componentNode = GetRuntimeNode();
             var index = _stateIndex;
             var reference = StateStore.GetOrCreateState(componentNode, index, new Ref<T>(initialValue));
             RecordHook(componentId, index, HookKind.Ref, typeof(T).Name, DiagnosticsValueFormatter.Summary(reference.Current));
@@ -190,7 +202,7 @@ namespace Nuri.UI
 
             _hasUsedHooks = true;
             var componentId = Id;
-            var componentNode = RuntimeTreeIdentity.GetNode(componentId);
+            var componentNode = GetRuntimeNode();
             var index = _stateIndex;
             var selectedValue = selector(store.Value);
 
@@ -220,7 +232,7 @@ namespace Nuri.UI
                 throw new ArgumentNullException(nameof(factory));
 
             _hasUsedHooks = true;
-            var componentNode = RuntimeTreeIdentity.GetNode(Id);
+            var componentNode = GetRuntimeNode();
             var index = _stateIndex;
 
             lock (HookSyncRoot)
@@ -275,7 +287,7 @@ namespace Nuri.UI
                 throw new ArgumentNullException(nameof(effect));
 
             _hasUsedHooks = true;
-            var componentNode = RuntimeTreeIdentity.GetNode(Id);
+            var componentNode = GetRuntimeNode();
             var index = _stateIndex;
 
             lock (HookSyncRoot)
@@ -304,6 +316,7 @@ namespace Nuri.UI
 
         public void ResetStateIndexForRender()
         {
+            _runtimeNode = RuntimeTreeIdentity.GetNode(Id);
             ResetStateIndex();
         }
 
@@ -313,7 +326,7 @@ namespace Nuri.UI
                 NuriDiagnostics.RecordComponentRendered(Id, GetType().Name);
 
             if (_hasUsedHooks || _stateIndex > 0)
-                TrimHookStateForComponent(Id, _stateIndex);
+                TrimHookStateForComponent(GetRuntimeNode(), Id, _stateIndex);
         }
 
         protected static void FlushPendingEffectsForRender()
@@ -405,6 +418,11 @@ namespace Nuri.UI
 
         protected static void TrimHookStateForComponent(string componentId, int usedHookCount)
         {
+            TrimHookStateForComponent(RuntimeTreeIdentity.GetNode(componentId), componentId, usedHookCount);
+        }
+
+        private static void TrimHookStateForComponent(RuntimeTreeIdentity.RuntimeTreeNode componentNode, string componentId, int usedHookCount)
+        {
             if (string.IsNullOrWhiteSpace(componentId))
                 return;
 
@@ -413,7 +431,6 @@ namespace Nuri.UI
             lock (HookSyncRoot)
             {
                 cleanups = new List<Action?>();
-                var componentNode = RuntimeTreeIdentity.GetNode(componentId);
                 StateStore.TrimComponentState(componentNode, usedHookCount);
                 TrimStateIndexes(MemoStore, componentNode, usedHookCount);
                 TrimStoreHooks(componentNode, usedHookCount);

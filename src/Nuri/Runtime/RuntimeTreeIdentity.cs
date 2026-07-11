@@ -17,17 +17,22 @@ namespace Nuri.Runtime
             }
         }
 
-        public static void Register(string id, string? parentId)
+        public static RuntimeTreeNode Register(string id, string? parentId)
         {
             if (string.IsNullOrWhiteSpace(id))
-                return;
+                throw new ArgumentException("Runtime node id must not be empty.", nameof(id));
 
             lock (SyncRoot)
             {
                 if (Nodes.TryGetValue(id, out var existing))
+                {
                     existing.ParentId = parentId;
-                else
-                    Nodes[id] = new RuntimeTreeNode(id, parentId);
+                    return existing;
+                }
+
+                var node = new RuntimeTreeNode(id, parentId);
+                Nodes[id] = node;
+                return node;
             }
         }
 
@@ -51,7 +56,9 @@ namespace Nuri.Runtime
                 return;
 
             lock (SyncRoot)
+            {
                 Nodes.Remove(id);
+            }
         }
 
         public static IReadOnlyList<RuntimeTreeNode> GetSubtreeNodes(string rootId)
@@ -146,7 +153,9 @@ namespace Nuri.Runtime
                 }
 
                 foreach (var id in removed)
+                {
                     Nodes.Remove(id);
+                }
             }
         }
 

@@ -39,6 +39,8 @@ WPF Dispatcher and future renderer schedulers remain renderer-owned. Core owns n
 
 Runtime tree nodes are persistent in-memory identities. State, reducer, ref, memo, effect, and store hook data use runtime node references as ownership keys.
 
+Each current `ComponentBase` object caches its assigned runtime node. The node is resolved once at the render boundary, and hook calls use that reference directly instead of locking and searching the global registry by `Component.Id`.
+
 Strings such as `Component.Id` and `VirtualEntry.Id` remain for compatibility, diagnostics, virtual-tree lookup, and renderer patch targets. Tree ancestry and hook ownership must not be inferred by parsing those strings.
 
 See [RUNTIME_IDENTITY.md](RUNTIME_IDENTITY.md) for key, lifecycle, duplicate-key, and cleanup invariants.
@@ -77,6 +79,8 @@ The 10,000-child stress comparison used 10 iterations before optimization and 30
 
 Timing improved by about 76x in the confirmation run and allocation fell by about 67%. Treat result count `1` as the correctness invariant; timing remains environment-dependent.
 
+Runtime-node caching was measured separately with 100,000 stable render iterations. Current focused results were 0.0005 ms for 1 state hook, 0.0022 ms for 10 hooks, and 0.0046 ms for 50 hooks. Hook-render allocation stayed at 0.25 KB, 1.48 KB, and 6.95 KB because caching removes registry lookup rather than hook-value allocation. The cached reference adds about 8 bytes per transient component object; the 1,000-component mount scenario increased by about 7.8 KB. Short standard runs remain noise-sensitive, so this change is justified primarily by removing per-hook registry locking and simplifying ownership, not by claiming a fixed speedup ratio.
+
 ## Measurement Scenarios
 
 The Core performance harness covers:
@@ -99,11 +103,9 @@ The test suite separately verifies:
 
 Use measurements before adding runtime complexity. If hook-heavy scenarios regress materially, optimize in this order:
 
-1. Cache the assigned runtime node directly on the current component object and avoid repeated registry lookup.
-2. Replace per-kind hook dictionaries with compact ordered hook slots where allocation data justifies it.
-3. Reduce invalidation queue scans and allocations while preserving parent coverage.
-4. Reduce transient component or closure allocation only after profiling shows meaningful GC pressure.
-5. Consider scheduling sophistication only when renderer batching and subtree rendering are insufficient.
+1. Replace per-kind hook dictionaries with compact ordered hook slots where allocation data justifies it.
+2. Reduce transient component or closure allocation only after profiling shows meaningful GC pressure.
+3. Consider scheduling sophistication only when renderer batching and subtree rendering are insufficient.
 
 Do not trade patch count, deterministic cleanup, keyed state preservation, or platform neutrality for small isolated timing gains.
 

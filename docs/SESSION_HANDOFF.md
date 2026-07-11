@@ -24,6 +24,7 @@ Move Nuri from WPF-direct UI creation toward a platform-neutral Core virtual UI/
 - Duplicate virtual keys are diagnosed and fall back to index diff. Duplicate component keys also emit `RuntimeLogKind.DuplicateKey` and use position-based hook identity so state/effects cannot collide.
 - Keyed component lifecycle uses explicit component keys. Key changes clean up the old logical component and mount the replacement.
 - Runtime subtree cleanup, diagnostics cleanup, and dirty-component coalescing use the in-memory `RuntimeTreeIdentity` ancestry registry instead of parsing ID delimiters.
+- `ComponentBase` caches its assigned runtime node, so hook access does not repeat global registry lookup; detached nodes are refreshed before reuse.
 - `ComponentInvalidationQueue` uses hash-based enqueue deduplication and runtime-parent traversal; the documented 10,000-child stress case retains one parent invalidation at about 3.03 ms versus 232.45 ms before optimization.
 - The authoritative identity/key/hook invariants and regression checklist are in `docs/RUNTIME_IDENTITY.md`.
 - The runtime architecture decision, non-goals, performance scenarios, and measured baseline are in `docs/RUNTIME_ARCHITECTURE.md`.

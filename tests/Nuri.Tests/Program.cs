@@ -24,6 +24,7 @@ internal static class Program
         RuntimeAncestryCleansAndCoalescesKeyedSubtrees();
         InvalidationQueuePreservesOrderingIndependentCoverage();
         RuntimeAncestryRegistryReleasesDisposedSubtrees();
+        ComponentCachesAndRefreshesItsRuntimeNode();
         DuplicateComponentKeysUseIndependentHookIdentity();
         RemovingHooksFromARenderCleansUpTheirState();
         StoreSetInvalidatesOnlySubscribedComponents();
@@ -419,6 +420,25 @@ internal static class Program
         AssertEqual(true, RuntimeTreeIdentity.RegisteredNodeCount > baseline, "Building a subtree should register runtime ancestry nodes.");
         Component.DisposeHookState(root.Id);
         AssertEqual(baseline, RuntimeTreeIdentity.RegisteredNodeCount, "Disposing a subtree should release all runtime ancestry nodes.");
+    }
+
+    private static void ComponentCachesAndRefreshesItsRuntimeNode()
+    {
+        var component = new HookProbe().Key("runtime-node-cache");
+        component.LoadNodeNumber("runtime-node-cache-root", 1);
+        var initialNode = component.RuntimeNode;
+
+        component.LoadNodeNumber("runtime-node-cache-root", 1);
+        AssertEqual(true, ReferenceEquals(initialNode, component.RuntimeNode), "A stable logical component should retain its cached runtime node.");
+
+        var registeredBeforeDispose = RuntimeTreeIdentity.RegisteredNodeCount;
+        Component.DisposeHookState(component.Id);
+        AssertEqual(registeredBeforeDispose - 1, RuntimeTreeIdentity.RegisteredNodeCount, "Disposing a component should detach its cached runtime node.");
+
+        component.ResetStateIndexForRender();
+        var refreshedNode = component.RuntimeNode;
+        AssertEqual(false, ReferenceEquals(initialNode, refreshedNode), "A disposed component object must not reuse its detached runtime node.");
+        Component.DisposeHookState(component.Id);
     }
 
     private static void DuplicateComponentKeysUseIndependentHookIdentity()

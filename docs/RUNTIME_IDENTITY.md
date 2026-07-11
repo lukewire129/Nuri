@@ -53,6 +53,8 @@ Ancestry entries must be registered when node numbers are assigned and removed w
 
 Hook storage is keyed by persistent in-memory runtime nodes. `Component.Id` remains the diagnostic and compatibility identifier associated with the node; it is not the hook store's ownership key.
 
+The current component object caches its assigned runtime node. The cache is refreshed at the render boundary, so a component ID change or reuse after disposal resolves a currently registered node before hooks run.
+
 ## Change Checklist
 
 When changing identity, hooks, lifecycle, or diffing, cover these cases:

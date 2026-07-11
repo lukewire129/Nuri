@@ -49,6 +49,8 @@ Component key는 렌더 결과 root에 별도 key가 없을 때 virtual root로 
 
 Hook 저장소는 메모리에 유지되는 runtime node를 소유권 key로 사용합니다. `Component.Id`는 node에 연결된 diagnostics 및 호환성 식별자입니다.
 
+현재 component 객체는 할당된 runtime node를 캐시합니다. Render 경계에서 cache를 갱신하므로 Component ID가 바뀌거나 dispose 이후 객체를 다시 사용해도 hook 실행 전에 현재 등록된 node를 resolve합니다.
+
 ## 변경 체크리스트
 
 - 일반 rerender에서 unkeyed state 보존
