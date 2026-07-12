@@ -16,6 +16,9 @@ internal static class Program
         KeyedReorderPreservesPatchTargetIdentity();
         KeyedSlidingWindowPreservesRetainedChildIdentities();
         UseReducerDispatchesFromCurrentState();
+        UseStateReusesSetterForStableLogicalComponent();
+        UseStateSetterTracksLatestComponentOwner();
+        UseStateSettersRemainIsolatedAndTrimmed();
         UseRefPreservesReferenceAcrossRenders();
         UseLatestTracksTheCurrentValue();
         UseMemoCachesUntilDependenciesChange();
@@ -335,6 +338,54 @@ internal static class Program
         AssertEqual("form", rendered.Key, "Router should key selected route content by route key.");
     }
 
+    private static void UseStateReusesSetterForStableLogicalComponent()
+    {
+        var component = new HookProbe { Id = "hook-state-stable-setter" };
+        var (_, firstSetter) = component.UseNumberState(0);
+
+        component.ResetStateIndexForRender();
+        var (_, secondSetter) = component.UseNumberState(0);
+
+        AssertEqual(true, ReferenceEquals(firstSetter, secondSetter), "useState should reuse its setter for a stable logical hook slot.");
+        Component.DisposeHookState(component.Id);
+    }
+
+    private static void UseStateSetterTracksLatestComponentOwner()
+    {
+        const string componentId = "hook-state-latest-owner";
+        var first = new HookProbe { Id = componentId };
+        var (_, firstSetter) = first.UseNumberState(0);
+        var second = new HookProbe { Id = componentId };
+        var (_, secondSetter) = second.UseNumberState(0);
+
+        AssertEqual(true, ReferenceEquals(firstSetter, secondSetter), "A replacement CLR object for the same logical component should receive the same setter.");
+        secondSetter(current => current + 1);
+        AssertEqual(0, first.StateChangedCount, "A reused setter must not invalidate the stale CLR component object.");
+        AssertEqual(1, second.StateChangedCount, "A reused setter should invalidate the latest CLR component object.");
+
+        second.ResetStateIndexForRender();
+        var (state, _) = second.UseNumberState(0);
+        AssertEqual(1, state, "A reused setter should update the current logical component state.");
+        Component.DisposeHookState(componentId);
+    }
+
+    private static void UseStateSettersRemainIsolatedAndTrimmed()
+    {
+        var component = new HookProbe { Id = "hook-state-trim" };
+        var setters = component.UseNumberStates(2);
+        component.CompleteHooks();
+        AssertEqual(false, ReferenceEquals(setters[0], setters[1]), "Different state hook slots must keep distinct setters.");
+
+        component.ResetStateIndexForRender();
+        component.UseNumberStates(1);
+        component.CompleteHooks();
+        component.ResetStateIndexForRender();
+        var remountedSetters = component.UseNumberStates(2);
+        AssertEqual(true, ReferenceEquals(setters[0], remountedSetters[0]), "A retained hook slot should preserve its setter.");
+        AssertEqual(false, ReferenceEquals(setters[1], remountedSetters[1]), "A trimmed hook slot should create a new setter when remounted.");
+        Component.DisposeHookState(component.Id);
+    }
+
     private static void KeyedComponentsKeepDistinctHookLifetimesAtTheSamePosition()
     {
         var log = new List<string>();
@@ -614,11 +665,31 @@ internal static class Program
     {
         public int MemoFactoryCallCount { get; private set; }
 
+        public int StateChangedCount { get; private set; }
+
         public List<string> EffectLog { get; } = new List<string>();
 
         public (int state, Action<int> dispatch) UseCounter()
         {
             return useReducer<int, int>((state, action) => state + action, 0);
+        }
+
+        public (int state, Action<Func<int, int>> setter) UseNumberState(int initialValue)
+        {
+            return useState(initialValue);
+        }
+
+        public Action<Func<int, int>>[] UseNumberStates(int count)
+        {
+            var setters = new Action<Func<int, int>>[count];
+            for (var i = 0; i < count; i++)
+                setters[i] = useState(i).setState;
+            return setters;
+        }
+
+        protected override void OnStateChanged()
+        {
+            StateChangedCount++;
         }
 
         public Ref<int> UseNumberRef()

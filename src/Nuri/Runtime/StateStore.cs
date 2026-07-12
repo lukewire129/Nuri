@@ -25,7 +25,21 @@ namespace Nuri.Runtime
                 return initialValue;
             }
 
+            if (value is StateSlot<T> slot)
+                return slot.Value;
+
             return (T)value!;
+        }
+
+        internal Dictionary<int, object?> GetOrCreateComponentStateEntries(RuntimeTreeIdentity.RuntimeTreeNode component)
+        {
+            if (!_store.TryGetValue(component, out var states))
+            {
+                states = new Dictionary<int, object?>();
+                _store[component] = states;
+            }
+
+            return states;
         }
 
         public void UpdateState<T>(string componentId, int index, T newValue)
@@ -36,7 +50,13 @@ namespace Nuri.Runtime
             if (!_store.TryGetValue(component, out var states))
                 throw new InvalidOperationException($"Component {component.Id} not found.");
 
-            if (states.TryGetValue(index, out var existingValue) && existingValue != null && !(existingValue is T))
+            if (states.TryGetValue(index, out var existingValue) && existingValue is StateSlot<T> slot)
+            {
+                slot.Value = newValue;
+                return;
+            }
+
+            if (existingValue != null && !(existingValue is T))
                 throw new InvalidOperationException($"Cannot change state type at index {index} from {existingValue.GetType()} to {typeof(T)}.");
 
             states[index] = newValue;
@@ -71,6 +91,17 @@ namespace Nuri.Runtime
         public void Clear()
         {
             _store.Clear();
+        }
+
+        internal class StateSlot<T>
+        {
+            public StateSlot(T value)
+            {
+                Value = value;
+            }
+
+            public T Value { get; set; }
+
         }
     }
 }

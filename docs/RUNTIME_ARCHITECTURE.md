@@ -91,6 +91,27 @@ Disabled-diagnostics hook formatting was optimized on 2026-07-12. The before and
 
 The 50-hook allocation fell by about 16.8%, but did not reach the expected upper bound of 5.40 KB. The result indicates that the change removed about 24 bytes per hook from disabled summary formatting while setter delegates, closures, and other hook costs remain. Treat this as a measured partial success rather than evidence for a broader hook-store rewrite.
 
+State setter reuse was measured on 2026-07-12 with the same 7-process, 10-warmup, 100-iteration method. Release IL confirmed that the previous `useState<T>` path created one display class and one setter delegate per hook on every render. State slots now retain one setter for the logical runtime node and hook index, and update its current CLR component owner on subsequent renders.
+
+| Scenario | Before alloc KB | Expected alloc KB | After alloc KB | Before/after median ms | Required result |
+|---|---:|---:|---:|---:|---:|
+| Stable render with state hooks | 1: 0.23 | 0.10-0.15 | 0.12 | 0.0009 / 0.0013 | 1 hook |
+| Stable render with state hooks | 10: 1.24 | 0.10-0.20 | 0.15 | 0.0018 / 0.0022 | 10 hooks |
+| Stable render with state hooks | 50: 5.78 | 0.10-0.30 | 0.31 | 0.0063 / 0.0077 | 50 hooks |
+
+The 50-hook stable allocation fell by about 94.6%. It missed the expected upper bound by 0.01 KB, and short 100-iteration latency increased, so this remains a partial success under the predeclared thresholds. The 1,000-component keyed mount allocation also fell from 1580.69 KB to 1557.25 KB and retained exactly 1,000 disposed states. Its after-time median was 6.6388 ms with a 5.9019-7.7229 ms range.
+
+The short run does not include enough allocation pressure to represent GC cost. A separate sustained comparison used the committed pre-change runtime and the working runtime in isolated worktrees. Each of 7 independent Release processes performed 10,000 warmups and 100,000 measured renders with 50 state hooks:
+
+| Version | Median total ms | Renders/sec | Alloc/render KB | Total alloc MB | Gen0 | Required result |
+|---|---:|---:|---:|---:|---:|---:|
+| Before | 626.04 | 159734 | 5.77 | 563.83 | 70 | 50 hooks |
+| After | 197.44 | 506491 | 0.30 | 29.76 | 3 | 50 hooks |
+
+Sustained elapsed time fell by about 68.5%, throughput increased by about 3.17x, total allocation fell by about 94.7%, and Gen0 collections fell by about 95.7%. This supports the setter reuse for sustained hook-heavy workloads while retaining the documented short-latency tradeoff.
+
+The expanded harness also establishes future baselines not used in the before/expected/after verdict: stable 100-hook render was 0.50 KB and 0.0178 ms; first mount results for 1, 10, 50, and 100 hooks were 1.33/3.10/11.21/22.34 KB with median times of 0.0052/0.0053/0.0136/0.0257 ms. Setter identity, latest-owner invalidation, functional updates, hook-slot isolation, trimming, and disposal are covered by regression tests.
+
 ## Measurement Scenarios
 
 The Core performance harness covers:

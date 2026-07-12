@@ -121,23 +121,30 @@ namespace Nuri.UI
             var componentId = Id;
             var componentNode = GetRuntimeNode();
             var index = _stateIndex;
-            var state = StateStore.GetOrCreateState(componentNode, index, initialValue);
-            RecordHookValue(componentId, index, HookKind.State, typeof(T).Name, state);
-
-            void SetState(Func<T, T> update)
+            var stateEntries = StateStore.GetOrCreateComponentStateEntries(componentNode);
+            StateHookState<T> hook;
+            if (!stateEntries.TryGetValue(index, out var entry))
             {
-                var currentState = StateStore.GetOrCreateState(componentNode, index, initialValue);
-                var newValue = update(currentState);
-                if (EqualityComparer<T>.Default.Equals(currentState, newValue))
-                    return;
-
-                StateStore.UpdateState(componentNode, index, newValue);
-                Id = componentId;
-                OnStateChanged();
+                hook = new StateHookState<T>(initialValue, this, componentId);
+                stateEntries[index] = hook;
             }
+            else if (entry is StateHookState<T> typedHook)
+            {
+                hook = typedHook;
+                hook.UpdateOwner(this, componentId);
+            }
+            else if (entry is T typedState)
+            {
+                hook = new StateHookState<T>(typedState, this, componentId);
+                stateEntries[index] = hook;
+            }
+            else
+                throw new InvalidOperationException($"Cannot change state type at index {index} from {entry?.GetType()} to {typeof(T)}.");
+
+            RecordHookValue(componentId, index, HookKind.State, typeof(T).Name, hook.Value);
 
             _stateIndex++;
-            return (state, SetState);
+            return (hook.Value, hook.Setter);
         }
 
         protected (TState state, Action<TAction> dispatch) useReducer<TState, TAction>(Func<TState, TAction, TState> reducer, TState initialState)
@@ -573,6 +580,44 @@ namespace Nuri.UI
         }
 
         public abstract void Dispose();
+
+        private sealed class StateHookState<T> : StateStore.StateSlot<T>
+        {
+            private ComponentBase<TElement, TAnimation> _owner;
+            private string _componentId;
+
+            public StateHookState(
+                T value,
+                ComponentBase<TElement, TAnimation> owner,
+                string componentId) : base(value)
+            {
+                _owner = owner;
+                _componentId = componentId;
+                Setter = SetState;
+            }
+
+            public Action<Func<T, T>> Setter { get; }
+
+            public void UpdateOwner(ComponentBase<TElement, TAnimation> owner, string componentId)
+            {
+                if (!ReferenceEquals(_owner, owner))
+                    _owner = owner;
+                if (!ReferenceEquals(_componentId, componentId))
+                    _componentId = componentId;
+            }
+
+            private void SetState(Func<T, T> update)
+            {
+                var currentState = Value;
+                var newValue = update(currentState);
+                if (EqualityComparer<T>.Default.Equals(currentState, newValue))
+                    return;
+
+                Value = newValue;
+                _owner.Id = _componentId;
+                _owner.OnStateChanged();
+            }
+        }
 
         private abstract class MemoHookState
         {

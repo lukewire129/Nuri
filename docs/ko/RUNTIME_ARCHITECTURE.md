@@ -91,6 +91,27 @@ Diagnostics 비활성 상태의 hook formatting은 2026-07-12에 최적화했습
 
 Hook 50개 할당량은 약 16.8% 감소했지만 예상 상한인 5.40 KB에는 도달하지 못했습니다. 이 결과는 비활성 summary formatting에서 hook당 약 24 bytes가 제거됐고 setter delegate, closure 및 다른 hook 비용은 남아 있음을 보여 줍니다. 더 광범위한 hook store 재작성 근거가 아니라 측정된 부분 성공으로 취급합니다.
 
+State setter 재사용은 2026-07-12에 동일한 독립 process 7개, warmup 10회, 측정 100회 방식으로 측정했습니다. Release IL에서 기존 `useState<T>` 경로가 매 render의 각 hook마다 display class 1개와 setter delegate 1개를 생성하는 것을 확인했습니다. 이제 state slot은 logical runtime node와 hook index에 setter 1개를 유지하고, 이후 render에서 현재 CLR component owner를 갱신합니다.
+
+| 시나리오 | 개선 전 할당 KB | 예상 할당 KB | 개선 후 할당 KB | 개선 전/후 중앙값 ms | 필수 결과 |
+|---|---:|---:|---:|---:|---:|
+| State hook 안정 렌더 | 1: 0.23 | 0.10-0.15 | 0.12 | 0.0009 / 0.0013 | hook 1개 |
+| State hook 안정 렌더 | 10: 1.24 | 0.10-0.20 | 0.15 | 0.0018 / 0.0022 | hook 10개 |
+| State hook 안정 렌더 | 50: 5.78 | 0.10-0.30 | 0.31 | 0.0063 / 0.0077 | hook 50개 |
+
+Hook 50개 안정 렌더 할당량은 약 94.6% 감소했습니다. 사전에 정한 예상 상한을 0.01 KB 초과했고 짧은 100회 지연 시간이 증가했으므로 사전 기준에 따른 판정은 부분 성공입니다. Keyed component 1,000개 mount 할당량도 1580.69 KB에서 1557.25 KB로 감소했으며 dispose된 state 수는 정확히 1,000개를 유지했습니다. 개선 후 시간 중앙값은 6.6388 ms이고 범위는 5.9019-7.7229 ms였습니다.
+
+짧은 실행은 GC 비용을 반영할 만큼 충분한 할당 압력을 만들지 않습니다. 별도의 지속 비교에서는 commit된 개선 전 runtime과 working runtime을 분리 worktree에서 실행했습니다. 독립 Release process 7개가 각각 warmup 10,000회 이후 state hook 50개 렌더를 100,000회 측정했습니다.
+
+| 버전 | 총시간 중앙값 ms | Renders/sec | 렌더당 할당 KB | 총 할당 MB | Gen0 | 필수 결과 |
+|---|---:|---:|---:|---:|---:|---:|
+| 개선 전 | 626.04 | 159734 | 5.77 | 563.83 | 70 | hook 50개 |
+| 개선 후 | 197.44 | 506491 | 0.30 | 29.76 | 3 | hook 50개 |
+
+지속 실행 총시간은 약 68.5% 감소했고 처리량은 약 3.17배 증가했습니다. 총 할당량은 약 94.7%, Gen0 횟수는 약 95.7% 감소했습니다. 따라서 문서에 기록한 짧은 지연 tradeoff를 유지하면서도 hook이 많은 지속 workload에서는 setter 재사용을 지지하는 결과입니다.
+
+확장한 harness는 개선 전/예상/개선 후 판정에 사용하지 않는 향후 기준선도 제공합니다. Hook 100개 안정 렌더는 0.50 KB와 0.0178 ms였습니다. Hook 1, 10, 50, 100개 first mount 결과는 1.33/3.10/11.21/22.34 KB이고 시간 중앙값은 0.0052/0.0053/0.0136/0.0257 ms였습니다. Setter identity, latest-owner invalidation, functional update, hook slot 격리, trimming, dispose는 회귀 테스트로 검증합니다.
+
 ## 최적화 순서
 
 Runtime 복잡성을 늘리기 전에 측정합니다.

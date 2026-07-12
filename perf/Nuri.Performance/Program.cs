@@ -8,6 +8,8 @@ var label = GetOption(args, "--label") ?? "current";
 var iterations = GetIntOption(args, "--iterations", 100);
 var size = GetIntOption(args, "--size", 1_000);
 var warmup = GetIntOption(args, "--warmup", 10);
+var sustainedIterations = GetIntOption(args, "--sustained-iterations", 100_000);
+var sustainedWarmup = GetIntOption(args, "--sustained-warmup", 10_000);
 
 var scenarios = new[]
 {
@@ -15,9 +17,14 @@ var scenarios = new[]
     CreateHookRenderScenario(1),
     CreateHookRenderScenario(10),
     CreateHookRenderScenario(50),
+    CreateHookRenderScenario(100),
     CreateKeyedStateScenario(size),
     CreateInvalidationScenario(size),
     CreateEffectChurnScenario(size),
+    CreateHookMountScenario(1),
+    CreateHookMountScenario(10),
+    CreateHookMountScenario(50),
+    CreateHookMountScenario(100),
 };
 
 var results = new List<Result>();
@@ -66,6 +73,62 @@ foreach (var result in results)
     Console.WriteLine($"{result.Label}\t{result.Scenario}\t{result.Size}\t{result.Iterations}\t{result.MeanMilliseconds:F4}\t{result.AllocatedBytes / 1024.0:F2}\t{result.OperationCount:F1}");
 Console.WriteLine("```");
 
+var sustainedResults = new[] { 10_000, sustainedIterations }
+    .Distinct()
+    .Select(count => MeasureSustainedHookRender(label, 50, count, sustainedWarmup))
+    .ToArray();
+
+Console.WriteLine();
+Console.WriteLine("## Sustained state-hook throughput");
+Console.WriteLine();
+Console.WriteLine("| Label | Hooks | Renders | Total ms | Renders/sec | Alloc/render KB | Total alloc MB | Gen0 | Gen1 | Gen2 | Result count |");
+Console.WriteLine("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+foreach (var result in sustainedResults)
+    Console.WriteLine($"| {result.Label} | {result.HookCount} | {result.Renders} | {result.TotalMilliseconds:F2} | {result.RendersPerSecond:F0} | {result.AllocatedBytesPerRender / 1024.0:F2} | {result.TotalAllocatedBytes / 1024.0 / 1024.0:F2} | {result.Gen0Collections} | {result.Gen1Collections} | {result.Gen2Collections} | {result.OperationCount:F1} |");
+
+Console.WriteLine();
+Console.WriteLine("```tsv");
+Console.WriteLine("label\thooks\trenders\ttotal_ms\trenders_per_sec\talloc_per_render_kb\ttotal_alloc_mb\tgen0\tgen1\tgen2\tresult_count");
+foreach (var result in sustainedResults)
+    Console.WriteLine($"{result.Label}\t{result.HookCount}\t{result.Renders}\t{result.TotalMilliseconds:F2}\t{result.RendersPerSecond:F0}\t{result.AllocatedBytesPerRender / 1024.0:F2}\t{result.TotalAllocatedBytes / 1024.0 / 1024.0:F2}\t{result.Gen0Collections}\t{result.Gen1Collections}\t{result.Gen2Collections}\t{result.OperationCount:F1}");
+Console.WriteLine("```");
+
+static SustainedResult MeasureSustainedHookRender(string label, int hookCount, int renders, int warmup)
+{
+    var component = new PerfComponent { Id = $"perf-sustained-hooks-{hookCount}-{renders}" };
+    for (var i = 0; i < warmup; i++)
+        component.RenderStateHooks(hookCount);
+
+    GC.Collect();
+    GC.WaitForPendingFinalizers();
+    GC.Collect();
+
+    var gen0Before = GC.CollectionCount(0);
+    var gen1Before = GC.CollectionCount(1);
+    var gen2Before = GC.CollectionCount(2);
+    var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+    var operationCount = 0L;
+    var stopwatch = Stopwatch.StartNew();
+    for (var i = 0; i < renders; i++)
+        operationCount += component.RenderStateHooks(hookCount);
+    stopwatch.Stop();
+    var totalAllocatedBytes = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+
+    Component.DisposeHookState(component.Id);
+    return new SustainedResult(
+        label,
+        hookCount,
+        renders,
+        stopwatch.Elapsed.TotalMilliseconds,
+        renders / stopwatch.Elapsed.TotalSeconds,
+        totalAllocatedBytes,
+        totalAllocatedBytes / (double)renders,
+        GC.CollectionCount(0) - gen0Before,
+        GC.CollectionCount(1) - gen1Before,
+        GC.CollectionCount(2) - gen2Before,
+        operationCount / (double)renders);
+}
+
 static Scenario CreateKeyedReorderScenario(int size)
 {
     var trees = CreateReorderedTree(size);
@@ -76,6 +139,18 @@ static Scenario CreateHookRenderScenario(int hookCount)
 {
     var component = new PerfComponent { Id = $"perf-hooks-{hookCount}" };
     return new Scenario($"Stable render with {hookCount} state hooks", hookCount, () => component.RenderStateHooks(hookCount), () => Component.DisposeHookState(component.Id));
+}
+
+static Scenario CreateHookMountScenario(int hookCount)
+{
+    var sequence = 0;
+    return new Scenario($"First mount with {hookCount} state hooks", hookCount, () =>
+    {
+        var component = new PerfComponent { Id = $"perf-hook-mount-{hookCount}-{sequence++}" };
+        component.RenderStateHooks(hookCount);
+        Component.DisposeHookState(component.Id);
+        return hookCount;
+    }, () => { });
 }
 
 static Scenario CreateKeyedStateScenario(int size)
@@ -186,3 +261,15 @@ sealed class PerfComponent : Component
 
 sealed record Scenario(string Name, int Size, Func<int> Run, Action Cleanup);
 sealed record Result(string Label, string Scenario, int Size, int Iterations, double MeanMilliseconds, double AllocatedBytes, double OperationCount);
+sealed record SustainedResult(
+    string Label,
+    int HookCount,
+    int Renders,
+    double TotalMilliseconds,
+    double RendersPerSecond,
+    long TotalAllocatedBytes,
+    double AllocatedBytesPerRender,
+    int Gen0Collections,
+    int Gen1Collections,
+    int Gen2Collections,
+    double OperationCount);
