@@ -18,6 +18,8 @@ internal static class Program
         {
             new Scenario("Initial build", () => CreateReorderedTree(size), false),
             new Scenario("Keyed reorder", () => CreateReorderedTree(size), true),
+            new Scenario("Todo screen initial build", () => CreateTodoTree(size, false), false),
+            new Scenario("Todo screen keyed reorder", () => CreateTodoTree(size, true), true),
         };
 
         var results = new List<Result>();
@@ -119,6 +121,52 @@ internal static class Program
         newChildren.Add(CreateItem(0, keyed: true, "value"));
 
         return (CreateRoot(oldChildren), CreateRoot(newChildren));
+    }
+
+    private static (VirtualEntry Old, VirtualEntry New) CreateTodoTree(int size, bool reorder)
+    {
+        var oldItems = Enumerable.Range(0, size).Select(CreateTodoItem).ToArray();
+        var newItems = reorder
+            ? Enumerable.Range(1, Math.Max(0, size - 1)).Append(0).Select(CreateTodoItem).ToArray()
+            : oldItems;
+
+        return (CreateTodoRoot(oldItems), CreateTodoRoot(newItems));
+    }
+
+    private static VirtualEntry CreateTodoRoot(IEnumerable<VirtualEntry> items)
+    {
+        var list = new VirtualEntry(
+            VirtualControlTypes.Div,
+            kind: DivTypes.Column,
+            children: items).WithIdentity("0_2", null);
+
+        return new VirtualEntry(
+            VirtualControlTypes.Div,
+            kind: DivTypes.Column,
+            children: new[]
+            {
+                new VirtualEntry(VirtualControlTypes.Text, properties: new[]
+                {
+                    KeyValuePair.Create<string, object?>("Text", "할 일 검증 샘플")
+                }),
+                new VirtualEntry(VirtualControlTypes.Text, properties: new[]
+                {
+                    KeyValuePair.Create<string, object?>("Text", "controlled input, list diff, filter")
+                }),
+                list
+            }).WithIdentity("0", null);
+    }
+
+    private static VirtualEntry CreateTodoItem(int index)
+    {
+        return new VirtualEntry(
+            VirtualControlTypes.Text,
+            key: $"todo-{index}",
+            properties: new[]
+            {
+                KeyValuePair.Create<string, object?>("Text", $"Todo item {index}"),
+                KeyValuePair.Create<string, object?>("Tag", index)
+            });
     }
 
     private static VirtualEntry CreateRoot(IEnumerable<VirtualEntry> children)

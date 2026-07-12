@@ -19,8 +19,11 @@ var scenarios = new[]
     CreateHookRenderScenario(50),
     CreateHookRenderScenario(100),
     CreateKeyedStateScenario(size),
+    CreateInvalidationEnqueueScenario(size),
     CreateInvalidationScenario(size),
     CreateEffectChurnScenario(size),
+    CreateEffectUpdateScenario(100, changing: false),
+    CreateEffectUpdateScenario(100, changing: true),
     CreateHookMountScenario(1),
     CreateHookMountScenario(10),
     CreateHookMountScenario(50),
@@ -192,6 +195,27 @@ static Scenario CreateInvalidationScenario(int size)
     }, () => Component.DisposeHookState(parent.Id));
 }
 
+static Scenario CreateInvalidationEnqueueScenario(int size)
+{
+    var parent = new PerfComponent();
+    parent.LoadNodeNumber("perf-enqueue", 1);
+    var children = new PerfComponent[size];
+    for (var i = 0; i < size; i++)
+    {
+        children[i] = new PerfComponent().Key($"enqueue-child-{i}");
+        children[i].LoadNodeNumber(parent.Id, i + 1);
+    }
+
+    return new Scenario("Invalidation enqueue only", size, () =>
+    {
+        var queue = new ComponentInvalidationQueue();
+        foreach (var child in children)
+            queue.Enqueue(child);
+        queue.Enqueue(parent);
+        return queue.HasPending ? 1 : 0;
+    }, () => Component.DisposeHookState(parent.Id));
+}
+
 static Scenario CreateEffectChurnScenario(int size)
 {
     var sequence = 0;
@@ -211,6 +235,25 @@ static Scenario CreateEffectChurnScenario(int size)
         Component.DisposeHookState(rootId);
         return cleanupCount - before;
     }, () => { });
+}
+
+static Scenario CreateEffectUpdateScenario(int hookCount, bool changing)
+{
+    var component = new PerfComponent { Id = $"perf-effect-update-{(changing ? "changing" : "stable")}" };
+    var sequence = 0;
+    component.RegisterEffects(hookCount, 0, changing);
+    PerfComponent.FlushEffects();
+
+    return new Scenario(
+        $"Effect {(changing ? "dependency update" : "stable update")} ({hookCount})",
+        hookCount,
+        () =>
+        {
+            component.RegisterEffects(hookCount, changing ? ++sequence : 0, changing);
+            PerfComponent.FlushEffects();
+            return hookCount;
+        },
+        () => Component.DisposeHookState(component.Id));
 }
 
 static string? GetOption(string[] args, string name)
@@ -252,6 +295,18 @@ sealed class PerfComponent : Component
     {
         ResetStateIndexForRender();
         useEffect(() => cleanup, []);
+        CompleteRenderHooks();
+    }
+
+    public void RegisterEffects(int count, int dependency, bool changing)
+    {
+        ResetStateIndexForRender();
+        for (var i = 0; i < count; i++)
+        {
+            var index = i;
+            useEffect(() => () => { _ = index; }, changing ? dependency : 0);
+        }
+
         CompleteRenderHooks();
     }
 

@@ -46,3 +46,14 @@ Runtime identity, key, and required regression-test contracts are defined in [RU
 - Each component resets its hook index before render.
 - After render, hook state beyond the number of hooks used in that render is trimmed.
 - Trimmed effect hooks run their cleanup immediately.
+
+## Effect Performance Measurement
+
+Effect update measurements were added on 2026-07-12. The 100-hook scenarios use the existing public `useEffect(..., params object?[] dependencies)` shape and verify that cleanup/result counts remain correct.
+
+| Scenario | Before alloc KB | Expected alloc KB | After alloc KB | Before/after median ms | Required result |
+|---|---:|---:|---:|---:|---:|
+| Same dependency update | 15.38 | <=15.38 | 15.38 | 0.0100 / 0.0078 | 100 hooks, no rerun |
+| Changed dependency update | 38.66 | <=30.00 | 31.63 | 0.0235 / 0.0487 | 100 cleanups and reruns |
+
+Single dependencies are retained without an internal dependency array, preserving cleanup-before-rerun behavior. The changed-dependency allocation target was not reached because the public `params` call still creates its argument array; this is a measured partial success and does not justify a breaking overload change.

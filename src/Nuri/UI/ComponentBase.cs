@@ -301,12 +301,20 @@ namespace Nuri.UI
             {
                 var hooks = GetOrCreateHooks(EffectStore, componentNode);
                 if (!hooks.TryGetValue(index, out var hook)
-                    || DependenciesChanged(hook.Dependencies, dependencies))
+                    || hook.DependenciesChanged(dependencies))
                 {
-                    hooks[index] = new EffectHookState(effect, CloneDependencies(dependencies))
+                    if (hook == null)
                     {
-                        Cleanup = hook?.Cleanup
-                    };
+                        hook = dependencies != null && dependencies.Length == 1
+                            ? new EffectHookState(effect, dependencies[0])
+                            : new EffectHookState(effect, CloneDependencies(dependencies));
+                        hooks[index] = hook;
+                    }
+                    else
+                    {
+                        hook.Update(effect, dependencies);
+                    }
+
                     GetOrCreatePendingEffects(componentNode).Add(index);
                 }
 
@@ -638,17 +646,48 @@ namespace Nuri.UI
 
         private sealed class EffectHookState
         {
+            private bool _hasSingleDependency;
+            private object? _singleDependency;
+
             public EffectHookState(Func<Action?> effect, object?[]? dependencies)
             {
                 Effect = effect;
                 Dependencies = dependencies;
             }
 
-            public Func<Action?> Effect { get; }
+            public EffectHookState(Func<Action?> effect, object? dependency)
+            {
+                Effect = effect;
+                _hasSingleDependency = true;
+                _singleDependency = dependency;
+            }
 
-            public object?[]? Dependencies { get; }
+            public Func<Action?> Effect { get; private set; }
+
+            public object?[]? Dependencies { get; private set; }
 
             public Action? Cleanup { get; set; }
+
+            public void Update(Func<Action?> effect, object?[]? dependencies)
+            {
+                var cleanup = Cleanup;
+                Effect = effect;
+                _hasSingleDependency = dependencies != null && dependencies.Length == 1;
+                _singleDependency = _hasSingleDependency ? dependencies![0] : null;
+                Dependencies = _hasSingleDependency ? null : CloneDependencies(dependencies);
+                Cleanup = cleanup;
+            }
+
+            public bool DependenciesChanged(object?[]? current)
+            {
+                if (current == null)
+                    return true;
+
+                if (_hasSingleDependency)
+                    return current.Length != 1 || !Equals(_singleDependency, current[0]);
+
+                return ComponentBase<TElement, TAnimation>.DependenciesChanged(Dependencies, current);
+            }
         }
     }
 

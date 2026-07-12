@@ -110,6 +110,17 @@ The short run does not include enough allocation pressure to represent GC cost. 
 
 Sustained elapsed time fell by about 68.5%, throughput increased by about 3.17x, total allocation fell by about 94.7%, and Gen0 collections fell by about 95.7%. This supports the setter reuse for sustained hook-heavy workloads while retaining the documented short-latency tradeoff.
 
+Application-shaped WPF and invalidation validation was added on 2026-07-12. The WPF scenario uses the same header/input/keyed-list virtual structure as `Nuri.TodoValidationSample`; it is intentionally a renderer harness, not a direct sample assembly reference. Values are medians from the committed before runtime and the working runtime under the same Release harness.
+
+| Scenario | Before | After | Alloc before/after KB | Required result |
+|---|---:|---:|---:|---:|
+| Todo-shaped initial build, 1,000 items | 6.1149 ms | 6.2102 ms | 1398.58 / 1398.58 | 0 patches |
+| Todo-shaped keyed reorder, 1,000 items | 6.4502 ms | 6.2962 ms | 1608.87 / 1608.87 | 1 patch |
+| Invalidation enqueue, 1,000 children | 0.1941 ms | 0.1862 ms | 147.33 / 147.33 | pending result 1 |
+| Parent/child coalescing, 1,000 children | 0.3843 ms | 0.3189 ms | 226.81 / 226.81 | retained result 1 |
+
+The differences are within environment noise and do not justify additional queue or renderer complexity. The new scenarios remain as regression and measurement coverage; no further runtime optimization was made in this slice.
+
 The expanded harness also establishes future baselines not used in the before/expected/after verdict: stable 100-hook render was 0.50 KB and 0.0178 ms; first mount results for 1, 10, 50, and 100 hooks were 1.33/3.10/11.21/22.34 KB with median times of 0.0052/0.0053/0.0136/0.0257 ms. Setter identity, latest-owner invalidation, functional updates, hook-slot isolation, trimming, and disposal are covered by regression tests.
 
 ## Measurement Scenarios
