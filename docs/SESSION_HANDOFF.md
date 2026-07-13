@@ -12,10 +12,11 @@ Maintain Nuri as a platform-neutral Core virtual UI/runtime/diff model, with WPF
 - `Nuri.WPF` references the Core project and acts as the WPF renderer/materializer adapter.
 - WPF controls are now created by `WpfControlRegistry`/`WpfVirtualEntryRenderer`, not by component render methods directly.
 - Dirty component subtree render/diff/patch and Dispatcher batching are implemented.
-- Core DSL state changes are batched by `ApplicationRoot`; non-root component hooks render/diff/patch only that component subtree when the current virtual entry can be found, with root rebuild as fallback.
+- WPF and Avalonia roots share `RenderCoordinator` for native patch, commit, and post-commit effect flushing, and both use `ComponentInvalidationQueue` with `RuntimeTreeIdentity` coverage.
+- Core DSL state changes are batched by each renderer root; non-root component hooks render/diff/patch only that component subtree when the current virtual entry can be found, with root rebuild as fallback.
 - Keyed reconciliation is implemented with `MoveChildPatch` and WPF move support.
 - A simple perf harness exists under `perf/` for basic before/after measurements.
-- Release builds are expected to pass when the preview host is not loaded. The 2026-07-13 validation reached all projects but failed with `CS2012` because `Nuri.WPF.PreviewHost.dll` in `obj/Release` was locked by another process; close the running preview host and rerun. Existing Visual Studio preview threading analyzer warnings may still be reported.
+- The 2026-07-14 Release validation, including `Nuri.RendererTests`, completed with zero warnings and zero errors while the preview host was not running. If `Nuri.WPF.PreviewHost.dll` is locked by a live preview process, close it before rebuilding.
 
 ## Recent Feature Additions
 
@@ -59,6 +60,7 @@ Maintain Nuri as a platform-neutral Core virtual UI/runtime/diff model, with WPF
 - Component cleanup is stronger now: removed and replaced component subtrees are disposed.
 - `src/Nuri.Avalonia` contains the Avalonia renderer and references Avalonia desktop packages.
 - The Avalonia adapter includes application-root scheduling, virtual-entry rendering, control/property/event mapping, hot reload support, and a smoke-test sample. It is no longer a renderer skeleton.
+- `tests/Nuri.RendererTests` validates WPF/Avalonia post-commit effects, subtree and key-replacement cleanup, repeated keyed native moves, and idempotent root disposal without external test packages.
 - `samples/WPF/GridTest` demonstrates `.Key(...)`, neutral `.OnClick(Action)`, and the preferred `Grid(...).Rows(...).Columns(...)` layout style.
 - Legacy `Div(Rows(...), Columns(...), children...)` overloads remain for compatibility, but new code should prefer fluent layout definitions so row/column definitions do not look like child controls.
 - Core DSL now exposes WPF-familiar factory aliases such as `Button`, `TextBox`, `CheckBox`, `RadioButton`, `ToggleButton`, and `PasswordBox`. These are semantic aliases over Nuri virtual input descriptions, not WPF types in Core.
@@ -98,6 +100,8 @@ Maintain Nuri as a platform-neutral Core virtual UI/runtime/diff model, with WPF
 ## Validation Commands
 
 ```powershell
+dotnet run --project "tests\Nuri.Tests\Nuri.Tests.csproj" -c Release
+dotnet run --project "tests\Nuri.RendererTests\Nuri.RendererTests.csproj" -c Release
 dotnet build "Nuri.sln" -c Release
 dotnet run --project "perf\Nuri.Performance\Nuri.Performance.csproj" -c Release -- --label after
 dotnet run --project "perf\Nuri.WPFPerformance\Nuri.WPFPerformance.csproj" -c Release -- --label after

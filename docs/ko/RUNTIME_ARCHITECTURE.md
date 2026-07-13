@@ -43,6 +43,8 @@ Runtime tree node는 메모리에 유지되는 identity입니다. state, reducer
 
 `Component.Id`와 `VirtualEntry.Id` 같은 문자열은 호환성, diagnostics, virtual tree 검색 및 renderer patch target을 위해 유지합니다. 문자열을 파싱해서 tree ancestry 또는 hook 소유권을 판단하면 안 됩니다.
 
+WPF와 Avalonia application root는 native build, patch, commit 및 commit 이후 effect 실행에 `RenderCoordinator`를 공통으로 사용합니다. 두 root 모두 `ComponentInvalidationQueue`를 사용하므로 dirty subtree 포함 관계는 renderer별 문자열 ancestry 검사가 아니라 `RuntimeTreeIdentity`를 따릅니다.
+
 key, lifecycle, 중복 key 및 cleanup 불변식은 [RUNTIME_IDENTITY.md](RUNTIME_IDENTITY.md)를 참고합니다.
 
 ## 성능 기준
@@ -139,6 +141,7 @@ Runtime 복잡성을 늘리기 전에 측정합니다.
 
 ```powershell
 dotnet run --project "tests\Nuri.Tests\Nuri.Tests.csproj" -c Release
+dotnet run --project "tests\Nuri.RendererTests\Nuri.RendererTests.csproj" -c Release
 dotnet build "Nuri.sln" -c Release
 dotnet run --project "perf\Nuri.Performance\Nuri.Performance.csproj" -c Release -- --label after
 dotnet run --project "perf\Nuri.WPFPerformance\Nuri.WPFPerformance.csproj" -c Release -- --label after

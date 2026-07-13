@@ -1,10 +1,9 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using Avalonia.Controls;
-using Avalonia.Threading;
+using Nuri.Platform.Abstractions;
 using Nuri.Runtime;
+using Nuri.Runtime.Invalidation;
 using Nuri.Runtime.Lifecycle;
 using Nuri.UI;
 using Nuri.UI.Dsl;
@@ -17,13 +16,17 @@ namespace Nuri.Avalonia
     {
         private static int _nextTreeIndex;
         private Control? _currentRootVisual;
+        private IElement? _rootElement;
         private ApplicationRuntime<IElement>? _runtime;
-        private Window? _mainWindow;
+        private RenderCoordinator<IElement, Control>? _coordinator;
+        private IUiScheduler? _scheduler;
         private string _treePrefix = string.Empty;
-        private readonly List<Component> _dirtyComponents = new List<Component>();
+        private readonly ComponentInvalidationQueue _invalidations = new ComponentInvalidationQueue();
         private bool _rebuildScheduled;
         private bool _disposed;
         private ApplicationRuntime<IElement> Runtime => _runtime ?? throw new InvalidOperationException("AvaloniaApplicationRoot is not initialized.");
+        private RenderCoordinator<IElement, Control> Coordinator => _coordinator ?? throw new InvalidOperationException("AvaloniaApplicationRoot is not initialized.");
+        private IUiScheduler Scheduler => _scheduler ?? throw new InvalidOperationException("AvaloniaApplicationRoot is not initialized.");
 
         private AvaloniaApplicationRoot()
         {
@@ -31,29 +34,79 @@ namespace Nuri.Avalonia
 
         public static AvaloniaApplicationRoot Initialize(IElement rootElement, Window mainWindow)
         {
+            if (mainWindow == null)
+                throw new ArgumentNullException(nameof(mainWindow));
+
             var instance = new AvaloniaApplicationRoot();
-            instance.InitializeInternal(rootElement, mainWindow);
+            var host = new AvaloniaApplicationHost(mainWindow);
+            instance.InitializeInternal(rootElement, host, new AvaloniaScheduler(), host.ApplyWindowProperties);
+            return instance;
+        }
+
+        public static AvaloniaApplicationRoot Initialize(
+            IElement rootElement,
+            IHostAdapter<Control> host,
+            IUiScheduler scheduler,
+            Action<IElement>? applyHostProperties = null)
+        {
+            var instance = new AvaloniaApplicationRoot();
+            instance.InitializeInternal(rootElement, host, scheduler, applyHostProperties ?? (_ => { }));
             return instance;
         }
 
         public void Rebuild()
         {
-            if (_disposed || _currentRootVisual == null)
+            if (_disposed)
                 return;
 
-            var renderResult = Runtime.CreateRebuild();
-            CleanupRemovedComponentState(renderResult.Operations);
-            if (_mainWindow != null)
-                ApplyWindowProperties(_mainWindow, renderResult.VisualNode);
-
-            AvaloniaVirtualEntryRenderer.ApplyDiff(_currentRootVisual, renderResult.Operations);
-            Runtime.Commit(renderResult);
-            Component.FlushPendingEffects();
+            Coordinator.RebuildAll();
         }
 
         public void DispatchRebuild()
         {
-            Dispatcher.UIThread.Post(Rebuild);
+            Scheduler.Schedule(Rebuild);
+        }
+
+        private void InitializeInternal(
+            IElement rootElement,
+            IHostAdapter<Control> host,
+            IUiScheduler scheduler,
+            Action<IElement> applyHostProperties)
+        {
+            if (rootElement == null)
+                throw new ArgumentNullException(nameof(rootElement));
+            if (host == null)
+                throw new ArgumentNullException(nameof(host));
+            if (scheduler == null)
+                throw new ArgumentNullException(nameof(scheduler));
+            if (applyHostProperties == null)
+                throw new ArgumentNullException(nameof(applyHostProperties));
+
+            _treePrefix = $"avalonia{Interlocked.Increment(ref _nextTreeIndex)}";
+            PrepareRoot(rootElement, _treePrefix);
+            _rootElement = rootElement;
+            _scheduler = scheduler;
+
+            _runtime = new ApplicationRuntime<IElement>(() =>
+            {
+                return _rootElement ?? throw new InvalidOperationException("Application root element is not initialized.");
+            }, element => element.ToVirtualEntry());
+
+            _coordinator = new RenderCoordinator<IElement, Control>(
+                Runtime,
+                new AvaloniaRendererAdapter(),
+                host,
+                () => _currentRootVisual,
+                root => _currentRootVisual = root,
+                applyHostProperties);
+
+            Coordinator.Initialize();
+        }
+
+        private static void PrepareRoot(IElement rootElement, string treePrefix)
+        {
+            rootElement.LoadNodeNumber(treePrefix, 0);
+            ElementTree<IElement, AnimationValue>.AssignDescendantIds(rootElement.Id, rootElement);
         }
 
         public void ScheduleComponentRebuild(Component component)
@@ -61,110 +114,43 @@ namespace Nuri.Avalonia
             if (!IsInThisTree(component))
                 return;
 
-            if (!_dirtyComponents.Any(dirty => ReferenceEquals(dirty, component)))
-                _dirtyComponents.Add(component);
-
+            _invalidations.Enqueue(component);
             if (_rebuildScheduled)
                 return;
 
             _rebuildScheduled = true;
-            Dispatcher.UIThread.Post(ProcessScheduledRebuild);
-        }
-
-        private void InitializeInternal(IElement rootElement, Window mainWindow)
-        {
-            var treePrefix = $"avalonia{Interlocked.Increment(ref _nextTreeIndex)}";
-            _treePrefix = treePrefix;
-            rootElement.LoadNodeNumber(treePrefix, 0);
-            ElementTree<IElement, AnimationValue>.AssignDescendantIds(rootElement.Id, rootElement);
-            _mainWindow = mainWindow;
-
-            _runtime = new ApplicationRuntime<IElement>(() => rootElement, element => element.ToVirtualEntry());
-
-            var renderResult = Runtime.Initialize();
-            ApplyWindowProperties(mainWindow, rootElement);
-            var rootVisual = AvaloniaVirtualEntryRenderer.Build(renderResult.VirtualEntry);
-
-            mainWindow.Content = rootVisual;
-            _currentRootVisual = rootVisual;
-            Component.FlushPendingEffects();
+            Scheduler.Schedule(ProcessScheduledRebuild);
         }
 
         private void ProcessScheduledRebuild()
         {
-            var dirtyComponents = _dirtyComponents.ToList();
-            _dirtyComponents.Clear();
+            var dirtyComponents = _invalidations.DrainCoveredByParents();
             _rebuildScheduled = false;
 
-            if (dirtyComponents.Count == 0)
-                return;
+            foreach (var invalidation in dirtyComponents)
+                Rebuild(invalidation.Component, invalidation.ComponentId);
+        }
 
-            if (dirtyComponents.Any(component => string.Equals(component.Id, Runtime.CurrentVirtualEntry.Id, StringComparison.Ordinal)))
+        private void Rebuild(Component component, string componentId)
+        {
+            if (string.Equals(componentId, Runtime.CurrentVirtualEntry.Id, StringComparison.Ordinal))
             {
                 Rebuild();
                 return;
             }
 
-            foreach (var component in FilterCoveredDirtyComponents(dirtyComponents))
-                Rebuild(component);
-        }
-
-        private void Rebuild(Component component)
-        {
-            if (_currentRootVisual == null)
-                return;
-
-            var oldEntry = Runtime.CurrentVirtualEntry.FindByComponentId(component.Id)
-                ?? Runtime.CurrentVirtualEntry.FindById(component.Id);
+            var oldEntry = Runtime.CurrentVirtualEntry.FindByComponentId(componentId)
+                ?? Runtime.CurrentVirtualEntry.FindById(componentId);
             if (oldEntry == null)
             {
                 Rebuild();
                 return;
             }
 
-            var newVisual = RenderComponentSubtree(component);
+            var newVisual = RenderComponentSubtree(component, componentId, oldEntry.ParentId);
             var newEntry = newVisual.ToVirtualEntry();
-            newEntry.RewriteIdentity(oldEntry.Id, oldEntry.ParentId);
-            newEntry.WithComponentId(component.Id);
-            var operations = VirtualTreeDiff.Diff(oldEntry, newEntry);
-
-            CleanupRemovedComponentState(operations);
-            AvaloniaVirtualEntryRenderer.ApplyDiff(_currentRootVisual, operations);
-
-            if (Runtime.CurrentVirtualEntry.ReplaceDescendantByComponentId(component.Id, newEntry)
-                || Runtime.CurrentVirtualEntry.ReplaceDescendant(oldEntry.Id, newEntry))
-                Runtime.CommitVirtualEntry(Runtime.CurrentVirtualEntry);
-            else
+            if (!Coordinator.RebuildSubtree(oldEntry, newEntry, componentId))
                 Rebuild();
-
-            Component.FlushPendingEffects();
-        }
-
-        private static void CleanupRemovedComponentState(IEnumerable<PatchOperation> operations)
-        {
-            ComponentLifecycle.CleanupRemovedComponentState(operations);
-        }
-
-        private static IEnumerable<Component> FilterCoveredDirtyComponents(IEnumerable<Component> dirtyComponents)
-        {
-            var ordered = dirtyComponents
-                .Where(component => !string.IsNullOrEmpty(component.Id))
-                .OrderBy(component => component.Id.Length)
-                .ToList();
-
-            for (var i = 0; i < ordered.Count; i++)
-            {
-                var component = ordered[i];
-                var isCoveredByParent = ordered.Take(i).Any(parent => IsDescendantId(component.Id, parent.Id));
-                if (!isCoveredByParent)
-                    yield return component;
-            }
-        }
-
-        private static bool IsDescendantId(string childId, string parentId)
-        {
-            return childId.Length > parentId.Length
-                && childId.StartsWith(parentId + "_", StringComparison.Ordinal);
         }
 
         private bool IsInThisTree(Component component)
@@ -173,8 +159,10 @@ namespace Nuri.Avalonia
                 && component.Id.StartsWith(_treePrefix + "_", StringComparison.Ordinal);
         }
 
-        private static IElement RenderComponentSubtree(Component component)
+        private static IElement RenderComponentSubtree(Component component, string componentId, string? parentId)
         {
+            component.Id = componentId;
+            component.ParentId = parentId ?? string.Empty;
             component.ResetStateIndexForRender();
             var renderedChild = component.Render();
             component.CompleteRenderHooks();
@@ -211,24 +199,12 @@ namespace Nuri.Avalonia
                 rendered.Key = component.Key;
         }
 
-        private static void ApplyWindowProperties(Window mainWindow, IElement rootElement)
-        {
-            if (rootElement.Properties.TryGetValue("Title", out var title) && title is string titleText)
-                mainWindow.Title = titleText;
-
-            if (rootElement.Properties.TryGetValue("Width", out var width) && width is not null)
-                mainWindow.Width = Convert.ToDouble(width);
-
-            if (rootElement.Properties.TryGetValue("Height", out var height) && height is not null)
-                mainWindow.Height = Convert.ToDouble(height);
-        }
-
         public void Dispose()
         {
             if (_disposed)
                 return;
 
-            Component.DisposeHookState(_treePrefix + "_0");
+            ComponentLifecycle.DisposeSubtree(_treePrefix + "_0");
             _disposed = true;
         }
     }

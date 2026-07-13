@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
-VisualStudioVersion = 18.8.11904.113 insiders
+VisualStudioVersion = 18.8.11904.113
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "samples", "samples", "{E3D23626-57FC-497B-BECB-678708C21BF0}"
 EndProject
@@ -68,6 +68,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nuri.WPF.PreviewHost", "src\Nuri.WPF.PreviewHost\Nuri.WPF.PreviewHost.csproj", "{2CAB45B5-1A2F-4A86-866F-35468B3E446F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nuri.VisualStudioPreview", "src\Nuri.VisualStudioPreview\Nuri.VisualStudioPreview.csproj", "{648B7B2E-77A8-B90F-623A-E38891A836D0}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nuri.RendererTests", "tests\Nuri.RendererTests\Nuri.RendererTests.csproj", "{16701C40-D8DF-4B81-8260-ED3F3B0D4163}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -415,6 +419,18 @@ Global
 		{648B7B2E-77A8-B90F-623A-E38891A836D0}.Release|x64.Build.0 = Release|Any CPU
 		{648B7B2E-77A8-B90F-623A-E38891A836D0}.Release|x86.ActiveCfg = Release|Any CPU
 		{648B7B2E-77A8-B90F-623A-E38891A836D0}.Release|x86.Build.0 = Release|Any CPU
+		{16701C40-D8DF-4B81-8260-ED3F3B0D4163}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{16701C40-D8DF-4B81-8260-ED3F3B0D4163}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{16701C40-D8DF-4B81-8260-ED3F3B0D4163}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{16701C40-D8DF-4B81-8260-ED3F3B0D4163}.Debug|x64.Build.0 = Debug|Any CPU
+		{16701C40-D8DF-4B81-8260-ED3F3B0D4163}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{16701C40-D8DF-4B81-8260-ED3F3B0D4163}.Debug|x86.Build.0 = Debug|Any CPU
+		{16701C40-D8DF-4B81-8260-ED3F3B0D4163}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{16701C40-D8DF-4B81-8260-ED3F3B0D4163}.Release|Any CPU.Build.0 = Release|Any CPU
+		{16701C40-D8DF-4B81-8260-ED3F3B0D4163}.Release|x64.ActiveCfg = Release|Any CPU
+		{16701C40-D8DF-4B81-8260-ED3F3B0D4163}.Release|x64.Build.0 = Release|Any CPU
+		{16701C40-D8DF-4B81-8260-ED3F3B0D4163}.Release|x86.ActiveCfg = Release|Any CPU
+		{16701C40-D8DF-4B81-8260-ED3F3B0D4163}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -449,6 +465,7 @@ Global
 		{9CA15925-9A90-4791-8B3C-70D89D365E7A} = {014682B3-BA2E-A573-AFAA-A9B4B15BAD1B}
 		{2CAB45B5-1A2F-4A86-866F-35468B3E446F} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{648B7B2E-77A8-B90F-623A-E38891A836D0} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{16701C40-D8DF-4B81-8260-ED3F3B0D4163} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {60E634DF-C48E-4831-AB77-BDA337A7DF2C}

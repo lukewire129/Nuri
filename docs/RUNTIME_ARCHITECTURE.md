@@ -43,6 +43,8 @@ Each current `ComponentBase` object caches its assigned runtime node. The node i
 
 Strings such as `Component.Id` and `VirtualEntry.Id` remain for compatibility, diagnostics, virtual-tree lookup, and renderer patch targets. Tree ancestry and hook ownership must not be inferred by parsing those strings.
 
+WPF and Avalonia application roots share `RenderCoordinator` for native build, patch, commit, and post-commit effect flushing. Both roots also use `ComponentInvalidationQueue`, so dirty-subtree coverage follows `RuntimeTreeIdentity` instead of renderer-specific string ancestry checks.
+
 See [RUNTIME_IDENTITY.md](RUNTIME_IDENTITY.md) for key, lifecycle, duplicate-key, and cleanup invariants.
 
 ## Performance Baseline
@@ -157,6 +159,7 @@ Do not trade patch count, deterministic cleanup, keyed state preservation, or pl
 
 ```powershell
 dotnet run --project "tests\Nuri.Tests\Nuri.Tests.csproj" -c Release
+dotnet run --project "tests\Nuri.RendererTests\Nuri.RendererTests.csproj" -c Release
 dotnet build "Nuri.sln" -c Release
 dotnet run --project "perf\Nuri.Performance\Nuri.Performance.csproj" -c Release -- --label after
 dotnet run --project "perf\Nuri.WPFPerformance\Nuri.WPFPerformance.csproj" -c Release -- --label after
