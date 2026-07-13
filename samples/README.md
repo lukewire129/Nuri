@@ -31,6 +31,7 @@ Add Core features only after a sample makes the need obvious and repeatable.
 - `Nuri.LargeListSample`: larger keyed-list rendering
 - `Nuri.DevToolsSample`: runtime diagnostics and developer tooling
 - `Nuri.ExplorerTreeSample`: recursive keyed folders/files with expand, selection, rename, add/delete, and lifecycle cleanup
+- `Nuri.AnimatedDashboardSample`: shared WPF/Avalonia opacity transition and interruption baseline
 - `Nuri.AvaloniaHotReloadSample`: minimal Avalonia renderer and C# Hot Reload smoke test
 
 ## Next Sample Roadmap
@@ -48,6 +49,8 @@ What it should pressure:
 - interruption and replacement of active transitions
 - renderer parity
 - unsupported-animation diagnostics
+
+The first slice covers shared WPF/Avalonia opacity transitions. Margin, color, rotation, and diagnostics remain follow-up slices driven by this sample.
 
 ### 2. Stress Sample
 

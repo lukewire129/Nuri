@@ -42,6 +42,12 @@ namespace Nuri.UI.Dsl
             return node;
         }
 
+        public static T Opacity<T>(this T node, double value) where T : IElement
+        {
+            node.SetProperty("Opacity", value);
+            return node;
+        }
+
         public static T Size<T>(this T node, double width, double height) where T : IElement
         {
             node.Width(width);

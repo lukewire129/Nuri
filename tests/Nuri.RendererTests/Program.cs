@@ -1,15 +1,19 @@
 using System.Collections.Generic;
 using System.Linq;
+using Avalonia.Animation;
 using Nuri.Platform.Abstractions;
 using Nuri.UI.Controls;
 using Nuri.UI.Dsl;
+using Nuri.UI.Values;
 using AvaloniaControl = Avalonia.Controls.Control;
 using AvaloniaPanel = Avalonia.Controls.Panel;
 using AvaloniaTextBlock = Avalonia.Controls.TextBlock;
+using AvaloniaVisual = Avalonia.Visual;
 using WpfFrameworkElement = System.Windows.FrameworkElement;
 using WpfDecorator = System.Windows.Controls.Decorator;
 using WpfPanel = System.Windows.Controls.Panel;
 using WpfTextBlock = System.Windows.Controls.TextBlock;
+using WpfUIElement = System.Windows.UIElement;
 
 namespace Nuri.RendererTests;
 
@@ -30,7 +34,27 @@ internal static class Program
         RemovedSubtreesCleanUpAfterNativeRemoval(createDriver());
         KeyReplacementCleansUpBeforeMount(createDriver());
         KeyedMovesPreserveNativeControlsAndEffects(createDriver());
+        OpacityTransitionsAreMaterializedReplacedAndRemoved(createDriver());
         RootDisposeCleansDescendantsExactlyOnce(createDriver());
+    }
+
+    private static void OpacityTransitionsAreMaterializedReplacedAndRemoved(RendererDriver driver)
+    {
+        var component = new OpacityTransitionComponent();
+        using var root = driver.Initialize(component);
+
+        component.Opacity = 0.8;
+        root.Rebuild();
+        var target = driver.RootChildren.Single();
+        AssertEqual(1, driver.GetOpacityTransitionCount(target), $"{driver.Name}: an opacity update should materialize one native transition.");
+
+        component.Opacity = 0.4;
+        root.Rebuild();
+        AssertEqual(1, driver.GetOpacityTransitionCount(target), $"{driver.Name}: replacing an active opacity transition should not duplicate native transitions.");
+
+        component.Animate = false;
+        root.Rebuild();
+        AssertEqual(0, driver.GetOpacityTransitionCount(target), $"{driver.Name}: removing the transition description should remove the native transition.");
     }
 
     private static void EffectsRunAfterNativeCommit(RendererDriver driver)
@@ -186,6 +210,8 @@ internal static class Program
         public abstract RendererRoot Initialize(IElement rootElement);
 
         public abstract string GetText(object control);
+
+        public abstract int GetOpacityTransitionCount(object control);
     }
 
     private sealed class WpfDriver : RendererDriver
@@ -208,6 +234,11 @@ internal static class Program
         public override string GetText(object control)
         {
             return control is WpfFrameworkElement element ? FindText(element) ?? string.Empty : string.Empty;
+        }
+
+        public override int GetOpacityTransitionCount(object control)
+        {
+            return control is WpfUIElement element && element.HasAnimatedProperties ? 1 : 0;
         }
 
         private static string? FindText(WpfFrameworkElement element)
@@ -260,6 +291,13 @@ internal static class Program
         public override string GetText(object control)
         {
             return control is AvaloniaControl element ? FindText(element) ?? string.Empty : string.Empty;
+        }
+
+        public override int GetOpacityTransitionCount(object control)
+        {
+            return control is AvaloniaControl element
+                ? element.Transitions?.OfType<TransitionBase>().Count(transition => transition.Property == AvaloniaVisual.OpacityProperty) ?? 0
+                : 0;
         }
 
         private static string? FindText(AvaloniaControl control)
@@ -324,6 +362,22 @@ internal static class Program
     private sealed class ImmediateScheduler : IUiScheduler
     {
         public void Schedule(Action action) => action();
+    }
+
+    private sealed class OpacityTransitionComponent : Component
+    {
+        public double Opacity { get; set; } = 0.2;
+
+        public bool Animate { get; set; } = true;
+
+        public override IElement Render()
+        {
+            var card = Text("opacity-card").Opacity(Opacity);
+            if (Animate)
+                card.Transition(TimeSpan.FromMilliseconds(500), EasingValue.CubicOut);
+
+            return Grid(card);
+        }
     }
 
     private sealed class CommitProbeComponent : Component

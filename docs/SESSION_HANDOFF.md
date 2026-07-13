@@ -66,6 +66,9 @@ Maintain Nuri as a platform-neutral Core virtual UI/runtime/diff model, with WPF
 - Legacy `Div(Rows(...), Columns(...), children...)` overloads remain for compatibility, but new code should prefer fluent layout definitions so row/column definitions do not look like child controls.
 - Core DSL now exposes WPF-familiar factory aliases such as `Button`, `TextBox`, `CheckBox`, `RadioButton`, `ToggleButton`, and `PasswordBox`. These are semantic aliases over Nuri virtual input descriptions, not WPF types in Core.
 - Animation DSL supports `.Transition(duration, easing)` for configured supported properties. Existing `.Transitions("Property", ...)` remains for explicit compatibility.
+- Core DSL exposes `.Opacity(...)`; WPF and Avalonia now materialize opacity transitions, replace repeated transitions without duplicate native registrations, and remove native transitions when the virtual animation is removed.
+- `Nuri.AnimatedDashboardSample` runs the same Core-neutral dashboard component through WPF by default or Avalonia with `--avalonia` and exercises opacity interruption/replacement.
+- `Nuri.RendererTests` covers cross-renderer opacity transition add, replacement, and removal behavior.
 - Runtime diagnostics already track component render counts and duplicate keys. Patch-count and unsupported property/event diagnostics remain candidates when a concrete sample needs them.
 
 ## Important Files
@@ -123,7 +126,8 @@ Expected baseline sanity for keyed reorder:
 2. Complete platform-neutral animation behavior.
    - Keep WPF `AnimationTimeline` out of Core.
    - Expand `AnimationValue` and supported properties only for demonstrated transitions.
-   - Add Avalonia animation materialization and actionable unsupported-animation diagnostics.
+   - Opacity materialization is covered in WPF and Avalonia; use the Animated Dashboard to drive margin, color, and rotation parity.
+   - Add actionable unsupported-animation diagnostics.
 
 3. Strengthen renderer-level lifecycle/effect coverage.
    - Verify effects flush after native commit in WPF and Avalonia.

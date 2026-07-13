@@ -2,7 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using Avalonia;
+using Avalonia.Animation;
+using Avalonia.Animation.Easings;
 using Avalonia.Controls;
+using Nuri.UI.Values;
 using Nuri.VirtualDom;
 
 namespace Nuri.Avalonia
@@ -11,6 +15,7 @@ namespace Nuri.Avalonia
     {
         private static readonly ConditionalWeakTable<Control, Dictionary<string, Control>> ControlIndexes = new ConditionalWeakTable<Control, Dictionary<string, Control>>();
         private static readonly ConditionalWeakTable<Control, Dictionary<string, Delegate>> EventHandlers = new ConditionalWeakTable<Control, Dictionary<string, Delegate>>();
+        private static readonly ConditionalWeakTable<Control, Dictionary<string, ITransition>> ActiveTransitions = new ConditionalWeakTable<Control, Dictionary<string, ITransition>>();
 
         public static Control Build(VirtualEntry entry)
         {
@@ -32,6 +37,7 @@ namespace Nuri.Avalonia
         public static void ApplyDiff(Control root, IReadOnlyList<PatchOperation> operations)
         {
             var controlIndex = ControlIndexes.GetValue(root, BuildControlIndex);
+            PrepareAnimations(controlIndex, operations);
 
             foreach (var operation in operations)
             {
@@ -66,8 +72,75 @@ namespace Nuri.Avalonia
                         if (controlIndex.TryGetValue(removeEvent.Target.Id, out var removeEventTarget))
                             RemoveEventHandler(removeEventTarget, removeEvent.Event);
                         break;
+                    case AddAnimationPatch:
+                    case RemoveAnimationPatch:
+                        break;
                 }
             }
+        }
+
+        private static void PrepareAnimations(Dictionary<string, Control> controlIndex, IReadOnlyList<PatchOperation> operations)
+        {
+            foreach (var operation in operations)
+            {
+                switch (operation)
+                {
+                    case RemoveAnimationPatch removeAnimation:
+                        if (controlIndex.TryGetValue(removeAnimation.Target.Id, out var removeTarget))
+                            RemoveAnimation(removeTarget, removeAnimation.Animation.Key);
+                        break;
+                    case AddAnimationPatch addAnimation:
+                        if (controlIndex.TryGetValue(addAnimation.Target.Id, out var addTarget)
+                            && addAnimation.Animation.Value is AnimationValue animationValue)
+                        {
+                            AddAnimation(addTarget, addAnimation.Animation.Key, animationValue);
+                        }
+                        break;
+                }
+            }
+        }
+
+        private static void AddAnimation(Control control, string animationName, AnimationValue animation)
+        {
+            ITransition transition = animation.PropertyName switch
+            {
+                "Opacity" => new DoubleTransition
+                {
+                    Property = Visual.OpacityProperty,
+                    Duration = animation.Duration,
+                    Easing = ToAvaloniaEasing(animation.Easing)
+                },
+                _ => throw new NotSupportedException($"The property '{animation.PropertyName}' is not supported for Avalonia animation.")
+            };
+
+            RemoveAnimation(control, animationName);
+
+            control.Transitions ??= new Transitions();
+            control.Transitions.Add(transition);
+            ActiveTransitions.GetOrCreateValue(control)[animationName] = transition;
+        }
+
+        private static void RemoveAnimation(Control control, string animationName)
+        {
+            var transitions = ActiveTransitions.GetOrCreateValue(control);
+            if (!transitions.TryGetValue(animationName, out var transition))
+                return;
+
+            control.Transitions?.Remove(transition);
+            transitions.Remove(animationName);
+        }
+
+        private static Easing ToAvaloniaEasing(EasingValue? easing)
+        {
+            if (easing == null)
+                return new LinearEasing();
+
+            return easing.Mode switch
+            {
+                EasingModeValue.In => new CubicEaseIn(),
+                EasingModeValue.Out => new CubicEaseOut(),
+                _ => new CubicEaseInOut()
+            };
         }
 
         private static void ReplaceEntry(Dictionary<string, Control> controlIndex, ReplaceEntryPatch operation)

@@ -668,17 +668,21 @@ internal static class Program
             .Background("#111827")
             .FontColor("#ffffff")
             .FontSize(20)
+            .Opacity(0.5)
             .Transition(200);
 
         AssertEqual(true, element.Animations.ContainsKey("Background"), "Transition should apply to Background.");
         AssertEqual(true, element.Animations.ContainsKey("Foreground"), "Transition should apply to Foreground.");
+        AssertEqual(true, element.Animations.ContainsKey("Opacity"), "Transition should apply to Opacity.");
         AssertEqual(false, element.Animations.ContainsKey("FontSize"), "Transition should skip unsupported FontSize animations.");
         AssertEqual(false, element.Animations.ContainsKey("ColumnDefinitions"), "Transition should skip grid column definitions.");
 
         var fontColor = element.Animations["Foreground"];
         var background = element.Animations["Background"];
+        var opacity = element.Animations["Opacity"];
         AssertEqual("Foreground", fontColor.PropertyName, "Foreground animation should target Foreground.");
         AssertEqual(element.Properties["Foreground"], fontColor.To, "Foreground animation should use the configured value.");
+        AssertEqual(0.5, opacity.To, "Opacity animation should use the configured value.");
         AssertEqual(TimeSpan.FromMilliseconds(200), background.Duration, "Transition should use the configured duration.");
     }
 

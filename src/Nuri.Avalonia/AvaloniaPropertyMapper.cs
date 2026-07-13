@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
@@ -21,6 +22,9 @@ namespace Nuri.Avalonia
                     return true;
                 case "Height":
                     control.Height = ToDouble(value);
+                    return true;
+                case "Opacity":
+                    control.Opacity = ToDouble(value);
                     return true;
                 case "Margin":
                     control.Margin = ToThickness(value);
@@ -79,6 +83,9 @@ namespace Nuri.Avalonia
                     return true;
                 case "Height":
                     control.ClearValue(Layoutable.HeightProperty);
+                    return true;
+                case "Opacity":
+                    control.ClearValue(Visual.OpacityProperty);
                     return true;
                 case "Margin":
                     control.ClearValue(Layoutable.MarginProperty);
