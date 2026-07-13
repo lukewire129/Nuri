@@ -52,7 +52,7 @@ namespace GridTest.Components
                             .OnCheckChanged(value => setRadioValue(_ => !value))
                     ).Row(3)
                 )
-                .Rows(Auto, Auto, Auto, Auto)
+                .Rows("Auto,Auto,Auto,Auto")
                 .Padding(12);
         }
     }

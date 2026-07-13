@@ -29,6 +29,11 @@ namespace Nuri.UI.Values
             return new LengthValue(0, LengthUnit.Auto);
         }
 
+        public static implicit operator LengthValue(double value)
+        {
+            return Pixels(value);
+        }
+
         public bool Equals(LengthValue other)
         {
             return Value.Equals(other.Value) && Unit == other.Unit;

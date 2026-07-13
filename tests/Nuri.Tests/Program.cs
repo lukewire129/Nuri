@@ -41,6 +41,9 @@ internal static class Program
         MultipleNavigationHooksKeepIndependentState();
         NestedNavigationComponentsKeepIndependentState();
         RouterAssignsSelectedRouteKey();
+        GridLengthDslTreatsNumbersAsPixels();
+        GridLengthDslParsesStringDefinitions();
+        GridLengthDslRejectsInvalidStringDefinitions();
         TransitionAppliesToAllConfiguredProperties();
         Console.WriteLine("Nuri.Tests passed.");
     }
@@ -679,6 +682,77 @@ internal static class Program
         AssertEqual(TimeSpan.FromMilliseconds(200), background.Duration, "Transition should use the configured duration.");
     }
 
+    private static void GridLengthDslTreatsNumbersAsPixels()
+    {
+        var element = Component.Grid()
+            .Rows(100, Component.Auto, Component.Star)
+            .Columns(12.5, Component.Stars(2), Component.Pixels(42));
+
+        var rows = (List<LengthValue>)element.Properties["RowDefinitions"];
+        var columns = (List<LengthValue>)element.Properties["ColumnDefinitions"];
+
+        AssertEqual(LengthUnit.Pixel, rows[0].Unit, "A numeric row should use pixels.");
+        AssertEqual(100d, rows[0].Value, "A numeric row should retain its value.");
+        AssertEqual(LengthUnit.Auto, rows[1].Unit, "Auto should remain available beside numeric rows.");
+        AssertEqual(LengthUnit.Star, rows[2].Unit, "Star should remain available beside numeric rows.");
+        AssertEqual(12.5d, columns[0].Value, "A fractional numeric column should retain its value.");
+        AssertEqual(2d, columns[1].Value, "Weighted stars should remain available beside numeric columns.");
+        AssertEqual(42d, columns[2].Value, "The explicit Pixels form should remain compatible.");
+    }
+
+    private static void GridLengthDslParsesStringDefinitions()
+    {
+        var fluent = Component.Grid()
+            .Rows(" auto , * , 100 , 2.5*")
+            .Columns("240,3*");
+
+        var rows = (List<LengthValue>)fluent.Properties["RowDefinitions"];
+        var columns = (List<LengthValue>)fluent.Properties["ColumnDefinitions"];
+
+        AssertEqual(4, rows.Count, "String rows should parse every comma-separated token.");
+        AssertEqual(LengthUnit.Auto, rows[0].Unit, "Auto parsing should be case-insensitive.");
+        AssertEqual(LengthUnit.Star, rows[1].Unit, "An unweighted star should parse as one star.");
+        AssertEqual(1d, rows[1].Value, "An unweighted star should have weight one.");
+        AssertEqual(LengthUnit.Pixel, rows[2].Unit, "A numeric string token should use pixels.");
+        AssertEqual(100d, rows[2].Value, "A numeric string token should retain its value.");
+        AssertEqual(2.5d, rows[3].Value, "A weighted star string should retain its weight.");
+        AssertEqual(240d, columns[0].Value, "String columns should parse pixel values.");
+        AssertEqual(3d, columns[1].Value, "String columns should parse weighted stars.");
+
+        var factory = Component.Grid(
+            Component.Rows("Auto,100"),
+            Component.Columns("*,2*"));
+        var factoryRows = (List<LengthValue>)factory.Properties["RowDefinitions"];
+        var factoryColumns = (List<LengthValue>)factory.Properties["ColumnDefinitions"];
+
+        AssertEqual(LengthUnit.Auto, factoryRows[0].Unit, "The Rows factory should use the shared parser.");
+        AssertEqual(100d, factoryRows[1].Value, "The Rows factory should parse numeric pixels.");
+        AssertEqual(1d, factoryColumns[0].Value, "The Columns factory should parse a default star.");
+        AssertEqual(2d, factoryColumns[1].Value, "The Columns factory should parse a weighted star.");
+    }
+
+    private static void GridLengthDslRejectsInvalidStringDefinitions()
+    {
+        AssertThrows<ArgumentNullException>(
+            () => Component.Grid().Rows((string)null!),
+            "Null grid definitions should fail immediately.");
+        AssertThrows<FormatException>(
+            () => Component.Grid().Rows(" "),
+            "Empty grid definitions should fail immediately.");
+
+        var emptyToken = AssertThrows<FormatException>(
+            () => Component.Grid().Rows("Auto,,*"),
+            "Empty grid tokens should fail immediately.");
+        AssertEqual(true, emptyToken.Message.Contains("index 1"), "An invalid token error should identify its index.");
+
+        AssertThrows<FormatException>(
+            () => Component.Grid().Columns("wide,*"),
+            "Unknown grid tokens should fail immediately.");
+        AssertThrows<FormatException>(
+            () => Component.Grid().Columns("Auto,two*"),
+            "Malformed star weights should fail immediately.");
+    }
+
     private static VirtualEntry Row(string key, bool selected)
     {
         return new VirtualEntry(
@@ -708,6 +782,21 @@ internal static class Program
     {
         if (EqualityComparer<T>.Default.Equals(notExpected, actual))
             throw new InvalidOperationException($"{message} Not expected: {notExpected}; Actual: {actual}");
+    }
+
+    private static TException AssertThrows<TException>(Action action, string message)
+        where TException : Exception
+    {
+        try
+        {
+            action();
+        }
+        catch (TException exception)
+        {
+            return exception;
+        }
+
+        throw new InvalidOperationException($"{message} Expected exception: {typeof(TException).Name}");
     }
 
     private sealed class HookProbe : Component

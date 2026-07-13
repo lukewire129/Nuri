@@ -242,9 +242,19 @@ namespace Nuri.UI.Dsl
             return new RowHeights { Lengths = heights };
         }
 
+        public static RowHeights Rows(string definitions)
+        {
+            return Rows(GridLengthParser.Parse(definitions, nameof(definitions)));
+        }
+
         public static ColumnWidths Columns(params LengthValue[] widths)
         {
             return new ColumnWidths { Lengths = widths };
+        }
+
+        public static ColumnWidths Columns(string definitions)
+        {
+            return Columns(GridLengthParser.Parse(definitions, nameof(definitions)));
         }
 
         public static LengthValue Pixels(double value)

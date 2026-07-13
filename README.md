@@ -150,9 +150,13 @@ return Grid(
         Sidebar().Row(1).Column(0),
         Content().Row(1).Column(1)
     )
-    .Rows(Auto, Star)
-    .Columns(Pixels(240), Star);
+    .Rows("Auto,*")
+    .Columns(240, Star);
 ```
+
+Numeric row and column values use pixels. A comma-separated string can combine
+pixel values with `Auto`, `*`, and weighted star values such as `2*`.
+The explicit `Pixels(240)` form remains available for compatibility.
 
 Use `Div(DivTypes.Scroll, ...)` for scrollable vertical content:
 

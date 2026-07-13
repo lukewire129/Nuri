@@ -39,10 +39,20 @@ namespace Nuri.UI.Dsl
             return this;
         }
 
+        public Div Rows(string definitions)
+        {
+            return Rows(GridLengthParser.Parse(definitions, nameof(definitions)));
+        }
+
         public Div Columns(params LengthValue[] widths)
         {
             SetLengthList("ColumnDefinitions", widths);
             return this;
+        }
+
+        public Div Columns(string definitions)
+        {
+            return Columns(GridLengthParser.Parse(definitions, nameof(definitions)));
         }
 
         private List<LengthValue> GetLengthList(string propertyName)
