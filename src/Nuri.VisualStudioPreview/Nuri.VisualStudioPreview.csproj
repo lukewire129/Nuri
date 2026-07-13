@@ -26,16 +26,22 @@
     <CreateTemplateManifestsCacheFile>$(VsixIntermediateOutputPath)\createTemplateManifests.cache</CreateTemplateManifestsCacheFile>
     <TemplateOutputDirectory>$(VsixIntermediateOutputPath)\Templates</TemplateOutputDirectory>
     <CreatePkgDefAssemblyToProcess>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\$(AssemblyName).dll</CreatePkgDefAssemblyToProcess>
-    <CreateVsixContainerDependsOn>Build;GeneratePkgDef;$(CreateVsixContainerDependsOn)</CreateVsixContainerDependsOn>
+    <CreateVsixContainerDependsOn>GeneratePkgDef;$(CreateVsixContainerDependsOn)</CreateVsixContainerDependsOn>
     <DeployVSTemplates>false</DeployVSTemplates>
     <PreviewHostProject>$(MSBuildProjectDirectory)\..\Nuri.WPF.PreviewHost\Nuri.WPF.PreviewHost.csproj</PreviewHostProject>
     <PreviewHostOutputDirectory>$(MSBuildProjectDirectory)\..\Nuri.WPF.PreviewHost\bin\$(Configuration)\net8.0-windows</PreviewHostOutputDirectory>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <DeployExtension>true</DeployExtension>
+    <StartAction>Program</StartAction>
+    <StartProgram>$(DevEnvDir)devenv.exe</StartProgram>
+    <StartArguments>/RootSuffix Exp</StartArguments>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.0.31902.203" ExcludeAssets="runtime" />
     <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.9.3168" PrivateAssets="all" GeneratePathProperty="true" />
-    <ProjectReference Include="$(PreviewHostProject)" ReferenceOutputAssembly="false" Private="false" SetTargetFramework="TargetFramework=net8.0-windows" />
   </ItemGroup>
 
   <ItemGroup>
@@ -48,6 +54,10 @@
     <None Include="source.extension.vsixmanifest">
       <SubType>Designer</SubType>
     </None>
+    <Content Include="..\..\assets\icon.png">
+      <IncludeInVSIX>true</IncludeInVSIX>
+      <VSIXSubPath>Assets</VSIXSubPath>
+    </Content>
     <VSCTCompile Include="source.extension.vsct">
       <ResourceName>Menus.ctmenu</ResourceName>
     </VSCTCompile>
@@ -65,7 +75,18 @@
     </ItemGroup>
   </Target>
 
-  <Target Name="CreateVsixAfterBuild" AfterTargets="Build" Condition="'$(VsSdkTargetsImported)' == 'true'">
+  <Target Name="BuildPreviewHostForVsix" BeforeTargets="CreateVsixAfterBuild">
+    <MSBuild
+      Projects="$(PreviewHostProject)"
+      Targets="Restore;Build"
+      Properties="Configuration=$(Configuration);RestoreBuildInParallel=false"
+      BuildInParallel="false" />
+  </Target>
+
+  <Target Name="CreateVsixAfterBuild" AfterTargets="Build" Condition="'$(VsSdkTargetsImported)' == 'true' and '$(_NuriCreatingVsix)' != 'true'">
+    <PropertyGroup>
+      <_NuriCreatingVsix>true</_NuriCreatingVsix>
+    </PropertyGroup>
     <CallTarget Targets="CreateVsixContainer" />
   </Target>
 

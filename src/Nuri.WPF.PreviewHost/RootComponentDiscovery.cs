@@ -12,7 +12,10 @@ internal static class RootComponentDiscovery
     public static ComponentDescriptor ResolveRoot(string projectPath, IReadOnlyList<ComponentDescriptor> components)
     {
         if (components.Count == 0)
-            throw new InvalidOperationException("No previewable Nuri components were found.");
+            throw new InvalidOperationException(
+                $"No previewable Nuri components were found in '{projectPath}'. " +
+                "Open a C# file in the intended Nuri project or select it as the Startup Project. " +
+                "A previewable component must inherit Nuri.UI.Dsl.Component and have a public parameterless constructor.");
 
         var candidateNames = FindNuriApplicationRootNames(projectPath);
         foreach (var candidateName in candidateNames)

@@ -3,7 +3,10 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace Nuri.WPF.PreviewHost;
@@ -12,7 +15,18 @@ internal sealed class PreviewWindow : Window
 {
     private readonly PreviewOptions _options;
     private readonly PreviewBuildService _buildService;
-    private readonly ContentControl _previewSurface = new();
+    private readonly ContentControl _previewSurface = new()
+    {
+        Width = 1000,
+        Height = 700,
+        Background = Brushes.White,
+        HorizontalContentAlignment = HorizontalAlignment.Stretch,
+        VerticalContentAlignment = VerticalAlignment.Stretch
+    };
+    private readonly Border _previewFrame;
+    private readonly Grid _previewWorkspace;
+    private readonly ScrollViewer _scrollViewer;
+    private readonly ScaleTransform _previewScale = new(1, 1);
     private readonly DispatcherTimer _reloadTimer;
     private readonly FileSystemWatcher? _commandWatcher;
     private readonly List<PreviewAssemblyLoadContext> _retiredLoadContexts = new();
@@ -23,6 +37,17 @@ internal sealed class PreviewWindow : Window
     private bool _reloadAgain;
     private bool _pendingFullReload;
     private bool _pendingPartialReload;
+    private string? _lastCommandText;
+    private bool _fitToWindow;
+    private bool _panCandidate;
+    private bool _isPanning;
+    private Point _panStart;
+    private double _panStartHorizontalOffset;
+    private double _panStartVerticalOffset;
+    private double _zoom = 1;
+    private const double MinimumZoom = 0.25;
+    private const double MaximumZoom = 4;
+    private const double ZoomStep = 0.1;
     [StructLayout (LayoutKind.Sequential)]
     private struct RECT
     {
@@ -81,8 +106,50 @@ internal sealed class PreviewWindow : Window
         _buildService = new PreviewBuildService(options.ProjectPath);
 
         Title = "Nuri Preview Renderer";
-        Background = System.Windows.Media.Brushes.White;
-        Content = _previewSurface;
+        var workspaceBrush = new SolidColorBrush(Color.FromRgb(44, 44, 47));
+        Background = workspaceBrush;
+
+        _previewFrame = new Border
+        {
+            Background = Brushes.White,
+            BorderBrush = new SolidColorBrush(Color.FromRgb(90, 90, 94)),
+            BorderThickness = new Thickness(1),
+            Child = _previewSurface,
+            LayoutTransform = _previewScale,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(24)
+        };
+        _previewWorkspace = new Grid
+        {
+            Background = workspaceBrush
+        };
+        _previewWorkspace.Children.Add(_previewFrame);
+
+        _scrollViewer = new ScrollViewer
+        {
+            Content = _previewWorkspace,
+            Background = workspaceBrush,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            VerticalContentAlignment = VerticalAlignment.Stretch,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            CanContentScroll = false,
+            PanningMode = PanningMode.Both
+        };
+        _scrollViewer.SizeChanged += (_, _) =>
+        {
+            UpdateWorkspaceViewport();
+            if (_fitToWindow)
+                ApplyFitZoom();
+        };
+        _scrollViewer.Loaded += (_, _) => CenterPreviewInViewport();
+        _scrollViewer.PreviewMouseWheel += OnPreviewMouseWheel;
+        _scrollViewer.PreviewMouseLeftButtonDown += OnPreviewMouseLeftButtonDown;
+        _scrollViewer.PreviewMouseMove += OnPreviewMouseMove;
+        _scrollViewer.PreviewMouseLeftButtonUp += OnPreviewMouseLeftButtonUp;
+        _scrollViewer.LostMouseCapture += (_, _) => EndPan();
+        Content = _scrollViewer;
 
         if (options.Embedded)
         {
@@ -135,7 +202,6 @@ internal sealed class PreviewWindow : Window
 
         var childHandle = new WindowInteropHelper (this).Handle;
 
-        // 1. 먼저 자식 창 스타일로 변경
         var style = GetWindowLongPtr (childHandle, GWL_STYLE).ToInt64 ();
 
         style &= ~WS_POPUP;
@@ -193,7 +259,43 @@ internal sealed class PreviewWindow : Window
     {
         Dispatcher.Invoke(() =>
         {
-            var command = ReadCommand(args.FullPath);
+            var commandText = ReadCommandText(args.FullPath);
+            if (string.Equals(commandText, _lastCommandText, StringComparison.Ordinal))
+                return;
+
+            _lastCommandText = commandText;
+            var command = ParseCommand(commandText);
+            if (string.Equals(command, "zoom-in", StringComparison.OrdinalIgnoreCase))
+            {
+                SetZoom(_zoom + ZoomStep);
+                return;
+            }
+
+            if (string.Equals(command, "zoom-out", StringComparison.OrdinalIgnoreCase))
+            {
+                SetZoom(_zoom - ZoomStep);
+                return;
+            }
+
+            if (string.Equals(command, "zoom-reset", StringComparison.OrdinalIgnoreCase))
+            {
+                SetZoom(1);
+                return;
+            }
+
+            if (string.Equals(command, "zoom-fit", StringComparison.OrdinalIgnoreCase))
+            {
+                _fitToWindow = true;
+                ApplyFitZoom();
+                return;
+            }
+
+            if (string.Equals(command, "zoom-center", StringComparison.OrdinalIgnoreCase))
+            {
+                CenterPreviewInViewport();
+                return;
+            }
+
             if (string.Equals(command, "full", StringComparison.OrdinalIgnoreCase))
             {
                 _pendingFullReload = true;
@@ -207,6 +309,156 @@ internal sealed class PreviewWindow : Window
             _reloadTimer.Stop();
             _reloadTimer.Start();
         });
+    }
+
+    private void OnPreviewMouseWheel(object sender, MouseWheelEventArgs args)
+    {
+        if ((Keyboard.Modifiers & ModifierKeys.Control) == 0)
+            return;
+
+        SetZoom(
+            _zoom + (args.Delta > 0 ? ZoomStep : -ZoomStep),
+            args.GetPosition(_scrollViewer));
+        args.Handled = true;
+    }
+
+    private void OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs args)
+    {
+        if (!CanPan() || IsInsideScrollBar(args.OriginalSource as DependencyObject))
+            return;
+
+        _panCandidate = true;
+        _panStart = args.GetPosition(_scrollViewer);
+        _panStartHorizontalOffset = _scrollViewer.HorizontalOffset;
+        _panStartVerticalOffset = _scrollViewer.VerticalOffset;
+    }
+
+    private void OnPreviewMouseMove(object sender, MouseEventArgs args)
+    {
+        if (!_panCandidate || args.LeftButton != MouseButtonState.Pressed)
+            return;
+
+        var current = args.GetPosition(_scrollViewer);
+        var deltaX = current.X - _panStart.X;
+        var deltaY = current.Y - _panStart.Y;
+
+        if (!_isPanning)
+        {
+            if (Math.Abs(deltaX) < SystemParameters.MinimumHorizontalDragDistance
+                && Math.Abs(deltaY) < SystemParameters.MinimumVerticalDragDistance)
+                return;
+
+            _isPanning = true;
+            _scrollViewer.CaptureMouse();
+            _scrollViewer.Cursor = Cursors.Hand;
+        }
+
+        _scrollViewer.ScrollToHorizontalOffset(_panStartHorizontalOffset - deltaX);
+        _scrollViewer.ScrollToVerticalOffset(_panStartVerticalOffset - deltaY);
+        args.Handled = true;
+    }
+
+    private void OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs args)
+    {
+        var handled = _isPanning;
+        EndPan();
+        args.Handled = handled;
+    }
+
+    private bool CanPan()
+    {
+        return _scrollViewer.ScrollableWidth > 0 || _scrollViewer.ScrollableHeight > 0;
+    }
+
+    private void EndPan()
+    {
+        _panCandidate = false;
+        _isPanning = false;
+        _scrollViewer.Cursor = null;
+        if (_scrollViewer.IsMouseCaptured)
+            _scrollViewer.ReleaseMouseCapture();
+    }
+
+    private static bool IsInsideScrollBar(DependencyObject? source)
+    {
+        for (var current = source; current != null; current = GetParent(current))
+        {
+            if (current is ScrollBar)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static DependencyObject? GetParent(DependencyObject current)
+    {
+        if (current is System.Windows.Media.Visual || current is System.Windows.Media.Media3D.Visual3D)
+            return VisualTreeHelper.GetParent(current);
+
+        if (current is FrameworkContentElement contentElement)
+            return contentElement.Parent;
+
+        return LogicalTreeHelper.GetParent(current);
+    }
+
+    private void SetZoom(double zoom, Point? viewportAnchor = null)
+    {
+        _fitToWindow = false;
+        var clampedZoom = Math.Max(MinimumZoom, Math.Min(MaximumZoom, zoom));
+        var anchor = viewportAnchor ?? new Point(
+            _scrollViewer.ViewportWidth / 2,
+            _scrollViewer.ViewportHeight / 2);
+        var frameAnchor = _scrollViewer.TranslatePoint(anchor, _previewFrame);
+        var horizontalOffset = _scrollViewer.HorizontalOffset;
+        var verticalOffset = _scrollViewer.VerticalOffset;
+
+        ApplyZoom(clampedZoom);
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+        {
+            UpdateWorkspaceViewport();
+            _scrollViewer.UpdateLayout();
+
+            var updatedAnchor = _previewFrame.TranslatePoint(frameAnchor, _scrollViewer);
+            _scrollViewer.ScrollToHorizontalOffset(horizontalOffset + updatedAnchor.X - anchor.X);
+            _scrollViewer.ScrollToVerticalOffset(verticalOffset + updatedAnchor.Y - anchor.Y);
+        }));
+    }
+
+    private void UpdateWorkspaceViewport()
+    {
+        _previewWorkspace.MinWidth = Math.Max(0, _scrollViewer.ViewportWidth);
+        _previewWorkspace.MinHeight = Math.Max(0, _scrollViewer.ViewportHeight);
+    }
+
+    private void CenterPreviewInViewport()
+    {
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+        {
+            UpdateWorkspaceViewport();
+            _scrollViewer.UpdateLayout();
+            _scrollViewer.ScrollToHorizontalOffset(
+                Math.Max(0, (_scrollViewer.ExtentWidth - _scrollViewer.ViewportWidth) / 2));
+            _scrollViewer.ScrollToVerticalOffset(
+                Math.Max(0, (_scrollViewer.ExtentHeight - _scrollViewer.ViewportHeight) / 2));
+        }));
+    }
+
+    private void ApplyFitZoom()
+    {
+        var availableWidth = Math.Max(1, _scrollViewer.ViewportWidth - 48);
+        var availableHeight = Math.Max(1, _scrollViewer.ViewportHeight - 48);
+        var fitZoom = Math.Min(availableWidth / _previewSurface.Width, availableHeight / _previewSurface.Height);
+        ApplyZoom(Math.Max(0.05, Math.Min(MaximumZoom, fitZoom)));
+    }
+
+    private void ApplyZoom(double zoom)
+    {
+        _zoom = zoom;
+        _previewScale.ScaleX = zoom;
+        _previewScale.ScaleY = zoom;
+        ReportStatus(_fitToWindow
+            ? $"Preview zoom: Fit ({zoom:P0})"
+            : $"Preview zoom: {zoom:P0}");
     }
 
     private async void OnReloadTimerTick()
@@ -395,7 +647,7 @@ internal sealed class PreviewWindow : Window
         }
     }
 
-    private static string ReadCommand(string path)
+    private static string ReadCommandText(string path)
     {
         for (var i = 0; i < 5; i++)
         {
@@ -404,9 +656,7 @@ internal sealed class PreviewWindow : Window
                 if (!File.Exists(path))
                     return "partial";
 
-                var text = File.ReadAllText(path).Trim();
-                var firstSpace = text.IndexOf(' ');
-                return firstSpace < 0 ? text : text.Substring(0, firstSpace);
+                return File.ReadAllText(path).Trim();
             }
             catch (IOException)
             {
@@ -415,6 +665,12 @@ internal sealed class PreviewWindow : Window
         }
 
         return "partial";
+    }
+
+    private static string ParseCommand(string commandText)
+    {
+        var firstSpace = commandText.IndexOf(' ');
+        return firstSpace < 0 ? commandText : commandText.Substring(0, firstSpace);
     }
 
     private void DisposeCurrentRoot()

@@ -10,6 +10,7 @@ using System.Windows.Forms.Integration;
 using System.Windows.Media;
 using EnvDTE;
 using EnvDTE80;
+using Microsoft.VisualStudio.PlatformUI;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Threading;
 using DiagnosticsProcess = System.Diagnostics.Process;
@@ -20,7 +21,12 @@ namespace Nuri.VisualStudioPreview;
 public sealed class NuriPreviewControl : UserControl, IDisposable
 {
     private readonly TextBlock _statusText = new TextBlock();
-    private readonly WinForms.Panel _hostPanel = new WinForms.Panel { Dock = WinForms.DockStyle.Fill };
+    private readonly TextBlock _zoomText = new TextBlock { Text = "100%" };
+    private readonly WinForms.Panel _hostPanel = new WinForms.Panel
+    {
+        Dock = WinForms.DockStyle.Fill,
+        BackColor = System.Drawing.Color.FromArgb(44, 44, 47)
+    };
     private DiagnosticsProcess? _previewProcess;
     private FileSystemWatcher? _statusWatcher;
     private DocumentEvents? _documentEvents;
@@ -28,27 +34,26 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
     private string? _commandFilePath;
     private string? _statusFilePath;
     private string? _startupProjectDirectory;
+    private int _zoomPercent = 100;
+    private const int MinimumZoomPercent = 25;
+    private const int MaximumZoomPercent = 400;
+    private const int ZoomStepPercent = 10;
 
     public NuriPreviewControl()
     {
-        var root = new DockPanel();
+        var workspaceBrush = new SolidColorBrush(Color.FromRgb(44, 44, 47));
+        var root = new DockPanel { Background = workspaceBrush };
 
         var toolbar = new DockPanel
         {
             LastChildFill = true,
-            Background = new SolidColorBrush(Color.FromRgb(245, 245, 245)),
             Margin = new Thickness(0),
-            Height = 32
+            Height = 34
         };
+        toolbar.SetResourceReference(Panel.BackgroundProperty, EnvironmentColors.ToolWindowBackgroundBrushKey);
         DockPanel.SetDock(toolbar, Dock.Top);
 
-        var refreshButton = new Button
-        {
-            Content = "강력새로고침",
-            MinWidth = 96,
-            Margin = new Thickness(4, 4, 6, 4),
-            Padding = new Thickness(8, 0, 8, 0)
-        };
+        var refreshButton = CreateToolbarButton("↻", "Refresh preview", 30);
         refreshButton.Click += (_, _) =>
         {
             ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
@@ -57,7 +62,7 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
                 if (IsPreviewHostRunning())
                 {
                     SendFullRefreshCommand();
-                    SetStatus("강력새로고침 요청됨");
+                    SetStatus("Refreshing preview...");
                 }
                 else if (PackageProvider.Package != null)
                 {
@@ -68,13 +73,51 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
         DockPanel.SetDock(refreshButton, Dock.Left);
         toolbar.Children.Add(refreshButton);
 
+        var zoomControls = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 4, 0)
+        };
+        DockPanel.SetDock(zoomControls, Dock.Right);
+
+        var zoomOutButton = CreateToolbarButton("−", "Zoom out", 28);
+        zoomOutButton.Click += (_, _) => ChangeZoom(-ZoomStepPercent);
+        zoomControls.Children.Add(zoomOutButton);
+
+        var zoomResetButton = CreateToolbarButton(_zoomText, "Reset zoom", 52);
+        zoomResetButton.Click += (_, _) => ResetZoom();
+        _zoomText.HorizontalAlignment = HorizontalAlignment.Center;
+        _zoomText.VerticalAlignment = VerticalAlignment.Center;
+        _zoomText.Foreground = Brushes.Black;
+        zoomControls.Children.Add(zoomResetButton);
+
+        var zoomInButton = CreateToolbarButton("+", "Zoom in", 28);
+        zoomInButton.Click += (_, _) => ChangeZoom(ZoomStepPercent);
+        zoomControls.Children.Add(zoomInButton);
+
+        var centerButton = CreateToolbarButton("Center", "Center the preview at the current zoom", 52);
+        centerButton.Click += (_, _) => CenterPreview();
+        zoomControls.Children.Add(centerButton);
+
+        var fitButton = CreateToolbarButton("Fit", "Fit preview to window", 38);
+        fitButton.Click += (_, _) => FitZoom();
+        zoomControls.Children.Add(fitButton);
+        toolbar.Children.Add(zoomControls);
+
         _statusText.VerticalAlignment = VerticalAlignment.Center;
         _statusText.TextTrimming = TextTrimming.CharacterEllipsis;
         _statusText.Text = "Open a C# file and run Nuri Preview.";
+        _statusText.Margin = new Thickness(6, 0, 8, 0);
+        _statusText.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
         toolbar.Children.Add(_statusText);
 
         
-        var formsHost = new WindowsFormsHost { Child = _hostPanel };
+        var formsHost = new WindowsFormsHost
+        {
+            Child = _hostPanel,
+            Background = workspaceBrush
+        };
         _hostPanel.Resize += (_, _) => ResizeEmbeddedWindow();
 
         root.Children.Add(toolbar);
@@ -91,6 +134,48 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
         };
     }
 
+    private static Button CreateToolbarButton(object content, string toolTip, double width)
+    {
+        var button = new Button
+        {
+            Content = content,
+            ToolTip = toolTip,
+            Width = width,
+            Height = 26,
+            Margin = new Thickness(2, 4, 0, 4),
+            Padding = new Thickness(4, 0, 4, 0),
+            VerticalContentAlignment = VerticalAlignment.Center,
+            HorizontalContentAlignment = HorizontalAlignment.Center
+        };
+        button.Foreground = Brushes.Black;
+        return button;
+    }
+
+    private void ChangeZoom(int delta)
+    {
+        _zoomPercent = Math.Max(MinimumZoomPercent, Math.Min(MaximumZoomPercent, _zoomPercent + delta));
+        _zoomText.Text = _zoomPercent + "%";
+        SendPreviewCommand(delta > 0 ? "zoom-in" : "zoom-out");
+    }
+
+    private void ResetZoom()
+    {
+        _zoomPercent = 100;
+        _zoomText.Text = "100%";
+        SendPreviewCommand("zoom-reset");
+    }
+
+    private void FitZoom()
+    {
+        _zoomText.Text = "Fit";
+        SendPreviewCommand("zoom-fit");
+    }
+
+    private void CenterPreview()
+    {
+        SendPreviewCommand("zoom-center");
+    }
+
     public async Task StartPreviewAsync(AsyncPackage package)
     {
         PackageProvider.Package = package;
@@ -105,10 +190,10 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
             return;
         }
 
-        var projectPath = ResolveStartupProjectPath(dte);
+        var projectPath = ResolvePreviewProjectPath(dte);
         if (string.IsNullOrWhiteSpace(projectPath))
         {
-            SetStatus("No Startup Project file was found.");
+            SetStatus("Open a C# file in a Nuri project or select a Startup Project.");
             return;
         }
 
@@ -306,21 +391,21 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
 
     private void SendFullRefreshCommand()
     {
-        SendRefreshCommand("full");
+        SendPreviewCommand("full");
     }
 
     private void SendPartialRefreshCommand()
     {
-        SendRefreshCommand("partial");
+        SendPreviewCommand("partial");
     }
 
-    private void SendRefreshCommand(string kind)
+    private void SendPreviewCommand(string command)
     {
         if (string.IsNullOrWhiteSpace(_commandFilePath))
             return;
 
         Directory.CreateDirectory(Path.GetDirectoryName(_commandFilePath)!);
-        File.WriteAllText(_commandFilePath, kind + " " + DateTime.UtcNow.Ticks.ToString());
+        File.WriteAllText(_commandFilePath, command + " " + DateTime.UtcNow.Ticks.ToString());
     }
 
     private void SubscribeDocumentEvents(DTE2 dte, string projectPath)
@@ -430,7 +515,65 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
     {
         ThreadHelper.ThrowIfNotOnUIThread();
         _statusText.Text = message;
+        UpdateZoomTextFromStatus(message);
         (PackageProvider.Package as NuriPreviewPackage)?.WriteLine(message);
+    }
+
+    private void UpdateZoomTextFromStatus(string message)
+    {
+        const string prefix = "Preview zoom: ";
+        if (!message.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        var value = message.Substring(prefix.Length).Trim();
+        if (value.StartsWith("Fit", StringComparison.OrdinalIgnoreCase))
+        {
+            _zoomText.Text = "Fit";
+            return;
+        }
+
+        var percentIndex = value.IndexOf('%');
+        if (percentIndex <= 0)
+            return;
+
+        var numberText = value.Substring(0, percentIndex);
+        if (!int.TryParse(numberText, out var percent))
+            return;
+
+        _zoomPercent = Math.Max(MinimumZoomPercent, Math.Min(MaximumZoomPercent, percent));
+        _zoomText.Text = _zoomPercent + "%";
+    }
+
+    private static string? ResolvePreviewProjectPath(DTE2 dte)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        var activeProjectPath = ResolveActiveDocumentProjectPath(dte);
+        return !string.IsNullOrWhiteSpace(activeProjectPath)
+            ? activeProjectPath
+            : ResolveStartupProjectPath(dte);
+    }
+
+    private static string? ResolveActiveDocumentProjectPath(DTE2 dte)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+
+        var document = dte.ActiveDocument;
+        if (document == null
+            || !Path.GetExtension(document.FullName).Equals(".cs", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        try
+        {
+            var projectPath = document.ProjectItem?.ContainingProject?.FullName;
+            return !string.IsNullOrWhiteSpace(projectPath) && File.Exists(projectPath)
+                ? projectPath
+                : null;
+        }
+        catch (COMException)
+        {
+            return null;
+        }
     }
 
     private static string? ResolveStartupProjectPath(DTE2 dte)
