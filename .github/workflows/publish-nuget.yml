@@ -1,0 +1,47 @@
+name: Publish NuGet packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version to publish
+        required: true
+        default: 0.1.0
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore package projects
+        run: dotnet restore src/Nuri.WPF/Nuri.WPF.csproj
+
+      - name: Pack Nuri
+        run: dotnet pack src/Nuri/Nuri.csproj -c Release --no-restore -m:1 -p:Version=${{ inputs.version }} -o artifacts/packages
+
+      - name: Pack Nuri.WPF
+        run: dotnet pack src/Nuri.WPF/Nuri.WPF.csproj -c Release --no-restore -m:1 -p:Version=${{ inputs.version }} -o artifacts/packages
+
+      - name: Sign in to NuGet.org with trusted publishing
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      - name: Publish Nuri
+        run: dotnet nuget push artifacts/packages/Nuri.${{ inputs.version }}.nupkg --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: Publish Nuri.WPF
+        run: dotnet nuget push artifacts/packages/Nuri.WPF.${{ inputs.version }}.nupkg --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate

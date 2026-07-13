@@ -4,4 +4,29 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
+
+  <PropertyGroup>
+    <Version>0.1.0</Version>
+    <PackageId>Nuri</PackageId>
+    <Title>Nuri</Title>
+    <Authors>lukewire129</Authors>
+    <Description>Platform-neutral MVU runtime, virtual UI model, hooks, and reconciliation for Nuri renderers.</Description>
+    <PackageProjectUrl>https://github.com/lukewire129/Nuri</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/lukewire129/Nuri</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>nuri;mvu;virtual-ui;hooks;csharp;dotnet</PackageTags>
+    <PackageReleaseNotes>Introduces the platform-neutral Nuri runtime and virtual UI core used by renderer packages.</PackageReleaseNotes>
+    <Copyright>Copyright © 2026 lukewire129.</Copyright>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\assets\icon.png" Pack="true" PackagePath="\" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 </Project>
