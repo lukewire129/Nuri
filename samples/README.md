@@ -32,6 +32,7 @@ Add Core features only after a sample makes the need obvious and repeatable.
 - `Nuri.DevToolsSample`: runtime diagnostics and developer tooling
 - `Nuri.ExplorerTreeSample`: recursive keyed folders/files with expand, selection, rename, add/delete, and lifecycle cleanup
 - `Nuri.AnimatedDashboardSample`: shared WPF/Avalonia opacity transition and interruption baseline
+- `Nuri.WPFAnimatedDashboardSample`: WPF Margin, background, foreground, and Rotate transition replacement coverage
 - `Nuri.AvaloniaHotReloadSample`: minimal Avalonia renderer and C# Hot Reload smoke test
 
 ## Next Sample Roadmap

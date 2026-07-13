@@ -30,6 +30,12 @@ namespace Nuri.WPF
                 case "Margin":
                     element.Margin = (Thickness)value!;
                     return true;
+                case "Rotate":
+                    var rotateTransform = element.RenderTransform as RotateTransform ?? new RotateTransform();
+                    rotateTransform.Angle = ToDouble(value);
+                    element.RenderTransform = rotateTransform;
+                    element.RenderTransformOrigin = new Point(0.5, 0.5);
+                    return true;
                 case PropertyKeys.Name:
                     element.Name = (string)value!;
                     return true;
@@ -111,6 +117,10 @@ namespace Nuri.WPF
                     return true;
                 case "Margin":
                     element.ClearValue(FrameworkElement.MarginProperty);
+                    return true;
+                case "Rotate":
+                    if (element.RenderTransform is RotateTransform rotateTransform)
+                        rotateTransform.ClearValue(RotateTransform.AngleProperty);
                     return true;
                 case PropertyKeys.Name:
                     element.ClearValue(FrameworkElement.NameProperty);

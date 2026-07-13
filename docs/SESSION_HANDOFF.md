@@ -68,7 +68,9 @@ Maintain Nuri as a platform-neutral Core virtual UI/runtime/diff model, with WPF
 - Animation DSL supports `.Transition(duration, easing)` for configured supported properties. Existing `.Transitions("Property", ...)` remains for explicit compatibility.
 - Core DSL exposes `.Opacity(...)`; WPF and Avalonia now materialize opacity transitions, replace repeated transitions without duplicate native registrations, and remove native transitions when the virtual animation is removed.
 - `Nuri.AnimatedDashboardSample` runs the same Core-neutral dashboard component through WPF by default or Avalonia with `--avalonia` and exercises opacity interruption/replacement.
+- `Nuri.WPFAnimatedDashboardSample` exercises WPF Margin, background, foreground, and Rotate transition replacement. WPF now preserves the latest Rotate base angle through native animation replacement and removal.
 - `Nuri.RendererTests` covers cross-renderer opacity transition add, replacement, and removal behavior.
+- `Nuri.RendererTests` also covers WPF Margin, background, foreground, and Rotate native animation replacement, base values, and removal.
 - Runtime diagnostics already track component render counts and duplicate keys. Patch-count and unsupported property/event diagnostics remain candidates when a concrete sample needs them.
 
 ## Important Files
@@ -126,7 +128,7 @@ Expected baseline sanity for keyed reorder:
 2. Complete platform-neutral animation behavior.
    - Keep WPF `AnimationTimeline` out of Core.
    - Expand `AnimationValue` and supported properties only for demonstrated transitions.
-   - Opacity materialization is covered in WPF and Avalonia; use the Animated Dashboard to drive margin, color, and rotation parity.
+   - Opacity materialization is covered in WPF and Avalonia. WPF Margin, color, and rotation replacement/removal are covered by the WPF Animated Dashboard and renderer tests.
    - Add actionable unsupported-animation diagnostics.
 
 3. Strengthen renderer-level lifecycle/effect coverage.

@@ -48,6 +48,12 @@ namespace Nuri.UI.Dsl
             return node;
         }
 
+        public static T Rotate<T>(this T node, double degrees) where T : IElement
+        {
+            node.SetProperty("Rotate", degrees);
+            return node;
+        }
+
         public static T Size<T>(this T node, double width, double height) where T : IElement
         {
             node.Width(width);

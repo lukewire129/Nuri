@@ -10,10 +10,15 @@ using AvaloniaPanel = Avalonia.Controls.Panel;
 using AvaloniaTextBlock = Avalonia.Controls.TextBlock;
 using AvaloniaVisual = Avalonia.Visual;
 using WpfFrameworkElement = System.Windows.FrameworkElement;
+using WpfBorder = System.Windows.Controls.Border;
 using WpfDecorator = System.Windows.Controls.Decorator;
 using WpfPanel = System.Windows.Controls.Panel;
 using WpfTextBlock = System.Windows.Controls.TextBlock;
 using WpfUIElement = System.Windows.UIElement;
+using WpfColor = System.Windows.Media.Color;
+using WpfRotateTransform = System.Windows.Media.RotateTransform;
+using WpfSolidColorBrush = System.Windows.Media.SolidColorBrush;
+using WpfThickness = System.Windows.Thickness;
 
 namespace Nuri.RendererTests;
 
@@ -23,8 +28,65 @@ internal static class Program
     private static void Main()
     {
         RunSuite(() => new WpfDriver());
+        WpfTransitionsReplaceAndClearNativeAnimations(new WpfDriver());
         RunSuite(() => new AvaloniaDriver());
         Console.WriteLine("Nuri.RendererTests passed.");
+    }
+
+    private static void WpfTransitionsReplaceAndClearNativeAnimations(WpfDriver driver)
+    {
+        var component = new WpfTransitionComponent();
+        using var root = driver.Initialize(component);
+
+        component.Margin = 18;
+        component.Background = "#2563eb";
+        component.Foreground = "#fef3c7";
+        component.Rotation = 5;
+        root.Rebuild();
+
+        var targets = driver.RootChildren.Cast<WpfFrameworkElement>().ToArray();
+        AssertWpfTransitions(targets, true);
+
+        component.Margin = 12;
+        component.Background = "#7c3aed";
+        component.Foreground = "#f8fafc";
+        component.Rotation = -6;
+        root.Rebuild();
+
+        var updatedTargets = driver.RootChildren.Cast<WpfFrameworkElement>().ToArray();
+        for (var index = 0; index < targets.Length; index++)
+            AssertSame(targets[index], updatedTargets[index], "WPF: replacing a transition should preserve the native target.");
+
+        AssertWpfTransitions(updatedTargets, true);
+        AssertEqual(new WpfThickness(12), (WpfThickness)updatedTargets[0].GetAnimationBaseValue(WpfFrameworkElement.MarginProperty), "WPF: Margin should retain the latest base value.");
+
+        var backgroundBrush = (WpfSolidColorBrush)((WpfBorder)updatedTargets[1]).Background;
+        AssertEqual(WpfColor.FromRgb(124, 58, 237), (WpfColor)backgroundBrush.GetAnimationBaseValue(WpfSolidColorBrush.ColorProperty), "WPF: Background should retain the latest base color.");
+
+        var foregroundBrush = (WpfSolidColorBrush)((WpfTextBlock)updatedTargets[2]).Foreground;
+        AssertEqual(WpfColor.FromRgb(248, 250, 252), (WpfColor)foregroundBrush.GetAnimationBaseValue(WpfSolidColorBrush.ColorProperty), "WPF: Foreground should retain the latest base color.");
+
+        var rotateTransform = (WpfRotateTransform)updatedTargets[3].RenderTransform;
+        AssertEqual(-6d, (double)rotateTransform.GetAnimationBaseValue(WpfRotateTransform.AngleProperty), "WPF: Rotate should retain the latest base angle.");
+
+        component.Animate = false;
+        root.Rebuild();
+        AssertWpfTransitions(updatedTargets, false);
+    }
+
+    private static void AssertWpfTransitions(IReadOnlyList<WpfFrameworkElement> targets, bool expected)
+    {
+        AssertEqual(4, targets.Count, "WPF: the animation probe should retain four targets.");
+        AssertEqual(expected, targets[0].HasAnimatedProperties, "WPF: Margin animation state should match the virtual transition.");
+
+        var backgroundBrush = (WpfSolidColorBrush)((WpfBorder)targets[1]).Background;
+        AssertEqual(expected, backgroundBrush.HasAnimatedProperties, "WPF: Background animation state should match the virtual transition.");
+
+        var foregroundBrush = (WpfSolidColorBrush)((WpfTextBlock)targets[2]).Foreground;
+        AssertEqual(expected, foregroundBrush.HasAnimatedProperties, "WPF: Foreground animation state should match the virtual transition.");
+
+        var rotateTransform = (WpfRotateTransform)targets[3].RenderTransform;
+        AssertEqual(expected, rotateTransform.HasAnimatedProperties, "WPF: Rotate animation state should match the virtual transition.");
     }
 
     private static void RunSuite(Func<RendererDriver> createDriver)
@@ -362,6 +424,37 @@ internal static class Program
     private sealed class ImmediateScheduler : IUiScheduler
     {
         public void Schedule(Action action) => action();
+    }
+
+    private sealed class WpfTransitionComponent : Component
+    {
+        public double Margin { get; set; } = 4;
+
+        public string Background { get; set; } = "#111827";
+
+        public string Foreground { get; set; } = "#94a3b8";
+
+        public double Rotation { get; set; } = -2;
+
+        public bool Animate { get; set; } = true;
+
+        public override IElement Render()
+        {
+            var margin = Div().Margin(Margin);
+            var background = Div().Background(Background);
+            var foreground = Text("foreground").FontColor(Foreground);
+            var rotate = Text("rotate").Rotate(Rotation);
+
+            if (Animate)
+            {
+                margin.Transition(500, EasingValue.CubicOut);
+                background.Transition(500, EasingValue.CubicOut);
+                foreground.Transition(500, EasingValue.CubicOut);
+                rotate.Transition(500, EasingValue.CubicOut);
+            }
+
+            return Grid(margin, background, foreground, rotate);
+        }
     }
 
     private sealed class OpacityTransitionComponent : Component
