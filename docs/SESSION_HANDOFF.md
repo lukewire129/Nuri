@@ -61,6 +61,7 @@ Maintain Nuri as a platform-neutral Core virtual UI/runtime/diff model, with WPF
 - `src/Nuri.Avalonia` contains the Avalonia renderer and references Avalonia desktop packages.
 - The Avalonia adapter includes application-root scheduling, virtual-entry rendering, control/property/event mapping, hot reload support, and a smoke-test sample. It is no longer a renderer skeleton.
 - `tests/Nuri.RendererTests` validates WPF/Avalonia post-commit effects, subtree and key-replacement cleanup, repeated keyed native moves, and idempotent root disposal without external test packages.
+- `samples/WPF/Nuri.ExplorerTreeSample` exercises recursive keyed components, expand/collapse cleanup, selection, rename, and add/delete flows through the WPF renderer.
 - `samples/WPF/GridTest` demonstrates `.Key(...)`, neutral `.OnClick(Action)`, and the preferred `Grid(...).Rows(...).Columns(...)` layout style.
 - Legacy `Div(Rows(...), Columns(...), children...)` overloads remain for compatibility, but new code should prefer fluent layout definitions so row/column definitions do not look like child controls.
 - Core DSL now exposes WPF-familiar factory aliases such as `Button`, `TextBox`, `CheckBox`, `RadioButton`, `ToggleButton`, and `PasswordBox`. These are semantic aliases over Nuri virtual input descriptions, not WPF types in Core.
