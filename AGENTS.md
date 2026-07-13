@@ -16,7 +16,7 @@ These instructions apply to AI agents working in this repository, including Open
 
 - `Nuri` must stay platform-neutral.
 - Do not add WPF, Avalonia, Uno, OpenSilver, MAUI, or other UI framework types to `Nuri`.
-- `Nuri.WPF` is a compatibility DSL plus renderer adapter.
+- `Nuri.WPF` is the WPF renderer adapter and retains compatibility overloads where needed.
 - Component `Render()` methods should produce virtual UI descriptions, not native WPF controls.
 - Native WPF controls should be created only by the WPF renderer/registry path.
 - Preserve existing user-facing DSL compatibility unless the user explicitly approves a breaking change.
@@ -88,8 +88,20 @@ dotnet run --project "perf\Nuri.WPFPerformance\Nuri.WPFPerformance.csproj" -c Re
 
 ## Current Feature Priorities
 
-1. Expand Core-neutral events: hover, pointer/mouse, keyboard, focus, loaded/unloaded if needed.
-2. Improve platform-neutral animation descriptions and renderer materialization.
-3. Move lifecycle/effect semantics further into Core.
-4. Flesh out the Avalonia renderer after package direction is decided.
-5. Add diagnostics only where useful: patch count, render count, duplicate key, unsupported property/event.
+1. Validate and refine existing Core-neutral event semantics across WPF and Avalonia.
+   - The baseline already includes click, text/content/check changes, hover, mouse down/up, keyboard down/up, focus changes, and loaded/unloaded compatibility events.
+   - Prefer `useEffect(..., [])` and its cleanup for component mount/unmount behavior; do not expand loaded/unloaded as component lifecycle APIs.
+   - Add richer pointer or keyboard payloads only when samples require modifiers, repeat state, handled semantics, coordinates, or device information.
+2. Complete platform-neutral animation support.
+   - Keep `AnimationValue` renderer-neutral.
+   - Expand supported properties and Avalonia materialization based on sample needs.
+   - Diagnose unsupported animation properties where actionable.
+3. Strengthen renderer-level lifecycle/effect validation.
+   - Verify effect flush after commit and deterministic cleanup across subtree removal, key replacement, and repeated moves in both renderers.
+4. Improve WPF/Avalonia renderer parity.
+   - Close property, event, animation, hot reload, and control-behavior gaps without moving framework types into Core.
+5. Add diagnostics only where useful.
+   - Render count and duplicate-key diagnostics already exist.
+   - Prioritize patch count and unsupported property/event warnings when they help real samples.
+6. Use the next samples to expose concrete gaps.
+   - Prioritize Explorer Tree, Animated Dashboard, Stress, and Multi-Window scenarios.

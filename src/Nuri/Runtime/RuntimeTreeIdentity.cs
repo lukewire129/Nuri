@@ -50,6 +50,15 @@ namespace Nuri.Runtime
             }
         }
 
+        public static bool IsRegistered(RuntimeTreeNode node)
+        {
+            if (node == null)
+                return false;
+
+            lock (SyncRoot)
+                return Nodes.TryGetValue(node.Id, out var current) && ReferenceEquals(current, node);
+        }
+
         public static void Unregister(string id)
         {
             if (string.IsNullOrWhiteSpace(id))

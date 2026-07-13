@@ -125,7 +125,7 @@ namespace Nuri.UI
             StateHookState<T> hook;
             if (!stateEntries.TryGetValue(index, out var entry))
             {
-                hook = new StateHookState<T>(initialValue, this, componentId);
+                hook = new StateHookState<T>(initialValue, this, componentId, componentNode);
                 stateEntries[index] = hook;
             }
             else if (entry is StateHookState<T> typedHook)
@@ -135,7 +135,7 @@ namespace Nuri.UI
             }
             else if (entry is T typedState)
             {
-                hook = new StateHookState<T>(typedState, this, componentId);
+                hook = new StateHookState<T>(typedState, this, componentId, componentNode);
                 stateEntries[index] = hook;
             }
             else
@@ -161,12 +161,18 @@ namespace Nuri.UI
 
             void Dispatch(TAction action)
             {
+                if (!RuntimeTreeIdentity.IsRegistered(componentNode))
+                    return;
+
                 var currentState = StateStore.GetOrCreateState(componentNode, index, initialState);
                 var newState = reducer(currentState, action);
                 if (EqualityComparer<TState>.Default.Equals(currentState, newState))
                     return;
 
                 StateStore.UpdateState(componentNode, index, newState);
+                if (!RuntimeTreeIdentity.IsRegistered(componentNode))
+                    return;
+
                 Id = componentId;
                 OnStateChanged();
             }
@@ -597,12 +603,16 @@ namespace Nuri.UI
             public StateHookState(
                 T value,
                 ComponentBase<TElement, TAnimation> owner,
-                string componentId) : base(value)
+                string componentId,
+                RuntimeTreeIdentity.RuntimeTreeNode componentNode) : base(value)
             {
                 _owner = owner;
                 _componentId = componentId;
+                _componentNode = componentNode;
                 Setter = SetState;
             }
+
+            private readonly RuntimeTreeIdentity.RuntimeTreeNode _componentNode;
 
             public Action<Func<T, T>> Setter { get; }
 
@@ -616,12 +626,18 @@ namespace Nuri.UI
 
             private void SetState(Func<T, T> update)
             {
+                if (!RuntimeTreeIdentity.IsRegistered(_componentNode))
+                    return;
+
                 var currentState = Value;
                 var newValue = update(currentState);
                 if (EqualityComparer<T>.Default.Equals(currentState, newValue))
                     return;
 
                 Value = newValue;
+                if (!RuntimeTreeIdentity.IsRegistered(_componentNode))
+                    return;
+
                 _owner.Id = _componentId;
                 _owner.OnStateChanged();
             }

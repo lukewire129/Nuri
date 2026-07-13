@@ -123,6 +123,8 @@ The differences are within environment noise and do not justify additional queue
 
 The expanded harness also establishes future baselines not used in the before/expected/after verdict: stable 100-hook render was 0.50 KB and 0.0178 ms; first mount results for 1, 10, 50, and 100 hooks were 1.33/3.10/11.21/22.34 KB with median times of 0.0052/0.0053/0.0136/0.0257 ms. Setter identity, latest-owner invalidation, functional updates, hook-slot isolation, trimming, and disposal are covered by regression tests.
 
+Stale setter protection was added on 2026-07-13. `useState` setters and `useReducer` dispatchers retain their owning runtime-node reference and become no-ops when that exact node is no longer registered, including when a replacement later reuses the same string ID. A 100-iteration sanity run retained 0.12/0.15/0.31/0.50 KB stable-render allocation for 1/10/50/100 hooks and the required keyed reorder result of 1 patch. The extra runtime-node reference increased first-mount allocation to 1.34/3.18/11.57/23.11 KB, approximately 8 bytes per state hook; it does not add stable-render allocation.
+
 ## Measurement Scenarios
 
 The Core performance harness covers:

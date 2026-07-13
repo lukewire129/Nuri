@@ -46,6 +46,7 @@ Component key는 렌더 결과 root에 별도 key가 없을 때 virtual root로 
 - type 또는 key 교체 시 이전 cleanup 이후 새 effect가 mount됩니다.
 - 부모 제거는 keyed/unkeyed 자손을 모두 정리합니다.
 - effect는 commit 이후 실행되며 dependency 변경, hook trimming 및 unmount 시 cleanup됩니다.
+- unmount 이후 보관된 `useState` setter 또는 `useReducer` dispatcher는 no-op이 되어야 합니다. 재사용 가능한 문자열 ID가 아니라 runtime node 객체 identity로 소유자가 아직 mount 상태인지 판단합니다.
 
 Hook 저장소는 메모리에 유지되는 runtime node를 소유권 key로 사용합니다. `Component.Id`는 node에 연결된 diagnostics 및 호환성 식별자입니다.
 
@@ -59,6 +60,7 @@ Hook 저장소는 메모리에 유지되는 runtime node를 소유권 key로 사
 - 한 component 안의 navigation hook 격리
 - nested navigation state 격리
 - 연속 함수형 state 변경이 최신 값 사용
+- stale state setter와 reducer dispatcher가 동일한 문자열 ID를 재사용한 replacement를 invalidate하지 않음
 - 부모 dispose 시 keyed 자손 cleanup
 - 부모와 keyed child 동시 invalidation이 부모 하나로 병합
 - 중복 key hook 격리와 diagnostics 기록

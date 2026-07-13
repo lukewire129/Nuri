@@ -50,6 +50,7 @@ Ancestry entries must be registered when node numbers are assigned and removed w
 - Replacing a type or key runs the old cleanup and mounts the new effect after commit.
 - Removing a parent cleans keyed and unkeyed descendants in the subtree.
 - Effect callbacks run after commit; cleanup runs before a changed effect, on hook trimming, and on unmount.
+- A `useState` setter or `useReducer` dispatcher retained after unmount must become a no-op. Runtime-node object identity, not a reusable string ID, determines whether its owner is still mounted.
 
 Hook storage is keyed by persistent in-memory runtime nodes. `Component.Id` remains the diagnostic and compatibility identifier associated with the node; it is not the hook store's ownership key.
 
@@ -65,6 +66,7 @@ When changing identity, hooks, lifecycle, or diffing, cover these cases:
 - two navigation hooks in one component remain independent;
 - nested navigation state remains isolated;
 - consecutive functional state updates use the latest state;
+- stale state setters and reducer dispatchers cannot invalidate a replacement that reuses the same string ID;
 - parent disposal cleans keyed descendants;
 - simultaneous parent and keyed-child invalidations coalesce to the parent;
 - duplicate keys receive independent hook slots and emit diagnostics;

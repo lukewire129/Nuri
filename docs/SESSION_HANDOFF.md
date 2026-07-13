@@ -4,7 +4,7 @@ This file is intentionally short. Use it only when resuming work after the local
 
 ## Current Goal
 
-Move Nuri from WPF-direct UI creation toward a platform-neutral Core virtual UI/runtime/diff model, with WPF as one renderer adapter and future renderers such as Avalonia/Uno/OpenSilver/MAUI attachable later.
+Maintain Nuri as a platform-neutral Core virtual UI/runtime/diff model, with WPF and Avalonia as renderer adapters and additional renderers attachable through Core contracts later.
 
 ## Current Status
 
@@ -15,7 +15,7 @@ Move Nuri from WPF-direct UI creation toward a platform-neutral Core virtual UI/
 - Core DSL state changes are batched by `ApplicationRoot`; non-root component hooks render/diff/patch only that component subtree when the current virtual entry can be found, with root rebuild as fallback.
 - Keyed reconciliation is implemented with `MoveChildPatch` and WPF move support.
 - A simple perf harness exists under `perf/` for basic before/after measurements.
-- Release build currently passes with 0 errors. Existing Visual Studio preview threading analyzer warnings may still be reported.
+- Release builds are expected to pass when the preview host is not loaded. The 2026-07-13 validation reached all projects but failed with `CS2012` because `Nuri.WPF.PreviewHost.dll` in `obj/Release` was locked by another process; close the running preview host and rerun. Existing Visual Studio preview threading analyzer warnings may still be reported.
 
 ## Recent Feature Additions
 
@@ -25,6 +25,7 @@ Move Nuri from WPF-direct UI creation toward a platform-neutral Core virtual UI/
 - Keyed component lifecycle uses explicit component keys. Key changes clean up the old logical component and mount the replacement.
 - Runtime subtree cleanup, diagnostics cleanup, and dirty-component coalescing use the in-memory `RuntimeTreeIdentity` ancestry registry instead of parsing ID delimiters.
 - `ComponentBase` caches its assigned runtime node, so hook access does not repeat global registry lookup; detached nodes are refreshed before reuse.
+- `useState` setters and `useReducer` dispatchers retain their owning runtime-node identity and become no-ops after unmount, so stale async completions cannot invalidate a replacement that reuses the same string ID.
 - `ComponentInvalidationQueue` uses hash-based enqueue deduplication and runtime-parent traversal; the documented 10,000-child stress case retains one parent invalidation at about 3.03 ms versus 232.45 ms before optimization.
 - The authoritative identity/key/hook invariants and regression checklist are in `docs/RUNTIME_IDENTITY.md`.
 - The runtime architecture decision, non-goals, performance scenarios, and measured baseline are in `docs/RUNTIME_ARCHITECTURE.md`.
@@ -35,8 +36,10 @@ Move Nuri from WPF-direct UI creation toward a platform-neutral Core virtual UI/
   - neutral `OnTextChanged(Action<string>)`
   - neutral `OnContentChanged(Action<object>)`
   - neutral `OnCheckChanged(Action<bool>)`
+  - neutral hover, mouse down/up, keyboard down/up, focus-change, and loaded/unloaded compatibility events
 - Existing WPF delegate overloads are still kept for compatibility.
-- WPF adapter materializes Core `VirtualEvent` into WPF native delegates.
+- WPF and Avalonia adapters materialize supported Core `VirtualEvent` descriptions into native events.
+- Component mount/unmount behavior belongs to `useEffect(..., [])` and its cleanup. Loaded/unloaded remain element-level compatibility events and are not a target for further component lifecycle expansion.
 - Core-neutral DSL foundation added under `src/Nuri/UI/Dsl` with public namespace `Nuri.UI.Dsl`.
   - New code can use Core `Component`, `IElement`, `Div`, `Text`, `Input`, and neutral extension methods without referencing WPF Controls.
   - `ApplicationRoot.Initialize(Nuri.UI.IElement, Window)` can render Core DSL trees through the WPF renderer.
@@ -55,10 +58,12 @@ Move Nuri from WPF-direct UI creation toward a platform-neutral Core virtual UI/
 - Each native window gets its own `ApplicationRoot` instance and unique tree prefix, so separate windows build separate virtual trees instead of sharing ids.
 - Component cleanup is stronger now: removed and replaced component subtrees are disposed.
 - `src/Nuri.Avalonia` contains the Avalonia renderer and references Avalonia desktop packages.
-- `samples/GridTest` demonstrates `.Key(...)`, neutral `.OnClick(Action)`, and the preferred `Grid(...).Rows(...).Columns(...)` layout style.
+- The Avalonia adapter includes application-root scheduling, virtual-entry rendering, control/property/event mapping, hot reload support, and a smoke-test sample. It is no longer a renderer skeleton.
+- `samples/WPF/GridTest` demonstrates `.Key(...)`, neutral `.OnClick(Action)`, and the preferred `Grid(...).Rows(...).Columns(...)` layout style.
 - Legacy `Div(Rows(...), Columns(...), children...)` overloads remain for compatibility, but new code should prefer fluent layout definitions so row/column definitions do not look like child controls.
 - Core DSL now exposes WPF-familiar factory aliases such as `Button`, `TextBox`, `CheckBox`, `RadioButton`, `ToggleButton`, and `PasswordBox`. These are semantic aliases over Nuri virtual input descriptions, not WPF types in Core.
-- Animation DSL now supports `.Transition(duration, easing)` immediately after a property setter, using the last changed property. Existing `.Transitions("Property", ...)` remains for explicit compatibility.
+- Animation DSL supports `.Transition(duration, easing)` for configured supported properties. Existing `.Transitions("Property", ...)` remains for explicit compatibility.
+- Runtime diagnostics already track component render counts and duplicate keys. Patch-count and unsupported property/event diagnostics remain candidates when a concrete sample needs them.
 
 ## Important Files
 
@@ -82,7 +87,11 @@ Move Nuri from WPF-direct UI creation toward a platform-neutral Core virtual UI/
 - `src/Nuri.WPF/VirtualDom/Bridge/VirtualEntryAdapter.cs`
 - `src/Nuri.WPF/VirtualDom/Rendering/WpfVirtualEntryRenderer.cs`
 - `src/Nuri.WPF/VirtualDom/Rendering/WpfControlRegistry.cs`
-- `src/Nuri.Avalonia/AvaloniaRendererSkeleton.cs`
+- `src/Nuri.Avalonia/AvaloniaApplicationRoot.cs`
+- `src/Nuri.Avalonia/AvaloniaVirtualEntryRenderer.cs`
+- `src/Nuri.Avalonia/AvaloniaControlRegistry.cs`
+- `src/Nuri.Avalonia/AvaloniaPropertyMapper.cs`
+- `src/Nuri.Avalonia/AvaloniaEventMapper.cs`
 - `perf/Nuri.Performance/Program.cs`
 - `perf/Nuri.WPFPerformance/Program.cs`
 
@@ -101,35 +110,33 @@ Expected baseline sanity for keyed reorder:
 
 ## Next Feature Priorities
 
-1. Continue refining Core DSL semantics.
-   - Keep the DSL C#/.NET UI-shaped, not HTML-shaped.
-   - Add only renderer-neutral concepts to Core.
-   - Keep framework-specific overloads out of Core and prefer renderer materialization.
+1. Validate and refine current neutral event semantics instead of adding baseline event kinds.
+   - Click, value changes, hover, mouse down/up, keyboard down/up, focus changes, and loaded/unloaded compatibility events already exist.
+   - Use `useEffect(..., [])` plus cleanup for component mount/unmount.
+   - Let samples justify richer pointer and keyboard payloads such as modifiers, repeat state, handled state, coordinates, or device information.
 
-2. Expand Core-neutral events.
-   - Mouse enter/leave
-   - Pointer/mouse down/up
-   - Keyboard events
-   - Focus/blur
-   - Loaded/unloaded if needed
-
-3. Rework animation as a platform-neutral feature.
+2. Complete platform-neutral animation behavior.
    - Keep WPF `AnimationTimeline` out of Core.
-   - Extend `AnimationValue` for common transitions.
-   - Add renderer-specific animation materialization in WPF.
-   - Later map the same Core animation description to Avalonia.
+   - Expand `AnimationValue` and supported properties only for demonstrated transitions.
+   - Add Avalonia animation materialization and actionable unsupported-animation diagnostics.
 
-4. Improve lifecycle/effects.
-   - Move more effect lifecycle behavior into Core.
-   - Ensure mount/update/unmount cleanup is deterministic.
+3. Strengthen renderer-level lifecycle/effect coverage.
+   - Verify effects flush after native commit in WPF and Avalonia.
+   - Cover subtree removal, key replacement, repeated keyed moves, and root/window disposal.
 
-5. Continue fleshing out the Avalonia renderer while keeping materialization outside Core.
+4. Improve WPF/Avalonia parity.
+   - Audit property, event, animation, hot reload, and semantic-control behavior.
+   - Keep all native materialization outside Core.
 
-6. Add diagnostics only where useful.
-   - Patch count
-   - render count per component
-   - duplicate key warning
-   - unsupported property/event warning
+5. Add diagnostics where they solve observed debugging problems.
+   - Render count and duplicate-key diagnostics already exist.
+   - Patch count and unsupported property/event warnings are the main remaining candidates.
+
+6. Drive the next Core refinements from focused samples.
+   - Explorer Tree for recursive keyed subtrees and lifecycle cleanup.
+   - Animated Dashboard for transition coverage.
+   - Stress Sample for reorder/filter/replacement diagnostics.
+   - Multi-Window for root registration and window lifecycle boundaries.
 
 ## Documentation Policy
 
@@ -144,5 +151,5 @@ Expected baseline sanity for keyed reorder:
 - Do not put WPF types in the Core project at `src/Nuri`.
 - Do not remove existing WPF delegate overloads unless compatibility is intentionally broken.
 - Do not replace `Name` fallback immediately; persisted/sample DSL may rely on it.
-- Do not add Avalonia NuGet until renderer/package direction is decided.
+- Keep the existing Avalonia package direction consistent; do not change renderer packages or versions without confirming the package direction.
 - Do not trust perf timings from one run; use patch count plus repeated measurements.

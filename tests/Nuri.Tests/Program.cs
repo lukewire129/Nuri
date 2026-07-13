@@ -18,6 +18,8 @@ internal static class Program
         UseReducerDispatchesFromCurrentState();
         UseStateReusesSetterForStableLogicalComponent();
         UseStateSetterTracksLatestComponentOwner();
+        DisposedStateSettersCannotInvalidateReplacementComponents();
+        DisposedReducerDispatchCannotRecreateStateOrInvalidate();
         UseStateSettersRemainIsolatedAndTrimmed();
         UseRefPreservesReferenceAcrossRenders();
         UseLatestTracksTheCurrentValue();
@@ -366,6 +368,53 @@ internal static class Program
         second.ResetStateIndexForRender();
         var (state, _) = second.UseNumberState(0);
         AssertEqual(1, state, "A reused setter should update the current logical component state.");
+        Component.DisposeHookState(componentId);
+    }
+
+    private static void DisposedStateSettersCannotInvalidateReplacementComponents()
+    {
+        const string componentId = "hook-state-disposed-setter";
+        var removed = new HookProbe { Id = componentId };
+        var (_, staleSetter) = removed.UseNumberState(0);
+        Component.DisposeHookState(componentId);
+
+        var replacement = new HookProbe { Id = componentId };
+        var (_, currentSetter) = replacement.UseNumberState(10);
+
+        staleSetter(current => current + 1);
+        AssertEqual(0, removed.StateChangedCount, "A disposed state setter must not invalidate its removed component.");
+        AssertEqual(0, replacement.StateChangedCount, "A disposed state setter must not invalidate a replacement that reused the same id.");
+
+        replacement.ResetStateIndexForRender();
+        var (unchangedState, _) = replacement.UseNumberState(10);
+        AssertEqual(10, unchangedState, "A disposed state setter must not change replacement state.");
+
+        currentSetter(current => current + 1);
+        AssertEqual(1, replacement.StateChangedCount, "The current replacement setter should remain active.");
+        Component.DisposeHookState(componentId);
+    }
+
+    private static void DisposedReducerDispatchCannotRecreateStateOrInvalidate()
+    {
+        const string componentId = "hook-reducer-disposed-dispatch";
+        var removed = new HookProbe { Id = componentId };
+        var (_, staleDispatch) = removed.UseCounter();
+        Component.DisposeHookState(componentId);
+
+        var replacement = new HookProbe { Id = componentId };
+        var (initialState, currentDispatch) = replacement.UseCounter();
+        AssertEqual(0, initialState, "A replacement reducer should mount with fresh state.");
+
+        staleDispatch(5);
+        AssertEqual(0, removed.StateChangedCount, "A disposed reducer dispatch must not invalidate its removed component.");
+        AssertEqual(0, replacement.StateChangedCount, "A disposed reducer dispatch must not invalidate a replacement that reused the same id.");
+
+        replacement.ResetStateIndexForRender();
+        var (unchangedState, _) = replacement.UseCounter();
+        AssertEqual(0, unchangedState, "A disposed reducer dispatch must not recreate or change replacement state.");
+
+        currentDispatch(2);
+        AssertEqual(1, replacement.StateChangedCount, "The current replacement reducer dispatch should remain active.");
         Component.DisposeHookState(componentId);
     }
 
