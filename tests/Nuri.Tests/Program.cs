@@ -199,7 +199,8 @@ internal static class Program
         AssertEqual(oldBId, newTree.Children[0].Id, "Retained B should inherit old B id.");
         AssertEqual(oldCId, newTree.Children[1].Id, "Retained C should inherit old C id.");
         AssertEqual(oldDId, newTree.Children[2].Id, "Retained D should inherit old D id.");
-        AssertEqual(oldAId, addedChild.Id, "New E may safely reuse removed A's id after A is removed.");
+        AssertNotEqual(oldAId, addedChild.Id, "A new key must not reuse a removed key's virtual identity.");
+        AssertEqual("root#key:e", addedChild.Id, "A new key should receive its own key-derived virtual identity.");
     }
 
     private static VirtualEntry Parent(params VirtualEntry[] children)

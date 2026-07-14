@@ -35,12 +35,97 @@ internal static class Program
     private static void Main()
     {
         RunSuite(() => new WpfDriver());
+        WpfRepeatedEffectLifecycleRemainsStable();
+        WpfDisposedRootIgnoresQueuedInvalidations();
         WpfDiagnosticsTrackAppliedPatchBatches();
         WpfRootDisposalRemovesVirtualizedDiagnostics();
         WpfTransitionsReplaceAndClearNativeAnimations(new WpfDriver());
         WpfVirtualizedItemsStayLazyAndRecycleContainers();
         RunSuite(() => new AvaloniaDriver());
         Console.WriteLine("Nuri.RendererTests passed.");
+    }
+
+    private static void WpfRepeatedEffectLifecycleRemainsStable()
+    {
+        const int iterations = 50;
+
+        var toggleLog = new List<string>();
+        var toggleComponent = new ToggleChildComponent(toggleLog);
+        var toggleRoot = new WpfDriver().Initialize(toggleComponent);
+        for (var index = 0; index < iterations; index++)
+        {
+            toggleComponent.ShowChild = false;
+            toggleRoot.Rebuild();
+            toggleComponent.ShowChild = true;
+            toggleRoot.Rebuild();
+        }
+
+        AssertEqual(iterations + 1, toggleLog.Count(entry => entry == "mount:child"), "WPF: repeated mounts should run the effect exactly once per mount.");
+        AssertEqual(iterations, toggleLog.Count(entry => entry == "cleanup:child"), "WPF: repeated unmounts should clean up exactly once per removal.");
+        toggleRoot.Dispose();
+        AssertEqual(iterations + 1, toggleLog.Count(entry => entry == "cleanup:child"), "WPF: root disposal should clean up the final mounted child exactly once.");
+
+        var replacementLog = new List<string>();
+        var replacementComponent = new KeyReplacementComponent(replacementLog);
+        var replacementRoot = new WpfDriver().Initialize(replacementComponent);
+        for (var index = 0; index < iterations; index++)
+        {
+            replacementComponent.CurrentKey = index % 2 == 0 ? "b" : "a";
+            replacementRoot.Rebuild();
+        }
+
+        AssertEqual(iterations + 1, replacementLog.Count(entry => entry.StartsWith("mount:", StringComparison.Ordinal)), "WPF: repeated key replacement should mount one logical child per key.");
+        AssertEqual(iterations, replacementLog.Count(entry => entry.StartsWith("cleanup:", StringComparison.Ordinal)), "WPF: repeated key replacement should clean the previous logical child exactly once.");
+        replacementRoot.Dispose();
+        AssertEqual(iterations + 1, replacementLog.Count(entry => entry.StartsWith("cleanup:", StringComparison.Ordinal)), "WPF: disposal should balance repeated replacement mounts and cleanups.");
+
+        var moveLog = new List<string>();
+        var moveComponent = new KeyedMoveComponent(moveLog);
+        var moveDriver = new WpfDriver();
+        using var moveRoot = moveDriver.Initialize(moveComponent);
+        var originalControls = moveDriver.RootChildren.ToDictionary(moveDriver.GetText, child => child);
+        var initialMoveLog = moveLog.ToArray();
+        var orders = new[]
+        {
+            new[] { "b", "c", "a" },
+            new[] { "c", "a", "b" },
+            new[] { "a", "b", "c" }
+        };
+
+        for (var index = 0; index < iterations; index++)
+        {
+            moveComponent.Order = orders[index % orders.Length];
+            moveRoot.Rebuild();
+            AssertChildOrderAndIdentity(moveDriver, moveComponent.Order, originalControls);
+        }
+
+        AssertSequence(initialMoveLog, moveLog, "WPF: repeated keyed moves should preserve effect lifetimes.");
+    }
+
+    private static void WpfDisposedRootIgnoresQueuedInvalidations()
+    {
+        var log = new List<string>();
+        var component = new DeferredInvalidationContainer(log);
+        var host = new WpfTestHost();
+        var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
+        var root = WPF.ApplicationRoot.Initialize(component, host, () => dispatcher);
+
+        AssertEqual(1, component.Child.RenderCount, "WPF: the deferred child should render once during initialization.");
+        root.ScheduleComponentRebuild(component.Child);
+        root.Dispose();
+        DrainDispatcher(dispatcher);
+
+        AssertEqual(1, component.Child.RenderCount, "WPF: a queued invalidation must not render after root disposal.");
+        AssertSequence(new[] { "mount:deferred", "cleanup:deferred" }, log, "WPF: disposal should not remount an effect from a queued invalidation.");
+    }
+
+    private static void DrainDispatcher(System.Windows.Threading.Dispatcher dispatcher)
+    {
+        var frame = new System.Windows.Threading.DispatcherFrame();
+        dispatcher.BeginInvoke(
+            System.Windows.Threading.DispatcherPriority.ApplicationIdle,
+            new Action(() => frame.Continue = false));
+        System.Windows.Threading.Dispatcher.PushFrame(frame);
     }
 
     private static void WpfVirtualizedItemsStayLazyAndRecycleContainers()
@@ -845,6 +930,44 @@ internal static class Program
             return Grid(
                 new EffectChild("first", _log).Key("first"),
                 new EffectChild("second", _log).Key("second"));
+        }
+    }
+
+    private sealed class DeferredInvalidationContainer : Component
+    {
+        public DeferredInvalidationContainer(List<string> log)
+        {
+            Child = new RenderCountingEffectChild("deferred", log).Key("deferred");
+        }
+
+        public RenderCountingEffectChild Child { get; }
+
+        public override IElement Render() => Grid(Child);
+    }
+
+    private sealed class RenderCountingEffectChild : Component
+    {
+        private readonly string _name;
+        private readonly List<string> _log;
+
+        public RenderCountingEffectChild(string name, List<string> log)
+        {
+            _name = name;
+            _log = log;
+        }
+
+        public int RenderCount { get; private set; }
+
+        public override IElement Render()
+        {
+            RenderCount++;
+            useEffect(() =>
+            {
+                _log.Add($"mount:{_name}");
+                return () => _log.Add($"cleanup:{_name}");
+            }, []);
+
+            return Text(_name);
         }
     }
 }

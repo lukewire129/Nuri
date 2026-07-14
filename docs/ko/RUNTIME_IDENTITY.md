@@ -17,6 +17,7 @@ Renderer patch identity가 hook 소유권을 결정하거나 lifecycle 코드가
 - 새로 생성된 `Component` 객체가 기존 논리적 component를 나타낼 수 있습니다.
 - 부모, component type 및 명시적 key가 안정적이면 논리적 identity도 유지됩니다.
 - key가 바뀌면 이전 component를 cleanup하고 새 component를 mount합니다.
+- 새로 추가된 key는 자체 key 기반 virtual-entry identity를 받습니다. 제거된 key의 patch identity는 제거된 component의 hook subtree 이름으로도 사용될 수 있으므로 재사용하면 안 됩니다.
 - keyed move는 hook state를 유지하며 가능하면 remove/add 대신 `MoveChildPatch`를 생성해야 합니다.
 - `Name`은 호환성을 위한 virtual-entry key fallback으로 유지합니다. 새 코드는 `.Key("...")`를 사용합니다.
 - key는 sibling 범위에서만 유일하면 됩니다.

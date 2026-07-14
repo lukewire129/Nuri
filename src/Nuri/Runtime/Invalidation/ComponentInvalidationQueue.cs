@@ -48,6 +48,12 @@ namespace Nuri.Runtime.Invalidation
             return result;
         }
 
+        public void Clear()
+        {
+            _dirtyComponents.Clear();
+            _dirtyKeys.Clear();
+        }
+
         private readonly struct InvalidationKey : IEquatable<InvalidationKey>
         {
             public InvalidationKey(Component component, string componentId)

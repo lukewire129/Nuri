@@ -24,6 +24,7 @@ Maintain Nuri as a platform-neutral Core virtual UI/runtime/diff model, with WPF
 - `Name` still works as a key fallback for compatibility.
 - Duplicate virtual keys are diagnosed and fall back to index diff. Duplicate component keys also emit `RuntimeLogKind.DuplicateKey` and use position-based hook identity so state/effects cannot collide.
 - Keyed component lifecycle uses explicit component keys. Key changes clean up the old logical component and mount the replacement.
+- Newly added keys receive key-derived virtual-entry IDs instead of reusing removed-key patch IDs. Reuse could dispose a newly remounted effect when a key sequence returned from `a` to `b` to `a`.
 - Runtime subtree cleanup, diagnostics cleanup, and dirty-component coalescing use the in-memory `RuntimeTreeIdentity` ancestry registry instead of parsing ID delimiters.
 - `ComponentBase` caches its assigned runtime node, so hook access does not repeat global registry lookup; detached nodes are refreshed before reuse.
 - `useState` setters and `useReducer` dispatchers retain their owning runtime-node identity and become no-ops after unmount, so stale async completions cannot invalidate a replacement that reuses the same string ID.
@@ -60,7 +61,8 @@ Maintain Nuri as a platform-neutral Core virtual UI/runtime/diff model, with WPF
 - Component cleanup is stronger now: removed and replaced component subtrees are disposed.
 - `src/Nuri.Avalonia` contains the Avalonia renderer and references Avalonia desktop packages.
 - The Avalonia adapter includes application-root scheduling, virtual-entry rendering, control/property/event mapping, hot reload support, and a smoke-test sample. It is no longer a renderer skeleton.
-- `tests/Nuri.RendererTests` validates WPF/Avalonia post-commit effects, subtree and key-replacement cleanup, repeated keyed native moves, and idempotent root disposal without external test packages.
+- `tests/Nuri.RendererTests` validates post-commit effects, subtree and key-replacement cleanup, repeated keyed native moves, and idempotent root disposal without external test packages. WPF coverage also runs 50-cycle mount/unmount, key replacement, and move stress cases.
+- WPF root disposal clears pending component invalidations and ignores Dispatcher callbacks that were posted before disposal, preventing effects from remounting on a closed root.
 - `samples/WPF/Nuri.ExplorerTreeSample` exercises recursive keyed components, expand/collapse cleanup, selection, rename, and add/delete flows through the WPF renderer.
 - `samples/WPF/GridTest` demonstrates `.Key(...)`, neutral `.OnClick(Action)`, and the preferred `Grid(...).Rows(...).Columns(...)` layout style.
 - Legacy `Div(Rows(...), Columns(...), children...)` overloads remain for compatibility, but new code should prefer fluent layout definitions so row/column definitions do not look like child controls.

@@ -19,6 +19,7 @@ Do not merge these responsibilities. Renderer patch identity must not decide hoo
 - A newly allocated `Component` object may represent an existing logical component.
 - Logical identity is stable when the parent, component type, and explicit key are stable.
 - A key change represents replacement: clean up the previous component, then mount the new component.
+- A newly added key receives its own key-derived virtual-entry identity. It must not reuse the removed key's patch identity because that identity may also name the removed component's hook subtree.
 - Keyed moves preserve hook state and should produce `MoveChildPatch` instead of remove/add patches where possible.
 - `Name` remains a virtual-entry key fallback for compatibility. New component and list code should use `.Key("...")`.
 - Keys are scoped to siblings. The same key may be reused under different parents.

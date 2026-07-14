@@ -148,6 +148,9 @@ namespace Nuri.WPF
 
         public void ScheduleComponentRebuild(Component component)
         {
+            if (_disposed)
+                return;
+
             if (!IsInThisTree(component))
                 return;
 
@@ -163,6 +166,13 @@ namespace Nuri.WPF
 
         private void ProcessScheduledRebuild()
         {
+            if (_disposed)
+            {
+                _invalidations.Clear();
+                _rebuildScheduled = false;
+                return;
+            }
+
             var dirtyComponents = _invalidations.DrainCoveredByParents();
             _rebuildScheduled = false;
 
@@ -254,12 +264,15 @@ namespace Nuri.WPF
             if (_disposed)
                 return;
 
+            _disposed = true;
+            _invalidations.Clear();
+            _rebuildScheduled = false;
+
             if (_currentRootVisual != null)
                 RemoveVirtualizationDiagnostics(_currentRootVisual);
             ComponentLifecycle.DisposeSubtree(_treePrefix + "_0");
             NuriDiagnostics.UnregisterRoot(_treePrefix);
             WpfDevToolsRuntime.UnregisterRoot(_treePrefix);
-            _disposed = true;
         }
 
         private static void RemoveVirtualizationDiagnostics(FrameworkElement element)

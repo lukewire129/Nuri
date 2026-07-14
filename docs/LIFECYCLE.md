@@ -31,6 +31,7 @@ Runtime identity, key, and required regression-test contracts are defined in [RU
 - Removing a child subtree disposes hook state for that subtree.
 - Replacing an entry disposes hook state for the replaced entry subtree.
 - Effect cleanups are invoked when hook state is disposed.
+- Disposing a WPF application root clears queued component invalidations. Dispatcher callbacks that were already posted must not render or remount effects after disposal.
 - `useState` setters and `useReducer` dispatchers retained by asynchronous work become no-ops after their owning runtime node is disposed. They must not invalidate a replacement component that later reuses the same string ID.
 - `DisposeHookState` removes effect, memo, pending effect, and state entries for the component subtree.
 - Subtree membership comes from the in-memory runtime ancestry registry, not from parsing component ID strings.

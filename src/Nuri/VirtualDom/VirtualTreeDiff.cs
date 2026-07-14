@@ -230,9 +230,6 @@ namespace Nuri.VirtualDom
                     operations.Add(new RemoveChildPatch(oldEntry, oldChild, oldIndex));
             }
 
-            var reusableRemovedIds = new Queue<string>(oldEntry.Children
-                .Where(child => !newKeys.Contains(child.Key!))
-                .Select(child => child.Id));
             var retainedIds = new HashSet<string>(oldEntry.Children
                 .Where(child => newKeys.Contains(child.Key!))
                 .Select(child => child.Id), StringComparer.Ordinal);
@@ -244,9 +241,7 @@ namespace Nuri.VirtualDom
 
                 if (!oldByKey.TryGetValue(newChild.Key!, out var oldMatch))
                 {
-                    var childId = reusableRemovedIds.Count > 0
-                        ? reusableRemovedIds.Dequeue()
-                        : CreateKeyedChildId(oldEntry.Id, newChild.Key!, retainedIds);
+                    var childId = CreateKeyedChildId(oldEntry.Id, newChild.Key!, retainedIds);
                     newChild.RewriteIdentity(childId, oldEntry.Id);
                     retainedIds.Add(childId);
                     operations.Add(new AddChildPatch(newEntry, newChild, newIndex));
