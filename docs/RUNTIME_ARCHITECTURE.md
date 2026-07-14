@@ -49,11 +49,11 @@ See [RUNTIME_IDENTITY.md](RUNTIME_IDENTITY.md) for key, lifecycle, duplicate-key
 
 ## Flat Virtualized Items
 
-Large renderer-owned lists use the platform-neutral `VirtualizedItems<T>(items, keySelector, itemExtent, itemTemplate, comparer)` contract. Core stores an immutable item snapshot description and emits `UpdateVirtualizedItemsPatch` with keyed add, remove, move, and update changes without invoking `itemTemplate`.
+Large renderer-owned lists use the platform-neutral `VirtualizedItems<T>(items, keySelector, itemExtent, itemTemplate, comparer)` contract. Core copies the supplied items into an immutable render snapshot and emits `UpdateVirtualizedItemsPatch` with keyed add, remove, move, and update changes without invoking `itemTemplate`.
 
 `itemTemplate` is lazy and stateless: it may return normal `IElement` trees, but it must not contain `Component` instances or hooks. Keys must be stable and unique. Duplicate keys produce `DuplicateKey` diagnostics and index-qualified fallback identities.
 
-The WPF adapter materializes this contract with a recycling `VirtualizingStackPanel`, fixed item extent, and viewport-driven row preparation. Same-key source updates preserve the native item container and refresh only realized rows. Regular `Items(...)`, `ItemsTypes.Tree`, and eager child reconciliation remain unchanged. Avalonia does not materialize `ItemsTypes.Virtualized` yet.
+The WPF adapter materializes this contract with a recycling `VirtualizingStackPanel`, fixed item extent, and viewport-driven row preparation. Same-key source updates and visible keyed moves preserve the native item container, while filtering, empty/full replacement, duplicate-key fallback rows, repeated scrolling, and unload/reload restoration retain bounded realized work. Regular `Items(...)`, `ItemsTypes.Tree`, and eager child reconciliation remain unchanged. Avalonia does not materialize `ItemsTypes.Virtualized` yet.
 
 The warmed `--explorer-comparison` WPF harness measured the same two-button row UI with 10,101 visible rows in a 700px viewport on 2026-07-14. Eager materialization took 4414.35 ms, allocated 543.17 MB, and created 10,101 native rows. Fixed-extent virtualization took 269.10 ms, allocated 3.27 MB, and created 19 native rows: 16.4x less materialization time and 166.2x less allocation in this local workload.
 

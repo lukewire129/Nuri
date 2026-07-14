@@ -98,10 +98,107 @@ internal static class Program
         AssertSame(firstContainer!, native.ItemContainerGenerator.ContainerFromIndex(0)!, "WPF: a same-key update should preserve its native item container.");
         AssertEqual(true, templateCalls <= 200, "WPF: a template refresh should remain proportional to realized rows, not 10k source rows.");
 
-        native.ScrollIntoView(native.Items[5_000]);
+        var reorderedItems = updatedItems.ToArray();
+        (reorderedItems[0], reorderedItems[1]) = (reorderedItems[1], reorderedItems[0]);
+        var reorderedEntry = VirtualizedEntry(
+            reorderedItems,
+            item => item.Selected ? $"selected:{item.Index}" : item.Index.ToString(),
+            () => templateCalls++);
+        ApplyVirtualizedDiff(native, ref newEntry, reorderedEntry);
         native.UpdateLayout();
-        AssertEqual(true, CountRealized(native) <= 100, "WPF: scrolling should recycle a bounded container set.");
+
+        AssertSame(firstContainer!, native.ItemContainerGenerator.ContainerFromIndex(1)!, "WPF: a visible keyed move should retain its native item container.");
+        AssertEqual("selected:0", GetRealizedText(native, 1), "WPF: a moved row should retain its latest rendered value.");
+
+        var filteredItems = reorderedItems.Where(item => item.Index % 2 == 0).ToArray();
+        var filteredEntry = VirtualizedEntry(
+            filteredItems,
+            item => item.Selected ? $"selected:{item.Index}" : item.Index.ToString(),
+            () => templateCalls++);
+        ApplyVirtualizedDiff(native, ref newEntry, filteredEntry);
+        native.UpdateLayout();
+
+        AssertEqual(5_000, native.Items.Count, "WPF: filtering should remove every missing virtual item.");
+        AssertEqual("selected:0", GetRealizedText(native, 0), "WPF: filtering should keep retained keyed row content current.");
+
+        var emptyEntry = VirtualizedEntry(
+            Array.Empty<VirtualizedRow>(),
+            item => item.Index.ToString(),
+            () => templateCalls++);
+        ApplyVirtualizedDiff(native, ref newEntry, emptyEntry);
+        native.UpdateLayout();
+        AssertEqual(0, native.Items.Count, "WPF: clearing a virtualized source should remove every item.");
+
+        var duplicateEntry = VirtualizedEntry(
+            new[]
+            {
+                new VirtualizedRow(7, false),
+                new VirtualizedRow(7, true)
+            },
+            item => item.Selected ? "selected:7" : "plain:7",
+            () => templateCalls++);
+        ApplyVirtualizedDiff(native, ref newEntry, duplicateEntry);
+        native.UpdateLayout();
+        AssertEqual(2, native.Items.Count, "WPF: duplicate-key fallback identities should keep every row independently addressable.");
+        AssertEqual("plain:7", GetRealizedText(native, 0), "WPF: the first duplicate-key row should render independently.");
+        AssertEqual("selected:7", GetRealizedText(native, 1), "WPF: the second duplicate-key row should render independently.");
+
+        var replacementItems = Enumerable.Range(20_000, 10_000).Select(index => new VirtualizedRow(index, false)).ToArray();
+        var replacementEntry = VirtualizedEntry(
+            replacementItems,
+            item => item.Index.ToString(),
+            () => templateCalls++);
+        ApplyVirtualizedDiff(native, ref newEntry, replacementEntry);
+        native.UpdateLayout();
+        AssertEqual(10_000, native.Items.Count, "WPF: a cleared source should accept a full replacement.");
+        AssertEqual("20000", GetRealizedText(native, 0), "WPF: replacement rows should render from the new source.");
+
+        foreach (var index in new[] { 100, 200, 300, 400, 500 })
+        {
+            native.ScrollIntoView(native.Items[index]);
+            native.UpdateLayout();
+            AssertEqual(true, CountRealized(native) <= 100, $"WPF: repeated scrolling should keep a bounded realized set at index {index}.");
+        }
+
+        window.Content = null;
+        window.UpdateLayout();
+        window.Content = native;
+        window.UpdateLayout();
+        AssertEqual(true, CountRealized(native) > 0, "WPF: reloading a virtualized host should restore realized rows.");
+        AssertEqual(true, native.ItemContainerGenerator.ContainerFromIndex(500) is WpfListBoxItem reloaded && reloaded.Content != null, "WPF: reloaded containers should restore their row content.");
         window.Close();
+    }
+
+    private static VirtualEntry VirtualizedEntry(
+        IReadOnlyList<VirtualizedRow> items,
+        Func<VirtualizedRow, string> text,
+        Action onRender)
+    {
+        return Component.VirtualizedItems(
+                items,
+                item => item.Index.ToString(),
+                32,
+                item =>
+                {
+                    onRender();
+                    return Component.Text(text(item));
+                })
+            .ToVirtualEntry()
+            .WithIdentity("virtualized-test", null);
+    }
+
+    private static void ApplyVirtualizedDiff(WpfListBox native, ref VirtualEntry current, VirtualEntry next)
+    {
+        WpfVirtualEntryRenderer.ApplyDiff(native, VirtualTreeDiff.Diff(current, next));
+        current = next;
+    }
+
+    private static string? GetRealizedText(WpfListBox listBox, int index)
+    {
+        return listBox.ItemContainerGenerator.ContainerFromIndex(index) is WpfListBoxItem container
+            && container.Content is WpfTextBlock text
+                ? text.Text
+                : null;
     }
 
     private static int CountRealized(WpfListBox listBox)

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using Nuri.Runtime.Diagnostics;
 using Nuri.UI.Dsl;
 
@@ -38,7 +39,10 @@ namespace Nuri.UI.Virtualization
             Func<T, IElement> itemTemplate,
             IEqualityComparer<T>? comparer)
         {
-            _items = items ?? throw new ArgumentNullException(nameof(items));
+            if (items == null)
+                throw new ArgumentNullException(nameof(items));
+
+            _items = items.ToArray();
             _keySelector = keySelector ?? throw new ArgumentNullException(nameof(keySelector));
             _itemTemplate = itemTemplate ?? throw new ArgumentNullException(nameof(itemTemplate));
             _comparer = comparer ?? EqualityComparer<T>.Default;

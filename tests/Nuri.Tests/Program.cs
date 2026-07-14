@@ -49,6 +49,7 @@ internal static class Program
         GridLengthDslRejectsInvalidStringDefinitions();
         TransitionAppliesToAllConfiguredProperties();
         VirtualizedItemsStayLazyAndProduceKeyedChanges();
+        VirtualizedItemsCaptureAnImmutableSnapshot();
         VirtualizedItemsUseSafeDuplicateIdentities();
         VirtualizedItemsRejectComponentTemplatesLazily();
         Console.WriteLine("Nuri.Tests passed.");
@@ -78,6 +79,26 @@ internal static class Program
         AssertEqual(1, patch.Changes.Count(change => change.Type == VirtualizedItemChangeType.Add), "A new key should produce one virtualized add change.");
         AssertEqual(2, patch.Changes.Count(change => change.Type == VirtualizedItemChangeType.Move), "Retained keys should report their new positions.");
         AssertEqual(1, patch.Changes.Count(change => change.Type == VirtualizedItemChangeType.Update), "A changed snapshot with the same key should produce one update.");
+    }
+
+    private static void VirtualizedItemsCaptureAnImmutableSnapshot()
+    {
+        var items = new List<VirtualizedProbe>
+        {
+            new VirtualizedProbe("a", 1)
+        };
+        var source = GetVirtualizedSource(Component.VirtualizedItems(
+            items,
+            item => item.Id,
+            32,
+            item => Component.Text($"{item.Id}:{item.Version}")));
+
+        items[0] = new VirtualizedProbe("changed", 2);
+        items.Add(new VirtualizedProbe("b", 1));
+
+        AssertEqual(1, source.Count, "A virtualized source must retain the item count captured at render time.");
+        AssertEqual("a", source.GetKey(0), "A virtualized source must retain keys from the captured render snapshot.");
+        AssertEqual("a:1", source.RenderItem(0).Properties["Text"], "A virtualized source must render values from the captured snapshot.");
     }
 
     private static void VirtualizedItemsUseSafeDuplicateIdentities()

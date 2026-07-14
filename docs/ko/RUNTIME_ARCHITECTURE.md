@@ -49,11 +49,11 @@ key, lifecycle, 중복 key 및 cleanup 불변식은 [RUNTIME_IDENTITY.md](RUNTIM
 
 ## 평탄화 Virtualized Items
 
-큰 renderer-owned 목록은 플랫폼 중립적인 `VirtualizedItems<T>(items, keySelector, itemExtent, itemTemplate, comparer)` 계약을 사용합니다. Core는 불변 item snapshot 설명을 저장하고 `itemTemplate`을 호출하지 않은 채 keyed add, remove, move, update 변경을 담은 `UpdateVirtualizedItemsPatch`를 생성합니다.
+큰 renderer-owned 목록은 플랫폼 중립적인 `VirtualizedItems<T>(items, keySelector, itemExtent, itemTemplate, comparer)` 계약을 사용합니다. Core는 전달된 items를 불변 render snapshot으로 복사하고 `itemTemplate`을 호출하지 않은 채 keyed add, remove, move, update 변경을 담은 `UpdateVirtualizedItemsPatch`를 생성합니다.
 
 `itemTemplate`은 lazy이고 stateless입니다. 일반 `IElement` tree는 반환할 수 있지만 `Component` instance 또는 hook을 포함하면 안 됩니다. Key는 안정적이고 고유해야 합니다. 중복 key는 `DuplicateKey` diagnostics를 생성하고 index-qualified fallback identity를 사용합니다.
 
-WPF adapter는 recycling `VirtualizingStackPanel`, 고정 item extent 및 viewport 기반 row 준비로 이 계약을 materialize합니다. 동일 key source update는 native item container를 보존하고 realized row만 갱신합니다. 기존 `Items(...)`, `ItemsTypes.Tree` 및 eager child reconciliation은 변경되지 않습니다. Avalonia는 아직 `ItemsTypes.Virtualized`를 materialize하지 않습니다.
+WPF adapter는 recycling `VirtualizingStackPanel`, 고정 item extent 및 viewport 기반 row 준비로 이 계약을 materialize합니다. 동일 key source update와 보이는 keyed move는 native item container를 보존하며, filtering, empty/full replacement, duplicate-key fallback row, 반복 scrolling 및 unload/reload 복구에서도 bounded realized work를 유지합니다. 기존 `Items(...)`, `ItemsTypes.Tree` 및 eager child reconciliation은 변경되지 않습니다. Avalonia는 아직 `ItemsTypes.Virtualized`를 materialize하지 않습니다.
 
 Warmup 이후 `--explorer-comparison` WPF harness는 2026-07-14에 700px viewport에서 동일한 두 버튼 row UI와 10,101개 visible row를 측정했습니다. Eager materialization은 4414.35 ms, 543.17 MB 할당 및 10,101개 native row 생성이었고, fixed-extent virtualization은 269.10 ms, 3.27 MB 할당 및 19개 native row 생성이었습니다. 이 로컬 workload에서 materialization 시간은 16.4x, 할당은 166.2x 감소했습니다.
 

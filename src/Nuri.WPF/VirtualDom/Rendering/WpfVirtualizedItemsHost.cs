@@ -35,6 +35,7 @@ namespace Nuri.WPF
 
             var panelFactory = new FrameworkElementFactory(typeof(VirtualizingStackPanel));
             ItemsPanel = new ItemsPanelTemplate(panelFactory);
+            Loaded += (_, __) => RestoreRealizedRows();
             Unloaded += (_, __) => ClearRealizedRows();
         }
 
@@ -207,6 +208,14 @@ namespace Nuri.WPF
         {
             foreach (var container in _rows.Keys.ToArray())
                 ClearRow(container);
+        }
+
+        private void RestoreRealizedRows()
+        {
+            if (_source == null || _rows.Count != 0)
+                return;
+
+            RefreshRealized(new HashSet<string>(_source.GetIdentities(), StringComparer.Ordinal));
         }
 
         private sealed class ItemHandle
