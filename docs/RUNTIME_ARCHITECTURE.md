@@ -67,6 +67,8 @@ Renderer-owned virtualized hosts may also publish neutral `VirtualizedItemsSnaps
 
 When diagnostics are enabled, the WPF property path records `RuntimeLogKind.UnsupportedProperty` only after mapper, writable CLR property, and attached-property fallbacks all fail. Host-only window properties remain intentionally excluded. Messages identify the property and native control type and are deduplicated by native control CLR type plus property name until `NuriDiagnostics.ClearLogs()` is called.
 
+The WPF event add path similarly records `RuntimeLogKind.UnsupportedEvent` when a neutral event cannot be converted or the mapped native event is absent on the target control. Native delegate compatibility remains unchanged, event removal does not emit warnings, and messages are deduplicated by native control CLR type plus source event name until `NuriDiagnostics.ClearLogs()` is called.
+
 ## Performance Baseline
 
 Measured in Release on 2026-07-11. These values are a local baseline, not universal budgets. Compare future results on the same machine and workload; correctness counters are hard invariants.

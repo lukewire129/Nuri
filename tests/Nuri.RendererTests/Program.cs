@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Avalonia.Animation;
+using Nuri.Constants;
 using Nuri.Platform.Abstractions;
 using Nuri.Runtime.Diagnostics;
 using Nuri.UI.Controls;
@@ -38,12 +39,52 @@ internal static class Program
         WpfRepeatedEffectLifecycleRemainsStable();
         WpfDisposedRootIgnoresQueuedInvalidations();
         WpfUnsupportedPropertyDiagnosticsAreDeduplicated();
+        WpfUnsupportedEventDiagnosticsAreDeduplicated();
         WpfDiagnosticsTrackAppliedPatchBatches();
         WpfRootDisposalRemovesVirtualizedDiagnostics();
         WpfTransitionsReplaceAndClearNativeAnimations(new WpfDriver());
         WpfVirtualizedItemsStayLazyAndRecycleContainers();
         RunSuite(() => new AvaloniaDriver());
         Console.WriteLine("Nuri.RendererTests passed.");
+    }
+
+    private static void WpfUnsupportedEventDiagnosticsAreDeduplicated()
+    {
+        NuriDiagnostics.Enable();
+        NuriDiagnostics.ClearLogs();
+        var component = new UnsupportedEventDiagnosticsComponent();
+        using (var root = new WpfDriver().Initialize(component))
+        {
+            component.Version++;
+            root.Rebuild();
+            component.Version++;
+            root.Rebuild();
+
+            var unsupportedLogs = NuriDiagnostics.GetSnapshot().RecentLogs
+                .Where(entry => entry.Kind == RuntimeLogKind.UnsupportedEvent)
+                .ToArray();
+            AssertEqual(2, unsupportedLogs.Length, "WPF: repeated unsupported event updates should emit one diagnostic per control type and event.");
+            AssertEqual(true, unsupportedLogs.Any(entry => entry.Message.Contains(EventKeys.TextChanged, StringComparison.Ordinal) && entry.Message.Contains("TextBlock", StringComparison.Ordinal)), "WPF: a missing native event diagnostic should name the event and control type.");
+            AssertEqual(true, unsupportedLogs.Any(entry => entry.Message.Contains("UnknownNeutral", StringComparison.Ordinal) && entry.Message.Contains("could not be mapped", StringComparison.Ordinal)), "WPF: an unmappable neutral event should explain the mapping failure.");
+
+            NuriDiagnostics.ClearLogs();
+            component.Version++;
+            root.Rebuild();
+            AssertEqual(2, NuriDiagnostics.GetSnapshot().RecentLogs.Count(entry => entry.Kind == RuntimeLogKind.UnsupportedEvent), "WPF: clearing diagnostics should allow unsupported events to be reported again.");
+
+            NuriDiagnostics.ClearLogs();
+            component.IncludeUnsupportedEvents = false;
+            root.Rebuild();
+            AssertEqual(0, NuriDiagnostics.GetSnapshot().RecentLogs.Count(entry => entry.Kind == RuntimeLogKind.UnsupportedEvent), "WPF: removing unsupported events should not emit new diagnostics.");
+        }
+
+        NuriDiagnostics.ClearLogs();
+        NuriDiagnostics.Disable();
+        WpfVirtualEntryRenderer.Build(
+            new UnsupportedEventDiagnosticsComponent()
+                .ToVirtualEntry()
+                .WithIdentity("unsupported-event-disabled", null));
+        AssertEqual(0, NuriDiagnostics.GetSnapshot().RecentLogs.Count(entry => entry.Kind == RuntimeLogKind.UnsupportedEvent), "WPF: disabled diagnostics should not record unsupported events.");
     }
 
     private static void WpfUnsupportedPropertyDiagnosticsAreDeduplicated()
@@ -830,6 +871,39 @@ internal static class Program
                 .Row(1);
             if (IncludeUnsupportedProperty)
                 text.SetProperty("UnsupportedProbe", Value);
+
+            return text;
+        }
+    }
+
+    private sealed class UnsupportedEventDiagnosticsComponent : Component
+    {
+        public int Version { get; set; }
+
+        public bool IncludeUnsupportedEvents { get; set; } = true;
+
+        public override IElement Render()
+        {
+            var version = Version;
+            var text = Text($"supported:{Version}")
+                .OnClick(() => GC.KeepAlive(version));
+            text.AddEvent(
+                EventKeys.MouseEnter,
+                new System.Windows.Input.MouseEventHandler((_, _) => GC.KeepAlive(version)));
+
+            if (IncludeUnsupportedEvents)
+            {
+                text.AddVirtualEvent(
+                    EventKeys.TextChanged,
+                    new Nuri.UI.Events.VirtualEvent(
+                        Nuri.UI.Events.VirtualEventKind.TextChanged,
+                        new Action<string>(_ => GC.KeepAlive(version))));
+                text.AddVirtualEvent(
+                    "UnknownNeutral",
+                    new Nuri.UI.Events.VirtualEvent(
+                        (Nuri.UI.Events.VirtualEventKind)int.MaxValue,
+                        new Action(() => GC.KeepAlive(version))));
+            }
 
             return text;
         }

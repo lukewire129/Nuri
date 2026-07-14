@@ -246,11 +246,17 @@ namespace Nuri.WPF
         private static void AddEventHandler(FrameworkElement element, KeyValuePair<string, object?> evt)
         {
             if (!WpfEventMapper.TryCreate(evt.Key, evt.Value, out var wpfEventName, out var handler))
+            {
+                LogUnsupportedEvent(element, evt.Key, null);
                 return;
+            }
 
             var eventInfo = GetCachedEvent(element.GetType(), wpfEventName);
             if (eventInfo == null)
+            {
+                LogUnsupportedEvent(element, evt.Key, wpfEventName);
                 return;
+            }
 
             eventInfo.AddEventHandler(element, handler);
             var handlers = EventHandlers.GetOrCreateValue(element);
@@ -271,6 +277,25 @@ namespace Nuri.WPF
             var handler = handlers.TryGetValue(handlerKey, out var cachedHandler) ? cachedHandler : fallbackHandler;
             eventInfo.RemoveEventHandler(element, handler);
             handlers.Remove(handlerKey);
+        }
+
+        private static void LogUnsupportedEvent(FrameworkElement element, string eventName, string? wpfEventName)
+        {
+            if (!NuriDiagnostics.IsEnabled)
+                return;
+
+            var controlType = element.GetType();
+            var controlTypeName = controlType.Name;
+            var dedupeKey = $"WPF:UnsupportedEvent:{controlType.FullName}:{eventName}";
+            var message = string.IsNullOrWhiteSpace(wpfEventName)
+                ? $"WPF event '{eventName}' could not be mapped for '{controlTypeName}'."
+                : $"WPF event '{eventName}' maps to '{wpfEventName}', which is not supported by '{controlTypeName}'.";
+            NuriDiagnostics.LogOnce(
+                RuntimeLogKind.UnsupportedEvent,
+                dedupeKey,
+                null,
+                element.GetUniqueId(),
+                message);
         }
 
         private static void RemoveAnimation(Dictionary<string, FrameworkElement> controlIndex, RemoveAnimationPatch operation)
