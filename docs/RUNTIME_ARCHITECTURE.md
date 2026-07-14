@@ -69,6 +69,12 @@ When diagnostics are enabled, the WPF property path records `RuntimeLogKind.Unsu
 
 The WPF event add path similarly records `RuntimeLogKind.UnsupportedEvent` when a neutral event cannot be converted or the mapped native event is absent on the target control. Native delegate compatibility remains unchanged, event removal does not emit warnings, and messages are deduplicated by native control CLR type plus source event name until `NuriDiagnostics.ClearLogs()` is called.
 
+## Neutral Transform Animation
+
+Core exposes renderer-neutral `.Translate(x, y)`, `.TranslateX(...)`, `.TranslateY(...)`, `.Scale(value)`, `.Scale(x, y)`, `.ScaleX(...)`, and `.ScaleY(...)` DSL properties. Their `TranslateX`, `TranslateY`, `ScaleX`, and `ScaleY` values are scalar doubles and participate in `.Transition(duration, easing)` beside `Rotate`.
+
+WPF materializes the transform properties in one centered `TransformGroup` ordered as Scale, Rotate, then Translate. Each axis owns an independent `DoubleAnimation`, so active animations can be replaced or removed without replacing the native control. The latest property value remains the animation base value; removing the properties restores Scale to `1`, Rotate to `0`, and Translate to `0`. `Nuri.WPFAnimatedDashboardSample` demonstrates the combined transform transition.
+
 ## Performance Baseline
 
 Measured in Release on 2026-07-11. These values are a local baseline, not universal budgets. Compare future results on the same machine and workload; correctness counters are hard invariants.

@@ -766,12 +766,18 @@ internal static class Program
             .FontSize(20)
             .Opacity(0.5)
             .Rotate(5)
+            .Translate(12, -4)
+            .Scale(1.1, 0.9)
             .Transition(200);
 
         AssertEqual(true, element.Animations.ContainsKey("Background"), "Transition should apply to Background.");
         AssertEqual(true, element.Animations.ContainsKey("Foreground"), "Transition should apply to Foreground.");
         AssertEqual(true, element.Animations.ContainsKey("Opacity"), "Transition should apply to Opacity.");
         AssertEqual(true, element.Animations.ContainsKey("Rotate"), "Transition should apply to Rotate.");
+        AssertEqual(true, element.Animations.ContainsKey("TranslateX"), "Transition should apply to TranslateX.");
+        AssertEqual(true, element.Animations.ContainsKey("TranslateY"), "Transition should apply to TranslateY.");
+        AssertEqual(true, element.Animations.ContainsKey("ScaleX"), "Transition should apply to ScaleX.");
+        AssertEqual(true, element.Animations.ContainsKey("ScaleY"), "Transition should apply to ScaleY.");
         AssertEqual(false, element.Animations.ContainsKey("FontSize"), "Transition should skip unsupported FontSize animations.");
         AssertEqual(false, element.Animations.ContainsKey("ColumnDefinitions"), "Transition should skip grid column definitions.");
 
@@ -783,6 +789,10 @@ internal static class Program
         AssertEqual(element.Properties["Foreground"], fontColor.To, "Foreground animation should use the configured value.");
         AssertEqual(0.5, opacity.To, "Opacity animation should use the configured value.");
         AssertEqual(5d, rotate.To, "Rotate animation should use the configured value.");
+        AssertEqual(12d, element.Animations["TranslateX"].To, "TranslateX animation should use the configured value.");
+        AssertEqual(-4d, element.Animations["TranslateY"].To, "TranslateY animation should use the configured value.");
+        AssertEqual(1.1d, element.Animations["ScaleX"].To, "ScaleX animation should use the configured value.");
+        AssertEqual(0.9d, element.Animations["ScaleY"].To, "ScaleY animation should use the configured value.");
         AssertEqual(TimeSpan.FromMilliseconds(200), background.Duration, "Transition should use the configured duration.");
     }
 

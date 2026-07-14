@@ -406,14 +406,24 @@ namespace Nuri.WPF
 
             if (propertyName == "Rotate")
             {
-                if (!(element.RenderTransform is RotateTransform rotateTransform))
-                {
-                    rotateTransform = new RotateTransform();
-                    element.RenderTransform = rotateTransform;
-                    element.RenderTransformOrigin = new Point(0.5, 0.5);
-                }
-
+                var rotateTransform = WpfTransformMapper.GetRotate(element);
                 rotateTransform.BeginAnimation(RotateTransform.AngleProperty, animation);
+                return;
+            }
+
+            if (propertyName == "ScaleX" || propertyName == "ScaleY")
+            {
+                var scaleTransform = WpfTransformMapper.GetScale(element);
+                var transformProperty = propertyName == "ScaleX" ? ScaleTransform.ScaleXProperty : ScaleTransform.ScaleYProperty;
+                scaleTransform.BeginAnimation(transformProperty, animation);
+                return;
+            }
+
+            if (propertyName == "TranslateX" || propertyName == "TranslateY")
+            {
+                var translateTransform = WpfTransformMapper.GetTranslate(element);
+                var transformProperty = propertyName == "TranslateX" ? TranslateTransform.XProperty : TranslateTransform.YProperty;
+                translateTransform.BeginAnimation(transformProperty, animation);
                 return;
             }
 

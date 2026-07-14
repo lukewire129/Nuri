@@ -14,7 +14,11 @@ namespace Nuri.UI.Dsl
             PropertyKeys.Foreground,
             "Margin",
             "Opacity",
-            "Rotate"
+            "Rotate",
+            "ScaleX",
+            "ScaleY",
+            "TranslateX",
+            "TranslateY"
         };
 
         public static T Key<T>(this T node, string key) where T : IElement
@@ -51,6 +55,45 @@ namespace Nuri.UI.Dsl
         public static T Rotate<T>(this T node, double degrees) where T : IElement
         {
             node.SetProperty("Rotate", degrees);
+            return node;
+        }
+
+        public static T Translate<T>(this T node, double x, double y) where T : IElement
+        {
+            return node.TranslateX(x).TranslateY(y);
+        }
+
+        public static T TranslateX<T>(this T node, double x) where T : IElement
+        {
+            node.SetProperty("TranslateX", x);
+            return node;
+        }
+
+        public static T TranslateY<T>(this T node, double y) where T : IElement
+        {
+            node.SetProperty("TranslateY", y);
+            return node;
+        }
+
+        public static T Scale<T>(this T node, double value) where T : IElement
+        {
+            return node.Scale(value, value);
+        }
+
+        public static T Scale<T>(this T node, double x, double y) where T : IElement
+        {
+            return node.ScaleX(x).ScaleY(y);
+        }
+
+        public static T ScaleX<T>(this T node, double x) where T : IElement
+        {
+            node.SetProperty("ScaleX", x);
+            return node;
+        }
+
+        public static T ScaleY<T>(this T node, double y) where T : IElement
+        {
+            node.SetProperty("ScaleY", y);
             return node;
         }
 

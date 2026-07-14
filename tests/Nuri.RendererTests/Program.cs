@@ -21,8 +21,11 @@ using WpfTextBlock = System.Windows.Controls.TextBlock;
 using WpfUIElement = System.Windows.UIElement;
 using WpfColor = System.Windows.Media.Color;
 using WpfRotateTransform = System.Windows.Media.RotateTransform;
+using WpfScaleTransform = System.Windows.Media.ScaleTransform;
 using WpfSolidColorBrush = System.Windows.Media.SolidColorBrush;
 using WpfThickness = System.Windows.Thickness;
+using WpfTransformGroup = System.Windows.Media.TransformGroup;
+using WpfTranslateTransform = System.Windows.Media.TranslateTransform;
 using WpfListBox = System.Windows.Controls.ListBox;
 using WpfListBoxItem = System.Windows.Controls.ListBoxItem;
 using WpfButton = System.Windows.Controls.Button;
@@ -565,6 +568,10 @@ internal static class Program
         component.Background = "#2563eb";
         component.Foreground = "#fef3c7";
         component.Rotation = 5;
+        component.ScaleX = 1.05;
+        component.ScaleY = 0.97;
+        component.TranslateX = 6;
+        component.TranslateY = -2;
         root.Rebuild();
 
         var targets = driver.RootChildren.Cast<WpfFrameworkElement>().ToArray();
@@ -574,6 +581,10 @@ internal static class Program
         component.Background = "#7c3aed";
         component.Foreground = "#f8fafc";
         component.Rotation = -6;
+        component.ScaleX = 1.12;
+        component.ScaleY = 0.94;
+        component.TranslateX = 14;
+        component.TranslateY = -8;
         root.Rebuild();
 
         var updatedTargets = driver.RootChildren.Cast<WpfFrameworkElement>().ToArray();
@@ -589,12 +600,27 @@ internal static class Program
         var foregroundBrush = (WpfSolidColorBrush)((WpfTextBlock)updatedTargets[2]).Foreground;
         AssertEqual(WpfColor.FromRgb(248, 250, 252), (WpfColor)foregroundBrush.GetAnimationBaseValue(WpfSolidColorBrush.ColorProperty), "WPF: Foreground should retain the latest base color.");
 
-        var rotateTransform = (WpfRotateTransform)updatedTargets[3].RenderTransform;
+        var transformGroup = (WpfTransformGroup)updatedTargets[3].RenderTransform;
+        var rotateTransform = transformGroup.Children.OfType<WpfRotateTransform>().Single();
+        var scaleTransform = transformGroup.Children.OfType<WpfScaleTransform>().Single();
+        var translateTransform = transformGroup.Children.OfType<WpfTranslateTransform>().Single();
         AssertEqual(-6d, (double)rotateTransform.GetAnimationBaseValue(WpfRotateTransform.AngleProperty), "WPF: Rotate should retain the latest base angle.");
+        AssertEqual(1.12d, (double)scaleTransform.GetAnimationBaseValue(WpfScaleTransform.ScaleXProperty), "WPF: ScaleX should retain the latest base value.");
+        AssertEqual(0.94d, (double)scaleTransform.GetAnimationBaseValue(WpfScaleTransform.ScaleYProperty), "WPF: ScaleY should retain the latest base value.");
+        AssertEqual(14d, (double)translateTransform.GetAnimationBaseValue(WpfTranslateTransform.XProperty), "WPF: TranslateX should retain the latest base value.");
+        AssertEqual(-8d, (double)translateTransform.GetAnimationBaseValue(WpfTranslateTransform.YProperty), "WPF: TranslateY should retain the latest base value.");
 
         component.Animate = false;
         root.Rebuild();
         AssertWpfTransitions(updatedTargets, false);
+
+        component.IncludeTransforms = false;
+        root.Rebuild();
+        AssertEqual(0d, rotateTransform.Angle, "WPF: removing Rotate should restore its default value.");
+        AssertEqual(1d, scaleTransform.ScaleX, "WPF: removing ScaleX should restore its default value.");
+        AssertEqual(1d, scaleTransform.ScaleY, "WPF: removing ScaleY should restore its default value.");
+        AssertEqual(0d, translateTransform.X, "WPF: removing TranslateX should restore its default value.");
+        AssertEqual(0d, translateTransform.Y, "WPF: removing TranslateY should restore its default value.");
     }
 
     private static void AssertWpfTransitions(IReadOnlyList<WpfFrameworkElement> targets, bool expected)
@@ -608,8 +634,13 @@ internal static class Program
         var foregroundBrush = (WpfSolidColorBrush)((WpfTextBlock)targets[2]).Foreground;
         AssertEqual(expected, foregroundBrush.HasAnimatedProperties, "WPF: Foreground animation state should match the virtual transition.");
 
-        var rotateTransform = (WpfRotateTransform)targets[3].RenderTransform;
+        var transformGroup = (WpfTransformGroup)targets[3].RenderTransform;
+        var rotateTransform = transformGroup.Children.OfType<WpfRotateTransform>().Single();
+        var scaleTransform = transformGroup.Children.OfType<WpfScaleTransform>().Single();
+        var translateTransform = transformGroup.Children.OfType<WpfTranslateTransform>().Single();
         AssertEqual(expected, rotateTransform.HasAnimatedProperties, "WPF: Rotate animation state should match the virtual transition.");
+        AssertEqual(expected, scaleTransform.HasAnimatedProperties, "WPF: Scale animation state should match the virtual transition.");
+        AssertEqual(expected, translateTransform.HasAnimatedProperties, "WPF: Translate animation state should match the virtual transition.");
     }
 
     private static void RunSuite(Func<RendererDriver> createDriver)
@@ -959,24 +990,41 @@ internal static class Program
 
         public double Rotation { get; set; } = -2;
 
+        public double ScaleX { get; set; } = 0.98;
+
+        public double ScaleY { get; set; } = 1.02;
+
+        public double TranslateX { get; set; } = -4;
+
+        public double TranslateY { get; set; } = 3;
+
         public bool Animate { get; set; } = true;
+
+        public bool IncludeTransforms { get; set; } = true;
 
         public override IElement Render()
         {
             var margin = Div().Margin(Margin);
             var background = Div().Background(Background);
             var foreground = Text("foreground").FontColor(Foreground);
-            var rotate = Text("rotate").Rotate(Rotation);
+            var transform = Text("transform");
+            if (IncludeTransforms)
+            {
+                transform
+                    .Rotate(Rotation)
+                    .Scale(ScaleX, ScaleY)
+                    .Translate(TranslateX, TranslateY);
+            }
 
             if (Animate)
             {
                 margin.Transition(500, EasingValue.CubicOut);
                 background.Transition(500, EasingValue.CubicOut);
                 foreground.Transition(500, EasingValue.CubicOut);
-                rotate.Transition(500, EasingValue.CubicOut);
+                transform.Transition(500, EasingValue.CubicOut);
             }
 
-            return Grid(margin, background, foreground, rotate);
+            return Grid(margin, background, foreground, transform);
         }
     }
 

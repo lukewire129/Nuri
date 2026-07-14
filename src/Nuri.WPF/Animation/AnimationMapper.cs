@@ -15,7 +15,11 @@ namespace Nuri.WPF
             "Margin",
              PropertyKeys.Background,
              PropertyKeys.Foreground,
-            "Rotate"
+            "Rotate",
+            "ScaleX",
+            "ScaleY",
+            "TranslateX",
+            "TranslateY"
        };
 
         public static DependencyProperty? GetDependencyProperty(string property)
@@ -26,7 +30,11 @@ namespace Nuri.WPF
                 "Margin" => FrameworkElement.MarginProperty,
                 PropertyKeys.Background => Control.BackgroundProperty,
                 PropertyKeys.Foreground => Control.ForegroundProperty,
-                "Rotate" => RotateTransform.AngleProperty, 
+                "Rotate" => RotateTransform.AngleProperty,
+                "ScaleX" => ScaleTransform.ScaleXProperty,
+                "ScaleY" => ScaleTransform.ScaleYProperty,
+                "TranslateX" => TranslateTransform.XProperty,
+                "TranslateY" => TranslateTransform.YProperty,
                 _ => null
             };
         }

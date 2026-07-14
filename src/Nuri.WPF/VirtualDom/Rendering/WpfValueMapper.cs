@@ -61,6 +61,10 @@ namespace Nuri.WPF
             {
                 case "Opacity":
                 case "Rotate":
+                case "ScaleX":
+                case "ScaleY":
+                case "TranslateX":
+                case "TranslateY":
                     return new DoubleAnimation
                     {
                         From = from == null ? null : Convert.ToDouble(from),

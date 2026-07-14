@@ -36,10 +36,19 @@ namespace Nuri.WPF
                     element.Margin = (Thickness)value!;
                     return true;
                 case "Rotate":
-                    var rotateTransform = element.RenderTransform as RotateTransform ?? new RotateTransform();
-                    rotateTransform.Angle = ToDouble(value);
-                    element.RenderTransform = rotateTransform;
-                    element.RenderTransformOrigin = new Point(0.5, 0.5);
+                    WpfTransformMapper.GetRotate(element).Angle = ToDouble(value);
+                    return true;
+                case "ScaleX":
+                    WpfTransformMapper.GetScale(element).ScaleX = ToDouble(value);
+                    return true;
+                case "ScaleY":
+                    WpfTransformMapper.GetScale(element).ScaleY = ToDouble(value);
+                    return true;
+                case "TranslateX":
+                    WpfTransformMapper.GetTranslate(element).X = ToDouble(value);
+                    return true;
+                case "TranslateY":
+                    WpfTransformMapper.GetTranslate(element).Y = ToDouble(value);
                     return true;
                 case PropertyKeys.Name:
                     element.Name = (string)value!;
@@ -124,8 +133,19 @@ namespace Nuri.WPF
                     element.ClearValue(FrameworkElement.MarginProperty);
                     return true;
                 case "Rotate":
-                    if (element.RenderTransform is RotateTransform rotateTransform)
-                        rotateTransform.ClearValue(RotateTransform.AngleProperty);
+                    WpfTransformMapper.GetRotate(element).ClearValue(RotateTransform.AngleProperty);
+                    return true;
+                case "ScaleX":
+                    WpfTransformMapper.GetScale(element).ClearValue(ScaleTransform.ScaleXProperty);
+                    return true;
+                case "ScaleY":
+                    WpfTransformMapper.GetScale(element).ClearValue(ScaleTransform.ScaleYProperty);
+                    return true;
+                case "TranslateX":
+                    WpfTransformMapper.GetTranslate(element).ClearValue(TranslateTransform.XProperty);
+                    return true;
+                case "TranslateY":
+                    WpfTransformMapper.GetTranslate(element).ClearValue(TranslateTransform.YProperty);
                     return true;
                 case PropertyKeys.Name:
                     element.ClearValue(FrameworkElement.NameProperty);
