@@ -14,7 +14,52 @@ namespace Nuri.VirtualDom
         RemoveEvent,
         AddEvent,
         RemoveAnimation,
-        AddAnimation
+        AddAnimation,
+        UpdateVirtualizedItems
+    }
+
+    public enum VirtualizedItemChangeType
+    {
+        Add,
+        Remove,
+        Move,
+        Update
+    }
+
+    public sealed class VirtualizedItemChange
+    {
+        public VirtualizedItemChange(VirtualizedItemChangeType type, string key, int oldIndex, int newIndex)
+        {
+            Type = type;
+            Key = key;
+            OldIndex = oldIndex;
+            NewIndex = newIndex;
+        }
+
+        public VirtualizedItemChangeType Type { get; }
+        public string Key { get; }
+        public int OldIndex { get; }
+        public int NewIndex { get; }
+    }
+
+    public sealed class UpdateVirtualizedItemsPatch : PatchOperation
+    {
+        public UpdateVirtualizedItemsPatch(
+            VirtualEntry target,
+            UI.Virtualization.IVirtualizedItemsSource source,
+            IReadOnlyList<VirtualizedItemChange> changes,
+            bool refreshRealizedItems) : base(PatchOperationType.UpdateVirtualizedItems)
+        {
+            Target = target;
+            Source = source;
+            Changes = changes;
+            RefreshRealizedItems = refreshRealizedItems;
+        }
+
+        public VirtualEntry Target { get; }
+        public UI.Virtualization.IVirtualizedItemsSource Source { get; }
+        public IReadOnlyList<VirtualizedItemChange> Changes { get; }
+        public bool RefreshRealizedItems { get; }
     }
 
     public abstract class PatchOperation

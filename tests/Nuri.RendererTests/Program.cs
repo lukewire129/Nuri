@@ -5,6 +5,8 @@ using Nuri.Platform.Abstractions;
 using Nuri.UI.Controls;
 using Nuri.UI.Dsl;
 using Nuri.UI.Values;
+using Nuri.VirtualDom;
+using Nuri.WPF;
 using AvaloniaControl = Avalonia.Controls.Control;
 using AvaloniaPanel = Avalonia.Controls.Panel;
 using AvaloniaTextBlock = Avalonia.Controls.TextBlock;
@@ -19,18 +21,99 @@ using WpfColor = System.Windows.Media.Color;
 using WpfRotateTransform = System.Windows.Media.RotateTransform;
 using WpfSolidColorBrush = System.Windows.Media.SolidColorBrush;
 using WpfThickness = System.Windows.Thickness;
+using WpfListBox = System.Windows.Controls.ListBox;
+using WpfListBoxItem = System.Windows.Controls.ListBoxItem;
 
 namespace Nuri.RendererTests;
 
 internal static class Program
 {
+    private sealed record VirtualizedRow(int Index, bool Selected);
+
     [STAThread]
     private static void Main()
     {
         RunSuite(() => new WpfDriver());
         WpfTransitionsReplaceAndClearNativeAnimations(new WpfDriver());
+        WpfVirtualizedItemsStayLazyAndRecycleContainers();
         RunSuite(() => new AvaloniaDriver());
         Console.WriteLine("Nuri.RendererTests passed.");
+    }
+
+    private static void WpfVirtualizedItemsStayLazyAndRecycleContainers()
+    {
+        var templateCalls = 0;
+        var items = Enumerable.Range(0, 10_000).Select(index => new VirtualizedRow(index, false)).ToArray();
+        var oldElement = Component.VirtualizedItems(
+            items,
+            item => item.Index.ToString(),
+            32,
+            item =>
+            {
+                templateCalls++;
+                return Component.Text(item.Index.ToString());
+            });
+        var oldEntry = oldElement.ToVirtualEntry().WithIdentity("virtualized-test", null);
+        var native = (WpfListBox)WpfVirtualEntryRenderer.Build(oldEntry);
+
+        AssertEqual(0, templateCalls, "WPF: building a virtualized host should not render item templates eagerly.");
+
+        var window = new System.Windows.Window
+        {
+            Width = 400,
+            Height = 700,
+            Content = native,
+            ShowInTaskbar = false,
+            WindowStyle = System.Windows.WindowStyle.None,
+            Opacity = 0
+        };
+        window.Show();
+        native.ApplyTemplate();
+        native.UpdateLayout();
+
+        var realizedBefore = CountRealized(native);
+        AssertEqual(true, realizedBefore > 0 && realizedBefore <= 100, $"WPF: a 700px viewport should realize a bounded number of 32px rows (actual {realizedBefore}).");
+        AssertEqual(true, templateCalls <= 100, "WPF: initial template calls should be proportional to realized rows.");
+
+        var firstContainer = (WpfListBoxItem?)native.ItemContainerGenerator.ContainerFromIndex(0);
+        AssertEqual(new System.Windows.Thickness(0), firstContainer!.Padding, "WPF: virtualized containers should not shrink row content with theme padding.");
+        AssertEqual(new System.Windows.Thickness(0), firstContainer.BorderThickness, "WPF: virtualized containers should not shrink row content with theme borders.");
+        AssertEqual(System.Windows.VerticalAlignment.Stretch, firstContainer.VerticalContentAlignment, "WPF: virtualized row content should stretch through the fixed extent.");
+        AssertEqual(32d, ((WpfFrameworkElement)firstContainer.Content).ActualHeight, "WPF: virtualized row content should receive the full fixed extent.");
+        var updatedItems = (VirtualizedRow[])items.Clone();
+        updatedItems[0] = updatedItems[0] with { Selected = true };
+        var newElement = Component.VirtualizedItems(
+            updatedItems,
+            item => item.Index.ToString(),
+            32,
+            item =>
+            {
+                templateCalls++;
+                return Component.Text(item.Selected ? $"selected:{item.Index}" : item.Index.ToString());
+            });
+        var newEntry = newElement.ToVirtualEntry().WithIdentity("virtualized-test", null);
+        var operations = VirtualTreeDiff.Diff(oldEntry, newEntry);
+        WpfVirtualEntryRenderer.ApplyDiff(native, operations);
+
+        AssertSame(firstContainer!, native.ItemContainerGenerator.ContainerFromIndex(0)!, "WPF: a same-key update should preserve its native item container.");
+        AssertEqual(true, templateCalls <= 200, "WPF: a template refresh should remain proportional to realized rows, not 10k source rows.");
+
+        native.ScrollIntoView(native.Items[5_000]);
+        native.UpdateLayout();
+        AssertEqual(true, CountRealized(native) <= 100, "WPF: scrolling should recycle a bounded container set.");
+        window.Close();
+    }
+
+    private static int CountRealized(WpfListBox listBox)
+    {
+        var count = 0;
+        for (var index = 0; index < listBox.Items.Count; index++)
+        {
+            if (listBox.ItemContainerGenerator.ContainerFromIndex(index) != null)
+                count++;
+        }
+
+        return count;
     }
 
     private static void WpfTransitionsReplaceAndClearNativeAnimations(WpfDriver driver)

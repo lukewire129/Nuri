@@ -7,6 +7,7 @@ using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 using System.Windows.Controls.Primitives;
+using Nuri.UI.Virtualization;
 using WpfBorder = System.Windows.Controls.Border;
 using WpfContentControl = System.Windows.Controls.ContentControl;
 using WpfPanel = System.Windows.Controls.Panel;
@@ -21,6 +22,10 @@ namespace Nuri.WPF
         {
             switch (propertyName)
             {
+                case PropertyKeys.VirtualizedItemsSource:
+                    if (element is WpfVirtualizedItemsHost virtualizedHost && value is IVirtualizedItemsSource source)
+                        virtualizedHost.SetSource(source);
+                    return element is WpfVirtualizedItemsHost;
                 case PropertyKeys.Width:
                     element.Width = ToDouble(value);
                     return true;

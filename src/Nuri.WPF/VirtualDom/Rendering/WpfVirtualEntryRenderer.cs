@@ -60,10 +60,22 @@ namespace Nuri.WPF
                     case AddAnimationPatch addAnimation:
                         AddAnimation(controlIndex, addAnimation);
                         break;
+                    case UpdateVirtualizedItemsPatch updateVirtualizedItems:
+                        UpdateVirtualizedItems(controlIndex, updateVirtualizedItems);
+                        break;
                     default:
                         throw new InvalidOperationException($"Unknown patch operation: {operation.GetType().Name}");
                 }
             }
+        }
+
+        private static void UpdateVirtualizedItems(
+            Dictionary<string, FrameworkElement> controlIndex,
+            UpdateVirtualizedItemsPatch operation)
+        {
+            if (controlIndex.TryGetValue(operation.Target.Id, out var target)
+                && target is WpfVirtualizedItemsHost host)
+                host.ApplyPatch(operation);
         }
 
         public static FrameworkElement Build(VirtualEntry entry)

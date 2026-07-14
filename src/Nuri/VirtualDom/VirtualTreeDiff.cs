@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using Nuri.UI.Values;
+using Nuri.Constants;
+using Nuri.UI.Virtualization;
 
 namespace Nuri.VirtualDom
 {
@@ -42,6 +44,22 @@ namespace Nuri.VirtualDom
         {
             foreach (var property in newEntry.Properties)
             {
+                if (property.Key == PropertyKeys.VirtualizedItemsSource
+                    && property.Value is IVirtualizedItemsSource newSource)
+                {
+                    if (oldEntry.Properties.TryGetValue(property.Key, out var oldSourceValue)
+                        && oldSourceValue is IVirtualizedItemsSource oldSource)
+                    {
+                        operations.Add(CreateVirtualizedItemsPatch(newEntry, oldSource, newSource));
+                    }
+                    else
+                    {
+                        operations.Add(new UpdatePropertyPatch(newEntry, property.Key, property.Value));
+                    }
+
+                    continue;
+                }
+
                 if (!oldEntry.Properties.TryGetValue(property.Key, out var oldValue) || !ValuesEqual(oldValue, property.Value))
                     operations.Add(new UpdatePropertyPatch(newEntry, property.Key, property.Value));
             }
@@ -51,6 +69,51 @@ namespace Nuri.VirtualDom
                 if (!newEntry.Properties.ContainsKey(property.Key))
                     operations.Add(new RemovePropertyPatch(oldEntry, property.Key));
             }
+        }
+
+        private static UpdateVirtualizedItemsPatch CreateVirtualizedItemsPatch(
+            VirtualEntry target,
+            IVirtualizedItemsSource oldSource,
+            IVirtualizedItemsSource newSource)
+        {
+            var oldIdentities = oldSource.GetIdentities();
+            var newIdentities = newSource.GetIdentities();
+            var oldIndexes = new Dictionary<string, int>(StringComparer.Ordinal);
+            var newIndexes = new Dictionary<string, int>(StringComparer.Ordinal);
+
+            for (var index = 0; index < oldIdentities.Count; index++)
+                oldIndexes[oldIdentities[index]] = index;
+            for (var index = 0; index < newIdentities.Count; index++)
+                newIndexes[newIdentities[index]] = index;
+
+            var changes = new List<VirtualizedItemChange>();
+            for (var oldIndex = 0; oldIndex < oldIdentities.Count; oldIndex++)
+            {
+                var identity = oldIdentities[oldIndex];
+                if (!newIndexes.ContainsKey(identity))
+                    changes.Add(new VirtualizedItemChange(VirtualizedItemChangeType.Remove, identity, oldIndex, -1));
+            }
+
+            for (var newIndex = 0; newIndex < newIdentities.Count; newIndex++)
+            {
+                var identity = newIdentities[newIndex];
+                if (!oldIndexes.TryGetValue(identity, out var oldIndex))
+                {
+                    changes.Add(new VirtualizedItemChange(VirtualizedItemChangeType.Add, identity, -1, newIndex));
+                    continue;
+                }
+
+                if (oldIndex != newIndex)
+                    changes.Add(new VirtualizedItemChange(VirtualizedItemChangeType.Move, identity, oldIndex, newIndex));
+                if (!newSource.ItemsEqual(newIndex, oldSource, oldIndex))
+                    changes.Add(new VirtualizedItemChange(VirtualizedItemChangeType.Update, identity, oldIndex, newIndex));
+            }
+
+            return new UpdateVirtualizedItemsPatch(
+                target,
+                newSource,
+                changes,
+                !newSource.HasSameTemplate(oldSource) || newSource.ItemExtent != oldSource.ItemExtent);
         }
 
         private static void DiffEvents(VirtualEntry oldEntry, VirtualEntry newEntry, List<PatchOperation> operations)

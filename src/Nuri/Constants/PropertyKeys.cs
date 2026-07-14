@@ -12,5 +12,6 @@ namespace Nuri.Constants
         public const string Text = "Text";
         public const string Title = "Title";
         public const string Width = "Width";
+        public const string VirtualizedItemsSource = "VirtualizedItemsSource";
     }
 }

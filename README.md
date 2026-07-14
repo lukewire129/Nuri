@@ -199,6 +199,8 @@ dotnet run --project "samples\WPF\Nuri.TodoValidationSample\Nuri.TodoValidationS
 dotnet run --project "samples\WPF\Nuri.SettingsPreferencesSample\Nuri.SettingsPreferencesSample.csproj" -c Release
 dotnet run --project "samples\WPF\Nuri.ModalDialogSample\Nuri.ModalDialogSample.csproj" -c Release
 dotnet run --project "samples\WPF\Nuri.CommandPaletteSample\Nuri.CommandPaletteSample.csproj" -c Release
+dotnet run --project "samples\WPF\Nuri.ExplorerTreeSample\Nuri.ExplorerTreeSample.csproj" -c Release
+dotnet run --project "samples\WPF\Nuri.VirtualExplorerTreeSample\Nuri.VirtualExplorerTreeSample.csproj" -c Release
 dotnet run --project "samples\WPF\RouterSample\RouterSample.csproj" -c Release
 ```
 
@@ -208,6 +210,8 @@ Sample coverage:
 - `Nuri.SettingsPreferencesSample`: checkbox, radio, toggle, form grouping, validation.
 - `Nuri.ModalDialogSample`: mount/unmount, effect cleanup, overlay layering.
 - `Nuri.CommandPaletteSample`: controlled search input, keyboard events, filtered keyed list, selection, command execution.
+- `Nuri.ExplorerTreeSample`: recursive keyed components, subtree lifecycle cleanup, rename, add, and delete behavior.
+- `Nuri.VirtualExplorerTreeSample`: 10,101 generated tree nodes flattened into a fixed-extent WPF recycling viewport.
 - `RouterSample`: router, nested router, `useNavigation`, effects, keyed list behavior.
 
 ## Validation

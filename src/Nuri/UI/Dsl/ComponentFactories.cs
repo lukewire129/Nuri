@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
+using Nuri.Constants;
 using Nuri.UI.Controls;
 using Nuri.UI.Values;
+using Nuri.UI.Virtualization;
 
 namespace Nuri.UI.Dsl
 {
@@ -196,6 +199,23 @@ namespace Nuri.UI.Dsl
         public static ItemsView Items(string kind, params IElement[] children)
         {
             return new ItemsView(kind, children);
+        }
+
+        public static ItemsView VirtualizedItems<T>(
+            IReadOnlyList<T> items,
+            Func<T, string> keySelector,
+            double itemExtent,
+            Func<T, IElement> itemTemplate,
+            IEqualityComparer<T>? comparer = null)
+        {
+            var view = new ItemsView(ItemsTypes.Virtualized);
+            view.Properties[PropertyKeys.VirtualizedItemsSource] = new VirtualizedItemsSource<T>(
+                items,
+                keySelector,
+                itemExtent,
+                itemTemplate,
+                comparer);
+            return view;
         }
 
         public static OverlayView Overlay(params IElement[] children)

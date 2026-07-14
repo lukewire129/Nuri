@@ -3,6 +3,8 @@ using Nuri.Runtime.Invalidation;
 using Nuri.UI.Controls;
 using Nuri.UI.Dsl;
 using Nuri.VirtualDom;
+using Nuri.Constants;
+using Nuri.UI.Virtualization;
 
 var label = GetOption(args, "--label") ?? "current";
 var iterations = GetIntOption(args, "--iterations", 100);
@@ -14,6 +16,8 @@ var sustainedWarmup = GetIntOption(args, "--sustained-warmup", 10_000);
 var scenarios = new[]
 {
     CreateKeyedReorderScenario(size),
+    CreateVirtualizedUpdateScenario(10_000),
+    CreateVirtualizedUpdateScenario(100_000),
     CreateHookRenderScenario(1),
     CreateHookRenderScenario(10),
     CreateHookRenderScenario(50),
@@ -136,6 +140,40 @@ static Scenario CreateKeyedReorderScenario(int size)
 {
     var trees = CreateReorderedTree(size);
     return new Scenario("Keyed reorder patches", size, () => VirtualTreeDiff.Diff(trees.Old, trees.New).Count, () => { });
+}
+
+static Scenario CreateVirtualizedUpdateScenario(int size)
+{
+    var oldItems = Enumerable.Range(0, size).Select(index => new VirtualizedPerfItem(index, 0)).ToArray();
+    var newItems = (VirtualizedPerfItem[])oldItems.Clone();
+    newItems[size / 2] = newItems[size / 2] with { Version = 1 };
+    var oldTree = CreateVirtualizedTree(oldItems);
+    var newTree = CreateVirtualizedTree(newItems);
+
+    return new Scenario(
+        "Virtualized keyed snapshot update",
+        size,
+        () =>
+        {
+            var patch = VirtualTreeDiff.Diff(oldTree, newTree).OfType<UpdateVirtualizedItemsPatch>().Single();
+            return patch.Changes.Count;
+        },
+        () => { });
+}
+
+static VirtualEntry CreateVirtualizedTree(VirtualizedPerfItem[] items)
+{
+    var view = Component.VirtualizedItems(
+        items,
+        item => item.Index.ToString(),
+        32,
+        item => Component.Text(item.Version.ToString()));
+    var source = (IVirtualizedItemsSource)view.Properties[PropertyKeys.VirtualizedItemsSource];
+    return new VirtualEntry(
+        VirtualControlTypes.Items,
+        kind: ItemsTypes.Virtualized,
+        properties: new[] { KeyValuePair.Create<string, object?>(PropertyKeys.VirtualizedItemsSource, source) })
+        .WithIdentity("virtualized-perf", null);
 }
 
 static Scenario CreateHookRenderScenario(int hookCount)
@@ -315,6 +353,8 @@ sealed class PerfComponent : Component
 }
 
 sealed record Scenario(string Name, int Size, Func<int> Run, Action Cleanup);
+
+sealed record VirtualizedPerfItem(int Index, int Version);
 sealed record Result(string Label, string Scenario, int Size, int Iterations, double MeanMilliseconds, double AllocatedBytes, double OperationCount);
 sealed record SustainedResult(
     string Label,

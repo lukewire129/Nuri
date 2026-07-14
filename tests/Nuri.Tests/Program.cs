@@ -6,6 +6,9 @@ using Nuri.UI;
 using Nuri.UI.Dsl;
 using Nuri.UI.Navigation;
 using Nuri.UI.Values;
+using Nuri.UI.Virtualization;
+using Nuri.Constants;
+using Nuri.UI.Controls;
 
 namespace Nuri.Tests;
 
@@ -45,7 +48,76 @@ internal static class Program
         GridLengthDslParsesStringDefinitions();
         GridLengthDslRejectsInvalidStringDefinitions();
         TransitionAppliesToAllConfiguredProperties();
+        VirtualizedItemsStayLazyAndProduceKeyedChanges();
+        VirtualizedItemsUseSafeDuplicateIdentities();
+        VirtualizedItemsRejectComponentTemplatesLazily();
         Console.WriteLine("Nuri.Tests passed.");
+    }
+
+    private static void VirtualizedItemsStayLazyAndProduceKeyedChanges()
+    {
+        var templateCalls = 0;
+        var oldItems = new[] { new VirtualizedProbe("a", 1), new VirtualizedProbe("b", 1) };
+        var newItems = new[] { new VirtualizedProbe("b", 2), new VirtualizedProbe("a", 1), new VirtualizedProbe("c", 1) };
+        var oldSource = GetVirtualizedSource(Component.VirtualizedItems(
+            oldItems,
+            item => item.Id,
+            32,
+            item => { templateCalls++; return Component.Text(item.Id); }));
+        var newSource = GetVirtualizedSource(Component.VirtualizedItems(
+            newItems,
+            item => item.Id,
+            32,
+            item => { templateCalls++; return Component.Text(item.Id); }));
+
+        var oldTree = VirtualizedEntry(oldSource);
+        var newTree = VirtualizedEntry(newSource);
+        var patch = VirtualTreeDiff.Diff(oldTree, newTree).OfType<UpdateVirtualizedItemsPatch>().Single();
+
+        AssertEqual(0, templateCalls, "Virtualized source creation and diffing must not invoke item templates.");
+        AssertEqual(1, patch.Changes.Count(change => change.Type == VirtualizedItemChangeType.Add), "A new key should produce one virtualized add change.");
+        AssertEqual(2, patch.Changes.Count(change => change.Type == VirtualizedItemChangeType.Move), "Retained keys should report their new positions.");
+        AssertEqual(1, patch.Changes.Count(change => change.Type == VirtualizedItemChangeType.Update), "A changed snapshot with the same key should produce one update.");
+    }
+
+    private static void VirtualizedItemsUseSafeDuplicateIdentities()
+    {
+        var source = GetVirtualizedSource(Component.VirtualizedItems(
+            new[] { "same", "same" },
+            item => item,
+            24,
+            Component.Text));
+        var identities = source.GetIdentities();
+
+        AssertNotEqual(identities[0], identities[1], "Duplicate virtualized keys must receive distinct fallback identities.");
+    }
+
+    private static void VirtualizedItemsRejectComponentTemplatesLazily()
+    {
+        var source = GetVirtualizedSource(Component.VirtualizedItems(
+            new[] { "row" },
+            item => item,
+            24,
+            _ => new VirtualizedComponentProbe()));
+
+        var exception = AssertThrows<InvalidOperationException>(
+            () => source.RenderItem(0),
+            "Virtualized templates containing components should be rejected when the row is realized.");
+        AssertEqual(true, exception.Message.Contains("row") && exception.Message.Contains(nameof(VirtualizedComponentProbe)), "The template error should identify the item key and component type.");
+    }
+
+    private static IVirtualizedItemsSource GetVirtualizedSource(ItemsView view)
+    {
+        return (IVirtualizedItemsSource)view.Properties[PropertyKeys.VirtualizedItemsSource];
+    }
+
+    private static VirtualEntry VirtualizedEntry(IVirtualizedItemsSource source)
+    {
+        return new VirtualEntry(
+            VirtualControlTypes.Items,
+            kind: ItemsTypes.Virtualized,
+            properties: new[] { KeyValuePair.Create<string, object?>(PropertyKeys.VirtualizedItemsSource, source) })
+            .WithIdentity("virtualized-root", null);
     }
 
     private static void KeyedReorderPreservesPatchTargetIdentity()
@@ -888,6 +960,13 @@ internal static class Program
         {
             return Div();
         }
+    }
+
+    private sealed record VirtualizedProbe(string Id, int Version);
+
+    private sealed class VirtualizedComponentProbe : Component
+    {
+        public override IElement Render() => Text("component");
     }
 
     private sealed class StoreProbe : Component

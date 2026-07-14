@@ -44,6 +44,7 @@ namespace Nuri.WPF
                     {
                         ItemsTypes.Table => new DataGrid(),
                         ItemsTypes.Tree => new TreeView(),
+                        ItemsTypes.Virtualized => new WpfVirtualizedItemsHost(),
                         _ => new ItemsControl()
                     };
                 case VirtualControlTypes.Overlay:
