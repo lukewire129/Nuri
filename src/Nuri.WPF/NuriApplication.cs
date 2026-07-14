@@ -23,11 +23,15 @@ namespace Nuri.WPF
             var application = Application.Current;
             if (application == null)
             {
-                application = new Application();
+                application = new Application
+                {
+                    ShutdownMode = ShutdownMode.OnMainWindowClose
+                };
                 application.Run(CreateWindow<TComponent>(title, width, height));
                 return;
             }
 
+            application.ShutdownMode = ShutdownMode.OnMainWindowClose;
             var window = Show<TComponent>(title, width, height);
             application.MainWindow ??= window;
         }

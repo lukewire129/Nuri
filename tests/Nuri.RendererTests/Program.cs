@@ -3,6 +3,7 @@ using System.Linq;
 using Avalonia.Animation;
 using Nuri.Constants;
 using Nuri.Platform.Abstractions;
+using Nuri.Runtime;
 using Nuri.Runtime.Diagnostics;
 using Nuri.UI.Controls;
 using Nuri.UI.Dsl;
@@ -44,6 +45,7 @@ internal static class Program
         RunSuite(() => new WpfDriver());
         WpfRepeatedEffectLifecycleRemainsStable();
         WpfDisposedRootIgnoresQueuedInvalidations();
+        WpfMultipleRootsIsolateStateAndCleanupClosedWindows();
         WpfInputEventSubscriptionsRemainStable();
         WpfUnsupportedPropertyDiagnosticsAreDeduplicated();
         WpfUnsupportedEventDiagnosticsAreDeduplicated();
@@ -52,7 +54,92 @@ internal static class Program
         WpfTransitionsReplaceAndClearNativeAnimations(new WpfDriver());
         WpfVirtualizedItemsStayLazyAndRecycleContainers();
         RunSuite(() => new AvaloniaDriver());
+        WpfRunClosesEveryWindowWithTheMainWindow();
         Console.WriteLine("Nuri.RendererTests passed.");
+    }
+
+    private static void WpfRunClosesEveryWindowWithTheMainWindow()
+    {
+        NuriDiagnostics.Enable();
+        NuriDiagnostics.ClearLogs();
+        ApplicationLifetimeProbe.Reset();
+        var initialRootCount = NuriDiagnostics.GetSnapshot().Roots.Count;
+        Exception? threadFailure = null;
+        System.Windows.Application? application = null;
+        var configuredShutdownMode = System.Windows.ShutdownMode.OnLastWindowClose;
+        var childWasVisible = false;
+        var childClosed = false;
+
+        ApplicationLifetimeProbe.OnMainMounted = () =>
+        {
+            var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
+            dispatcher.BeginInvoke(new Action(() =>
+            {
+                try
+                {
+                    application = System.Windows.Application.Current
+                        ?? throw new InvalidOperationException("WPF: Run should create an Application before mounting the main root.");
+                    configuredShutdownMode = application.ShutdownMode;
+                    var mainWindow = application.MainWindow
+                        ?? throw new InvalidOperationException("WPF: Run should assign its window as Application.MainWindow.");
+                    var childWindow = NuriApplication.Show<ApplicationLifetimeChildComponent>(
+                        "Nuri.RendererTests.ApplicationLifetime.Child",
+                        width: 1,
+                        height: 1);
+                    childWindow.ShowInTaskbar = false;
+                    childWindow.WindowStyle = System.Windows.WindowStyle.None;
+                    childWindow.Opacity = 0;
+                    childWindow.Closed += (_, _) => childClosed = true;
+                    childWasVisible = childWindow.IsVisible;
+                    mainWindow.Close();
+                }
+                catch (Exception exception)
+                {
+                    threadFailure = exception;
+                    System.Windows.Application.Current?.Shutdown(-1);
+                }
+            }));
+        };
+
+        var applicationThread = new System.Threading.Thread(() =>
+        {
+            try
+            {
+                NuriApplication.Run<ApplicationLifetimeMainComponent>(
+                    "Nuri.RendererTests.ApplicationLifetime.Main",
+                    width: 1,
+                    height: 1);
+            }
+            catch (Exception exception)
+            {
+                threadFailure = exception;
+            }
+        });
+        applicationThread.SetApartmentState(System.Threading.ApartmentState.STA);
+        applicationThread.Start();
+
+        if (!applicationThread.Join(TimeSpan.FromSeconds(15)))
+        {
+            application?.Dispatcher.Invoke(() => application.Shutdown(-1));
+            applicationThread.Join(TimeSpan.FromSeconds(5));
+            throw new InvalidOperationException("WPF: closing the main window should shut down the application without waiting for child windows.");
+        }
+
+        if (threadFailure != null)
+            throw new InvalidOperationException("WPF: the application-lifetime probe failed.", threadFailure);
+
+        AssertEqual(System.Windows.ShutdownMode.OnMainWindowClose, configuredShutdownMode, "WPF: Run should select main-window shutdown semantics.");
+        AssertEqual(true, childWasVisible, "WPF: the lifetime probe should show a child window before closing the main window.");
+        AssertEqual(true, childClosed, "WPF: closing the main window should close every remaining application window.");
+        AssertEqual(1, ApplicationLifetimeProbe.Count("mount:main"), "WPF: the main root effect should mount once.");
+        AssertEqual(1, ApplicationLifetimeProbe.Count("mount:child"), "WPF: the child root effect should mount once.");
+        AssertEqual(1, ApplicationLifetimeProbe.Count("cleanup:main"), "WPF: application shutdown should clean the main root once.");
+        AssertEqual(1, ApplicationLifetimeProbe.Count("cleanup:child"), "WPF: application shutdown should clean the child root once.");
+        AssertEqual(initialRootCount, NuriDiagnostics.GetSnapshot().Roots.Count, "WPF: application shutdown should unregister every application root.");
+
+        ApplicationLifetimeProbe.Reset();
+        NuriDiagnostics.ClearLogs();
+        NuriDiagnostics.Disable();
     }
 
     private static void WpfInputEventSubscriptionsRemainStable()
@@ -326,6 +413,104 @@ internal static class Program
 
         AssertEqual(1, component.Child.RenderCount, "WPF: a queued invalidation must not render after root disposal.");
         AssertSequence(new[] { "mount:deferred", "cleanup:deferred" }, log, "WPF: disposal should not remount an effect from a queued invalidation.");
+    }
+
+    private static void WpfMultipleRootsIsolateStateAndCleanupClosedWindows()
+    {
+        NuriDiagnostics.Enable();
+        NuriDiagnostics.ClearLogs();
+        var initialRootCount = NuriDiagnostics.GetSnapshot().Roots.Count;
+        var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
+        var sharedStore = new Store<int>(0);
+        var lifecycleLog = new List<string>();
+        var firstComponent = new MultiRootProbeComponent("first", sharedStore, lifecycleLog);
+        var secondComponent = new MultiRootProbeComponent("second", sharedStore, lifecycleLog);
+        var firstWindow = CreateHiddenWpfWindow("Nuri.RendererTests.MultiRoot.First");
+        var secondWindow = CreateHiddenWpfWindow("Nuri.RendererTests.MultiRoot.Second");
+        var firstClosed = false;
+        var secondClosed = false;
+
+        try
+        {
+            NuriApplication.Attach(firstWindow, firstComponent);
+            NuriApplication.Attach(secondWindow, secondComponent);
+            firstWindow.Show();
+            secondWindow.Show();
+
+            AssertEqual(initialRootCount + 2, NuriDiagnostics.GetSnapshot().Roots.Count, "WPF: attaching two windows should register two independent roots.");
+            AssertEqual(1, firstComponent.RenderCount, "WPF: the first root should render once during initialization.");
+            AssertEqual(1, secondComponent.RenderCount, "WPF: the second root should render once during initialization.");
+            AssertSequence(new[] { "mount:first", "mount:second" }, lifecycleLog, "WPF: each root should mount its effect exactly once.");
+            AssertEqual(2, CountStoreSubscriptions(firstComponent.Id, secondComponent.Id), "WPF: each root should own an independent shared Store subscription.");
+
+            firstComponent.SetLocalState!(current => current + 1);
+            DrainDispatcher(dispatcher);
+            AssertEqual(2, firstComponent.RenderCount, "WPF: local state should rerender its owning root.");
+            AssertEqual(1, secondComponent.RenderCount, "WPF: local state should not rerender another root.");
+            AssertEqual(1, firstComponent.LocalValue, "WPF: the first root should retain its local state.");
+            AssertEqual(0, secondComponent.LocalValue, "WPF: the second root should retain independent local state.");
+
+            sharedStore.Set(1);
+            DrainDispatcher(dispatcher);
+            AssertEqual(3, firstComponent.RenderCount, "WPF: a shared Store update should rerender the first subscribed root.");
+            AssertEqual(2, secondComponent.RenderCount, "WPF: a shared Store update should rerender the second subscribed root.");
+            AssertEqual(1, firstComponent.SharedValue, "WPF: the first root should observe the shared Store value.");
+            AssertEqual(1, secondComponent.SharedValue, "WPF: the second root should observe the shared Store value.");
+
+            firstWindow.Close();
+            firstClosed = true;
+            DrainDispatcher(dispatcher);
+            AssertEqual(initialRootCount + 1, NuriDiagnostics.GetSnapshot().Roots.Count, "WPF: closing one window should unregister only its root.");
+            AssertEqual(1, lifecycleLog.Count(entry => entry == "cleanup:first"), "WPF: closing one window should clean its effect exactly once.");
+            AssertEqual(0, lifecycleLog.Count(entry => entry == "cleanup:second"), "WPF: closing one window should not clean another root.");
+            AssertEqual(1, CountStoreSubscriptions(firstComponent.Id, secondComponent.Id), "WPF: closing one window should remove only its Store subscription.");
+
+            var firstRenderCountAfterClose = firstComponent.RenderCount;
+            firstComponent.SetLocalState!(current => current + 1);
+            sharedStore.Set(2);
+            DrainDispatcher(dispatcher);
+            AssertEqual(firstRenderCountAfterClose, firstComponent.RenderCount, "WPF: stale local setters and Store subscriptions must not rerender a closed root.");
+            AssertEqual(3, secondComponent.RenderCount, "WPF: the remaining root should continue receiving shared Store updates.");
+            AssertEqual(2, secondComponent.SharedValue, "WPF: the remaining root should observe the latest shared Store value.");
+
+            secondWindow.Close();
+            secondClosed = true;
+            DrainDispatcher(dispatcher);
+            AssertEqual(initialRootCount, NuriDiagnostics.GetSnapshot().Roots.Count, "WPF: closing every window should restore the original registered-root count.");
+            AssertEqual(1, lifecycleLog.Count(entry => entry == "cleanup:second"), "WPF: the remaining root should clean its effect exactly once when closed.");
+            AssertEqual(0, CountStoreSubscriptions(firstComponent.Id, secondComponent.Id), "WPF: closing every window should remove all of their Store subscriptions.");
+        }
+        finally
+        {
+            if (!firstClosed)
+                firstWindow.Close();
+            if (!secondClosed)
+                secondWindow.Close();
+
+            NuriDiagnostics.ClearLogs();
+            NuriDiagnostics.Disable();
+        }
+    }
+
+    private static int CountStoreSubscriptions(params string[] componentIds)
+    {
+        var expectedIds = componentIds.ToHashSet(StringComparer.Ordinal);
+        return NuriDiagnostics.GetSnapshot().Stores
+            .SelectMany(store => store.Subscriptions)
+            .Count(subscription => expectedIds.Contains(subscription.ComponentId));
+    }
+
+    private static System.Windows.Window CreateHiddenWpfWindow(string title)
+    {
+        return new System.Windows.Window
+        {
+            Title = title,
+            Width = 1,
+            Height = 1,
+            ShowInTaskbar = false,
+            WindowStyle = System.Windows.WindowStyle.None,
+            Opacity = 0
+        };
     }
 
     private static void DrainDispatcher(System.Windows.Threading.Dispatcher dispatcher)
@@ -1288,6 +1473,108 @@ internal static class Program
         public RenderCountingEffectChild Child { get; }
 
         public override IElement Render() => Grid(Child);
+    }
+
+    private sealed class MultiRootProbeComponent : Component
+    {
+        private readonly string _name;
+        private readonly Store<int> _sharedStore;
+        private readonly List<string> _lifecycleLog;
+
+        public MultiRootProbeComponent(string name, Store<int> sharedStore, List<string> lifecycleLog)
+        {
+            _name = name;
+            _sharedStore = sharedStore;
+            _lifecycleLog = lifecycleLog;
+        }
+
+        public int RenderCount { get; private set; }
+
+        public int LocalValue { get; private set; }
+
+        public int SharedValue { get; private set; }
+
+        public Action<Func<int, int>>? SetLocalState { get; private set; }
+
+        public override IElement Render()
+        {
+            RenderCount++;
+            var (localValue, setLocalValue) = useState(0);
+            var sharedValue = useStore(_sharedStore);
+            LocalValue = localValue;
+            SharedValue = sharedValue;
+            SetLocalState = setLocalValue;
+
+            useEffect(() =>
+            {
+                _lifecycleLog.Add($"mount:{_name}");
+                return () => _lifecycleLog.Add($"cleanup:{_name}");
+            }, []);
+
+            return Text($"{_name}:{localValue}:{sharedValue}");
+        }
+    }
+
+    private sealed class ApplicationLifetimeMainComponent : Component
+    {
+        public override IElement Render()
+        {
+            useEffect(() =>
+            {
+                ApplicationLifetimeProbe.Record("mount:main");
+                ApplicationLifetimeProbe.OnMainMounted?.Invoke();
+                return () => ApplicationLifetimeProbe.Record("cleanup:main");
+            }, []);
+
+            return Text("main");
+        }
+    }
+
+    private sealed class ApplicationLifetimeChildComponent : Component
+    {
+        public override IElement Render()
+        {
+            useEffect(() =>
+            {
+                ApplicationLifetimeProbe.Record("mount:child");
+                return () => ApplicationLifetimeProbe.Record("cleanup:child");
+            }, []);
+
+            return Text("child");
+        }
+    }
+
+    private static class ApplicationLifetimeProbe
+    {
+        private static readonly object SyncRoot = new object();
+        private static readonly List<string> Entries = new List<string>();
+
+        public static Action? OnMainMounted { get; set; }
+
+        public static void Record(string entry)
+        {
+            lock (SyncRoot)
+            {
+                Entries.Add(entry);
+            }
+        }
+
+        public static int Count(string entry)
+        {
+            lock (SyncRoot)
+            {
+                return Entries.Count(value => value == entry);
+            }
+        }
+
+        public static void Reset()
+        {
+            lock (SyncRoot)
+            {
+                Entries.Clear();
+                OnMainMounted = null;
+            }
+        }
     }
 
     private sealed class RenderCountingEffectChild : Component

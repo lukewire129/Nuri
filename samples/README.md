@@ -34,6 +34,7 @@ Add Core features only after a sample makes the need obvious and repeatable.
 - `Nuri.AnimatedDashboardSample`: shared WPF/Avalonia opacity transition and interruption baseline
 - `Nuri.WPFAnimatedDashboardSample`: WPF Margin, background, foreground, and Rotate transition replacement coverage
 - `Nuri.AvaloniaHotReloadSample`: minimal Avalonia renderer and C# Hot Reload smoke test
+- `Nuri.MultiWindowSample`: WPF root registration, local state isolation, shared Store updates, and per-window lifecycle cleanup
 
 ## Next Sample Roadmap
 
@@ -64,10 +65,6 @@ What it should pressure:
 - keyed identity under repeated mixed updates
 - cleanup and invalidation coalescing
 - unsupported property/event reporting
-
-## Follow-Up Sample
-
-- `MultiWindowSample`: pressure root registration, shared vs isolated state, and window lifecycle boundaries
 
 ## Promotion Rule For Core Features
 

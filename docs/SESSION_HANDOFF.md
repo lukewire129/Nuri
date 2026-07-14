@@ -77,6 +77,8 @@ Maintain Nuri as a platform-neutral Core virtual UI/runtime/diff model, with WPF
 - Runtime diagnostics track component render counts, duplicate keys, root patch batches grouped by `PatchOperationType`, and virtualized item/realized-row counts. WPF also records deduplicated `UnsupportedProperty` entries after every supported property fallback fails and `UnsupportedEvent` entries when event conversion or native event lookup fails.
 - `Nuri.LargeListSample` is now the WPF 10,000-row stress screen for update, swap, reverse, filter, add, remove, replace, reset, and selection operations. It displays the previous committed patch batch, cumulative patches, component renders, and realized native rows.
 - WPF virtualized reconciliation keeps small keyed edits incremental and switches to one retained-handle collection reset when adds, removes, and LIS-derived moves exceed 256, avoiding quadratic large-reorder behavior.
+- `Nuri.MultiWindowSample` exercises per-window hook-state isolation, shared `Store` updates, root registration, and window cleanup. Renderer coverage verifies that closing one WPF window unregisters only its root, disposes its effect and Store subscription, and makes its stale setter inert while remaining roots continue updating.
+- WPF `NuriApplication.Run<TComponent>` uses `ShutdownMode.OnMainWindowClose`, so closing its MainWindow closes all remaining windows and disposes every registered root. `Show<TComponent>` alone preserves the caller's existing shutdown policy.
 
 ## Important Files
 

@@ -33,6 +33,7 @@ Runtime identity, key, and required regression-test contracts are defined in [RU
 - Effect cleanups are invoked when hook state is disposed.
 - Before a WPF subtree is removed or replaced, its committed native event handlers are detached recursively. WPF root disposal applies the same rule, so a retained reference to an unmounted native control cannot invoke the previous virtual callback.
 - Disposing a WPF application root clears queued component invalidations. Dispatcher callbacks that were already posted must not render or remount effects after disposal.
+- `NuriApplication.Run<TComponent>` configures WPF with `ShutdownMode.OnMainWindowClose`. Closing that main window shuts down the application, closes every remaining window, and disposes each registered root through its `Closed` handler. Calling `Show<TComponent>` by itself does not change an application's shutdown policy.
 - `useState` setters and `useReducer` dispatchers retained by asynchronous work become no-ops after their owning runtime node is disposed. They must not invalidate a replacement component that later reuses the same string ID.
 - `DisposeHookState` removes effect, memo, pending effect, and state entries for the component subtree.
 - Subtree membership comes from the in-memory runtime ancestry registry, not from parsing component ID strings.
