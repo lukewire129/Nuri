@@ -268,6 +268,8 @@ namespace Nuri.WPF
             _invalidations.Clear();
             _rebuildScheduled = false;
 
+            if (_currentRootVisual != null && _runtime != null)
+                WpfVirtualEntryRenderer.DetachEvents(_currentRootVisual, _runtime.CurrentVirtualEntry);
             if (_currentRootVisual != null)
                 RemoveVirtualizationDiagnostics(_currentRootVisual);
             ComponentLifecycle.DisposeSubtree(_treePrefix + "_0");

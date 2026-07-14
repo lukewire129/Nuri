@@ -25,6 +25,9 @@ using WpfSolidColorBrush = System.Windows.Media.SolidColorBrush;
 using WpfThickness = System.Windows.Thickness;
 using WpfListBox = System.Windows.Controls.ListBox;
 using WpfListBoxItem = System.Windows.Controls.ListBoxItem;
+using WpfButton = System.Windows.Controls.Button;
+using WpfCheckBox = System.Windows.Controls.CheckBox;
+using WpfTextBox = System.Windows.Controls.TextBox;
 
 namespace Nuri.RendererTests;
 
@@ -38,6 +41,7 @@ internal static class Program
         RunSuite(() => new WpfDriver());
         WpfRepeatedEffectLifecycleRemainsStable();
         WpfDisposedRootIgnoresQueuedInvalidations();
+        WpfInputEventSubscriptionsRemainStable();
         WpfUnsupportedPropertyDiagnosticsAreDeduplicated();
         WpfUnsupportedEventDiagnosticsAreDeduplicated();
         WpfDiagnosticsTrackAppliedPatchBatches();
@@ -46,6 +50,131 @@ internal static class Program
         WpfVirtualizedItemsStayLazyAndRecycleContainers();
         RunSuite(() => new AvaloniaDriver());
         Console.WriteLine("Nuri.RendererTests passed.");
+    }
+
+    private static void WpfInputEventSubscriptionsRemainStable()
+    {
+        var log = new List<string>();
+        var component = new InputEventLifecycleComponent(log);
+        var driver = new WpfDriver();
+        var root = driver.Initialize(component);
+        using var keyboardSource = new System.Windows.Interop.HwndSource(
+            new System.Windows.Interop.HwndSourceParameters("Nuri.RendererTests.InputEvents")
+            {
+                Width = 1,
+                Height = 1,
+                WindowStyle = 0
+            });
+
+        var controls = driver.RootChildren;
+        var button = (WpfButton)controls[0];
+        var textBox = (WpfTextBox)controls[1];
+        var checkBox = (WpfCheckBox)controls[2];
+        var pointerSurface = (WpfTextBlock)controls[3];
+
+        RaiseWpfInputEvents(button, textBox, checkBox, pointerSurface, keyboardSource, "initial-input");
+        AssertSequence(ExpectedInputEventLog(1, "initial-input"), log, "WPF: supported input events should deliver their native payloads once.");
+
+        log.Clear();
+        component.Generation = 2;
+        root.Rebuild();
+        AssertSame(button, driver.RootChildren[0], "WPF: replacing event handlers should preserve the button control.");
+        AssertSame(textBox, driver.RootChildren[1], "WPF: replacing event handlers should preserve the text input control.");
+        AssertSame(checkBox, driver.RootChildren[2], "WPF: replacing event handlers should preserve the check control.");
+        AssertSame(pointerSurface, driver.RootChildren[3], "WPF: replacing event handlers should preserve the pointer surface.");
+        RaiseWpfInputEvents(button, textBox, checkBox, pointerSurface, keyboardSource, "replacement-input");
+        AssertSequence(ExpectedInputEventLog(2, "replacement-input"), log, "WPF: handler replacement should remove every previous callback.");
+
+        for (var generation = 3; generation <= 52; generation++)
+        {
+            component.Generation = generation;
+            root.Rebuild();
+        }
+
+        log.Clear();
+        RaiseWpfInputEvents(button, textBox, checkBox, pointerSurface, keyboardSource, "stress-input");
+        AssertSequence(ExpectedInputEventLog(52, "stress-input"), log, "WPF: repeated rebuilds should not accumulate event handlers.");
+
+        component.ShowInputs = false;
+        root.Rebuild();
+        log.Clear();
+        RaiseWpfInputEvents(button, textBox, checkBox, pointerSurface, keyboardSource, "removed-input");
+        AssertEqual(0, log.Count, "WPF: removed subtrees should detach native event handlers.");
+        root.Dispose();
+
+        var disposeLog = new List<string>();
+        var disposeComponent = new InputEventLifecycleComponent(disposeLog) { Generation = 100 };
+        var disposeDriver = new WpfDriver();
+        var disposeRoot = disposeDriver.Initialize(disposeComponent);
+        var disposeControls = disposeDriver.RootChildren;
+        var disposedButton = (WpfButton)disposeControls[0];
+        var disposedTextBox = (WpfTextBox)disposeControls[1];
+        var disposedCheckBox = (WpfCheckBox)disposeControls[2];
+        var disposedPointerSurface = (WpfTextBlock)disposeControls[3];
+        disposeRoot.Dispose();
+        RaiseWpfInputEvents(disposedButton, disposedTextBox, disposedCheckBox, disposedPointerSurface, keyboardSource, "disposed-input");
+        AssertEqual(0, disposeLog.Count, "WPF: root disposal should detach native event handlers.");
+    }
+
+    private static void RaiseWpfInputEvents(
+        WpfButton button,
+        WpfTextBox textBox,
+        WpfCheckBox checkBox,
+        WpfTextBlock pointerSurface,
+        System.Windows.PresentationSource keyboardSource,
+        string textValue)
+    {
+        button.RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+        textBox.Text = textValue;
+        checkBox.IsChecked = true;
+        checkBox.IsChecked = false;
+
+        pointerSurface.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount)
+        {
+            RoutedEvent = System.Windows.Input.Mouse.MouseEnterEvent
+        });
+        pointerSurface.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount)
+        {
+            RoutedEvent = System.Windows.Input.Mouse.MouseLeaveEvent
+        });
+        pointerSurface.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, System.Windows.Input.MouseButton.Left)
+        {
+            RoutedEvent = System.Windows.UIElement.MouseLeftButtonDownEvent
+        });
+        pointerSurface.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, System.Windows.Input.MouseButton.Left)
+        {
+            RoutedEvent = System.Windows.UIElement.MouseLeftButtonUpEvent
+        });
+
+        textBox.RaiseEvent(new System.Windows.Input.KeyEventArgs(System.Windows.Input.Keyboard.PrimaryDevice, keyboardSource, Environment.TickCount, System.Windows.Input.Key.Escape)
+        {
+            RoutedEvent = System.Windows.Input.Keyboard.KeyDownEvent
+        });
+        textBox.RaiseEvent(new System.Windows.Input.KeyEventArgs(System.Windows.Input.Keyboard.PrimaryDevice, keyboardSource, Environment.TickCount, System.Windows.Input.Key.Escape)
+        {
+            RoutedEvent = System.Windows.Input.Keyboard.KeyUpEvent
+        });
+        textBox.RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.UIElement.GotFocusEvent));
+        textBox.RaiseEvent(new System.Windows.RoutedEventArgs(System.Windows.UIElement.LostFocusEvent));
+    }
+
+    private static IReadOnlyList<string> ExpectedInputEventLog(int generation, string textValue)
+    {
+        return new[]
+        {
+            $"click:{generation}",
+            $"text:{generation}:{textValue}",
+            $"check:{generation}:True",
+            $"check:{generation}:False",
+            $"hover:{generation}:True",
+            $"hover:{generation}:False",
+            $"mouse-down:{generation}",
+            $"mouse-up:{generation}",
+            $"key-down:{generation}:Escape",
+            $"key-up:{generation}:Escape",
+            $"focus:{generation}:True",
+            $"focus:{generation}:False"
+        };
     }
 
     private static void WpfUnsupportedEventDiagnosticsAreDeduplicated()
@@ -906,6 +1035,46 @@ internal static class Program
             }
 
             return text;
+        }
+    }
+
+    private sealed class InputEventLifecycleComponent : Component
+    {
+        private readonly List<string> _log;
+
+        public InputEventLifecycleComponent(List<string> log)
+        {
+            _log = log;
+        }
+
+        public int Generation { get; set; } = 1;
+
+        public bool ShowInputs { get; set; } = true;
+
+        public override IElement Render()
+        {
+            if (!ShowInputs)
+                return Grid();
+
+            var generation = Generation;
+            return Grid(
+                Button($"button:{generation}")
+                    .Key("event-button")
+                    .OnClick(() => _log.Add($"click:{generation}")),
+                TextBox(string.Empty)
+                    .Key("event-text")
+                    .OnTextChanged(value => _log.Add($"text:{generation}:{value}"))
+                    .OnKeyDown(key => _log.Add($"key-down:{generation}:{key}"))
+                    .OnKeyUp(key => _log.Add($"key-up:{generation}:{key}"))
+                    .OnFocus(focused => _log.Add($"focus:{generation}:{focused}")),
+                CheckBox($"check:{generation}")
+                    .Key("event-check")
+                    .OnCheckChanged(value => _log.Add($"check:{generation}:{value}")),
+                Text("pointer")
+                    .Key("event-pointer")
+                    .OnHover(hovered => _log.Add($"hover:{generation}:{hovered}"))
+                    .OnMouseDown(() => _log.Add($"mouse-down:{generation}"))
+                    .OnMouseUp(() => _log.Add($"mouse-up:{generation}")));
         }
     }
 

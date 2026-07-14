@@ -101,6 +101,15 @@ namespace Nuri.WPF
             return controlIndex.TryGetValue(id, out var element) ? element : null;
         }
 
+        internal static void DetachEvents(FrameworkElement root, VirtualEntry entry)
+        {
+            if (root == null || entry == null)
+                return;
+
+            var controlIndex = ControlIndexes.GetValue(root, BuildControlIndex);
+            DetachEvents(controlIndex, entry);
+        }
+
         private static FrameworkElement CreateElement(VirtualEntry entry)
         {
             var element = WpfControlRegistry.Create(entry);
@@ -147,6 +156,7 @@ namespace Nuri.WPF
 
             if (parent is FrameworkElement parentElement)
             {
+                DetachEvents(controlIndex, operation.OldEntry);
                 RemoveFromIndex(controlIndex, target);
                 WpfControlRegistry.ReplaceChild(parentElement, target, replacement);
                 AddToIndex(controlIndex, replacement);
@@ -210,6 +220,7 @@ namespace Nuri.WPF
             var parent = LogicalTreeHelper.GetParent(child);
             if (parent is FrameworkElement parentElement)
             {
+                DetachEvents(controlIndex, operation.Child);
                 RemoveFromIndex(controlIndex, child);
                 WpfControlRegistry.RemoveChild(parentElement, child);
             }
@@ -277,6 +288,20 @@ namespace Nuri.WPF
             var handler = handlers.TryGetValue(handlerKey, out var cachedHandler) ? cachedHandler : fallbackHandler;
             eventInfo.RemoveEventHandler(element, handler);
             handlers.Remove(handlerKey);
+        }
+
+        private static void DetachEvents(Dictionary<string, FrameworkElement> controlIndex, VirtualEntry entry)
+        {
+            if (controlIndex.TryGetValue(entry.Id, out var element))
+            {
+                foreach (var evt in entry.Events)
+                    RemoveEventHandler(element, evt);
+
+                EventHandlers.Remove(element);
+            }
+
+            foreach (var child in entry.Children)
+                DetachEvents(controlIndex, child);
         }
 
         private static void LogUnsupportedEvent(FrameworkElement element, string eventName, string? wpfEventName)

@@ -63,6 +63,7 @@ Maintain Nuri as a platform-neutral Core virtual UI/runtime/diff model, with WPF
 - The Avalonia adapter includes application-root scheduling, virtual-entry rendering, control/property/event mapping, hot reload support, and a smoke-test sample. It is no longer a renderer skeleton.
 - `tests/Nuri.RendererTests` validates post-commit effects, subtree and key-replacement cleanup, repeated keyed native moves, and idempotent root disposal without external test packages. WPF coverage also runs 50-cycle mount/unmount, key replacement, and move stress cases.
 - WPF root disposal clears pending component invalidations and ignores Dispatcher callbacks that were posted before disposal, preventing effects from remounting on a closed root.
+- WPF input-event coverage raises click, text/check, hover, mouse, keyboard, and focus events on native controls, replaces handlers through 50 rebuilds without duplication, and verifies recursive handler detachment on subtree removal and root disposal.
 - `samples/WPF/Nuri.ExplorerTreeSample` exercises recursive keyed components, expand/collapse cleanup, selection, rename, and add/delete flows through the WPF renderer.
 - `samples/WPF/GridTest` demonstrates `.Key(...)`, neutral `.OnClick(Action)`, and the preferred `Grid(...).Rows(...).Columns(...)` layout style.
 - Legacy `Div(Rows(...), Columns(...), children...)` overloads remain for compatibility, but new code should prefer fluent layout definitions so row/column definitions do not look like child controls.
