@@ -9,10 +9,15 @@ namespace Nuri.WPF
     {
         public static void UpdateAttachedProperty(this FrameworkElement? element, string propertyName, object value)
         {
+            element.TryUpdateAttachedProperty(propertyName, value);
+        }
+
+        internal static bool TryUpdateAttachedProperty(this FrameworkElement? element, string propertyName, object value)
+        {
             if (propertyName == "RowDefinitions")
             {
                 if (element is not System.Windows.Controls.Grid grid || value is not List<LengthValue> rows)
-                    return;
+                    return false;
 
                 grid.RowDefinitions.Clear ();
 
@@ -20,85 +25,94 @@ namespace Nuri.WPF
                 {
                     grid.RowDefinitions.Add (new RowDefinition { Height = WpfValueMapper.ToWpfGridLength(rowdefinition) });
                 }
+                return true;
             }
             if (propertyName == "ColumnDefinitions")
             {
                 if (element is not System.Windows.Controls.Grid grid || value is not List<LengthValue> columns)
-                    return;
+                    return false;
 
                 grid.ColumnDefinitions.Clear ();
                 foreach (var columndefinition in columns)
                 {
                     grid.ColumnDefinitions.Add (new ColumnDefinition { Width = WpfValueMapper.ToWpfGridLength(columndefinition) });
                 }
+                return true;
             }
             if (propertyName == "Grid.Row")
             {
                 if (element == null)
-                    return;
+                    return false;
 
                 System.Windows.Controls.Grid.SetRow (element, (int)value);
+                return true;
             }
             if (propertyName == "Grid.Column")
             {
                 if (element == null)
-                    return;
+                    return false;
 
                 System.Windows.Controls.Grid.SetColumn (element, (int)value);
+                return true;
             }
             if (propertyName == "Grid.RowSpan")
             {
                 if (element == null)
-                    return;
+                    return false;
 
                 System.Windows.Controls.Grid.SetRowSpan (element, (int)value);
+                return true;
             }
             if (propertyName == "Grid.ColumnSpan")
             {
                 if (element == null)
-                    return;
+                    return false;
 
                 System.Windows.Controls.Grid.SetColumnSpan (element, (int)value);
+                return true;
             }
             if (propertyName == "Canvas.Bottom")
             {
                 if (element == null)
-                    return;
+                    return false;
 
                 System.Windows.Controls.Canvas.SetBottom (element, (double)value);
+                return true;
             }
             if (propertyName == "Canvas.Top")
             {
                 if (element == null)
-                    return;
+                    return false;
 
                 System.Windows.Controls.Canvas.SetTop (element, (double)value);
+                return true;
             }
             if (propertyName == "Canvas.Left")
             {
                 if (element == null)
-                    return;
+                    return false;
 
                 System.Windows.Controls.Canvas.SetLeft (element, (double)value);
+                return true;
             }
             if (propertyName == "Canvas.Right")
             {
                 if (element == null)
-                    return;
+                    return false;
 
                 System.Windows.Controls.Canvas.SetRight (element, (double)value);
+                return true;
             }
             if (propertyName == "RenderOptions.BitmapScalingMode")
             {
                 if (element == null)
-                    return;
+                    return false;
 
                 System.Windows.Media.RenderOptions.SetBitmapScalingMode (element, (System.Windows.Media.BitmapScalingMode)value);
+                return true;
             }
-            //else
-            //{
-            //    Console.WriteLine ($"Property '{propertyName}' does not exist or is not writable on '{element.GetType ().Name}'.");
-            //}
+
+            return false;
         }
 
         public static bool ResetAttachedProperty(this FrameworkElement? element, string propertyName)

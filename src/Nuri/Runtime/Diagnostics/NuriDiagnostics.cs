@@ -14,6 +14,7 @@ namespace Nuri.Runtime.Diagnostics
         private static readonly Dictionary<string, StoreRecord> Stores = new Dictionary<string, StoreRecord>();
         private static readonly Dictionary<string, VirtualizedItemsSnapshot> VirtualizedItems = new Dictionary<string, VirtualizedItemsSnapshot>();
         private static readonly RuntimeLogBuffer Logs = new RuntimeLogBuffer(5000);
+        private static readonly HashSet<string> LoggedOnceKeys = new HashSet<string>(StringComparer.Ordinal);
         private static long _sequence;
 
         public static bool IsEnabled { get; private set; }
@@ -323,6 +324,7 @@ namespace Nuri.Runtime.Diagnostics
             lock (SyncRoot)
             {
                 Logs.Clear();
+                LoggedOnceKeys.Clear();
             }
 
             Changed?.Invoke(null, EventArgs.Empty);
@@ -358,6 +360,30 @@ namespace Nuri.Runtime.Diagnostics
         public static void Log(RuntimeLogKind kind, string? rootId, string? componentId, string message)
         {
             Log(kind, rootId, componentId, message, null, null, null, null);
+        }
+
+        public static void LogOnce(RuntimeLogKind kind, string dedupeKey, string? rootId, string? componentId, string message)
+        {
+            if (!IsEnabled || string.IsNullOrWhiteSpace(dedupeKey))
+                return;
+
+            RuntimeLogEntry entry;
+            lock (SyncRoot)
+            {
+                if (!LoggedOnceKeys.Add(dedupeKey))
+                    return;
+
+                entry = new RuntimeLogEntry(
+                    ++_sequence,
+                    DateTimeOffset.UtcNow,
+                    kind,
+                    rootId,
+                    componentId,
+                    message);
+                Logs.Add(entry);
+            }
+
+            Changed?.Invoke(null, EventArgs.Empty);
         }
 
         public static void Log(

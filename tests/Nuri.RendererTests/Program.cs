@@ -37,12 +37,48 @@ internal static class Program
         RunSuite(() => new WpfDriver());
         WpfRepeatedEffectLifecycleRemainsStable();
         WpfDisposedRootIgnoresQueuedInvalidations();
+        WpfUnsupportedPropertyDiagnosticsAreDeduplicated();
         WpfDiagnosticsTrackAppliedPatchBatches();
         WpfRootDisposalRemovesVirtualizedDiagnostics();
         WpfTransitionsReplaceAndClearNativeAnimations(new WpfDriver());
         WpfVirtualizedItemsStayLazyAndRecycleContainers();
         RunSuite(() => new AvaloniaDriver());
         Console.WriteLine("Nuri.RendererTests passed.");
+    }
+
+    private static void WpfUnsupportedPropertyDiagnosticsAreDeduplicated()
+    {
+        NuriDiagnostics.Enable();
+        NuriDiagnostics.ClearLogs();
+        var component = new UnsupportedPropertyDiagnosticsComponent();
+        using (var root = new WpfDriver().Initialize(component))
+        {
+            component.Value = "updated";
+            root.Rebuild();
+            component.Value = "updated-again";
+            root.Rebuild();
+
+            var unsupportedLogs = NuriDiagnostics.GetSnapshot().RecentLogs
+                .Where(entry => entry.Kind == RuntimeLogKind.UnsupportedProperty)
+                .ToArray();
+            AssertEqual(1, unsupportedLogs.Length, "WPF: repeated unsupported property updates should emit one diagnostic per control type and property.");
+            AssertEqual(true, unsupportedLogs[0].Message.Contains("UnsupportedProbe", StringComparison.Ordinal), "WPF: unsupported property diagnostics should name the property.");
+            AssertEqual(true, unsupportedLogs[0].Message.Contains("TextBlock", StringComparison.Ordinal), "WPF: unsupported property diagnostics should name the native control type.");
+
+            NuriDiagnostics.ClearLogs();
+            component.IncludeUnsupportedProperty = false;
+            root.Rebuild();
+            AssertEqual(1, NuriDiagnostics.GetSnapshot().RecentLogs.Count(entry => entry.Kind == RuntimeLogKind.UnsupportedProperty), "WPF: clearing diagnostics should allow an unsupported property removal to be reported again.");
+        }
+
+        NuriDiagnostics.ClearLogs();
+        NuriDiagnostics.Disable();
+        WpfVirtualEntryRenderer.Build(
+            Component.Text("disabled")
+                .SetProperty("UnsupportedProbe", "value")
+                .ToVirtualEntry()
+                .WithIdentity("unsupported-disabled", null));
+        AssertEqual(0, NuriDiagnostics.GetSnapshot().RecentLogs.Count(entry => entry.Kind == RuntimeLogKind.UnsupportedProperty), "WPF: disabled diagnostics should not record unsupported properties.");
     }
 
     private static void WpfRepeatedEffectLifecycleRemainsStable()
@@ -779,6 +815,24 @@ internal static class Program
         public string Value { get; set; } = "initial";
 
         public override IElement Render() => Text(Value);
+    }
+
+    private sealed class UnsupportedPropertyDiagnosticsComponent : Component
+    {
+        public string Value { get; set; } = "initial";
+
+        public bool IncludeUnsupportedProperty { get; set; } = true;
+
+        public override IElement Render()
+        {
+            var text = Text("supported")
+                .Opacity(0.75)
+                .Row(1);
+            if (IncludeUnsupportedProperty)
+                text.SetProperty("UnsupportedProbe", Value);
+
+            return text;
+        }
     }
 
     private sealed class OpacityTransitionComponent : Component

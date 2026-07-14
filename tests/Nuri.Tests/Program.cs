@@ -35,6 +35,7 @@ internal static class Program
         ComponentCachesAndRefreshesItsRuntimeNode();
         DiagnosticsPreserveHookSummaryWhenEnabled();
         DiagnosticsTrackPatchBatchesAndVirtualizedRows();
+        DiagnosticsLogOnceDeduplicatesUntilLogsAreCleared();
         DuplicateComponentKeysUseIndependentHookIdentity();
         RemovingHooksFromARenderCleansUpTheirState();
         StoreSetInvalidatesOnlySubscribedComponents();
@@ -1024,6 +1025,32 @@ internal static class Program
         {
             NuriDiagnostics.RemoveVirtualizedItems(hostId);
             NuriDiagnostics.UnregisterRoot(rootId);
+            NuriDiagnostics.Disable();
+        }
+    }
+
+    private static void DiagnosticsLogOnceDeduplicatesUntilLogsAreCleared()
+    {
+        NuriDiagnostics.Enable();
+        NuriDiagnostics.ClearLogs();
+        try
+        {
+            NuriDiagnostics.LogOnce(RuntimeLogKind.UnsupportedProperty, "test:property", null, "component", "first");
+            NuriDiagnostics.LogOnce(RuntimeLogKind.UnsupportedProperty, "test:property", null, "component", "duplicate");
+
+            var logs = NuriDiagnostics.GetSnapshot().RecentLogs;
+            AssertEqual(1, logs.Count, "LogOnce should retain only the first entry for a dedupe key.");
+            AssertEqual("first", logs[0].Message, "LogOnce should preserve the first diagnostic message.");
+
+            NuriDiagnostics.ClearLogs();
+            NuriDiagnostics.LogOnce(RuntimeLogKind.UnsupportedProperty, "test:property", null, "component", "after-clear");
+            logs = NuriDiagnostics.GetSnapshot().RecentLogs;
+            AssertEqual(1, logs.Count, "Clearing logs should reset LogOnce deduplication.");
+            AssertEqual("after-clear", logs[0].Message, "LogOnce should emit the diagnostic again after logs are cleared.");
+        }
+        finally
+        {
+            NuriDiagnostics.ClearLogs();
             NuriDiagnostics.Disable();
         }
     }

@@ -65,6 +65,8 @@ When `NuriDiagnostics` is enabled, each registered application root records appl
 
 Renderer-owned virtualized hosts may also publish neutral `VirtualizedItemsSnapshot` entries containing host id, virtual item count, and realized native row count. WPF root disposal removes these entries deterministically. The WPF Large List stress screen displays the previous committed patch batch, cumulative patches, component render count, and realized row count so interactive operations expose full rebuilds or unbounded materialization.
 
+When diagnostics are enabled, the WPF property path records `RuntimeLogKind.UnsupportedProperty` only after mapper, writable CLR property, and attached-property fallbacks all fail. Host-only window properties remain intentionally excluded. Messages identify the property and native control type and are deduplicated by native control CLR type plus property name until `NuriDiagnostics.ClearLogs()` is called.
+
 ## Performance Baseline
 
 Measured in Release on 2026-07-11. These values are a local baseline, not universal budgets. Compare future results on the same machine and workload; correctness counters are hard invariants.

@@ -2,6 +2,7 @@ using Nuri.Constants;
 using Nuri.UI.Controls;
 using Nuri.VirtualDom;
 using Nuri.UI.Values;
+using Nuri.Runtime.Diagnostics;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -184,7 +185,10 @@ namespace Nuri.WPF
             {
                 var defaultValue = property.PropertyType.IsValueType ? Activator.CreateInstance(property.PropertyType) : null;
                 property.SetValue(propertyTarget, defaultValue);
+                return;
             }
+
+            LogUnsupportedProperty(propertyTarget, operation.PropertyName);
         }
 
         private static void AddChild(Dictionary<string, FrameworkElement> controlIndex, AddChildPatch operation)
@@ -301,12 +305,29 @@ namespace Nuri.WPF
             if (property != null && property.CanWrite)
             {
                 property.SetValue(propertyTarget, value);
+                return;
             }
-            else
-            {
-                if (value != null)
-                    propertyTarget.UpdateAttachedProperty(propertyName, value);
-            }
+
+            if (value != null && propertyTarget.TryUpdateAttachedProperty(propertyName, value))
+                return;
+
+            LogUnsupportedProperty(propertyTarget, propertyName);
+        }
+
+        private static void LogUnsupportedProperty(FrameworkElement element, string propertyName)
+        {
+            if (!NuriDiagnostics.IsEnabled)
+                return;
+
+            var controlType = element.GetType();
+            var controlTypeName = controlType.Name;
+            var dedupeKey = $"WPF:UnsupportedProperty:{controlType.FullName}:{propertyName}";
+            NuriDiagnostics.LogOnce(
+                RuntimeLogKind.UnsupportedProperty,
+                dedupeKey,
+                null,
+                element.GetUniqueId(),
+                $"WPF property '{propertyName}' is not supported by '{controlTypeName}'.");
         }
 
         private static bool IsHostOnlyWindowProperty(VirtualEntry entry, string propertyName)

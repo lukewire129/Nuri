@@ -65,6 +65,8 @@ Warmup 이후 `--explorer-comparison` WPF harness는 2026-07-14에 700px viewpor
 
 Renderer-owned virtualized host는 host id, virtual item count 및 realized native row count를 담은 중립 `VirtualizedItemsSnapshot` entry도 게시할 수 있습니다. WPF root disposal은 이 entry를 결정적으로 제거합니다. WPF Large List stress 화면은 직전 commit의 patch batch, 누적 patch, component render count 및 realized row count를 표시하여 interactive operation에서 full rebuild 또는 unbounded materialization을 드러냅니다.
 
+Diagnostics가 활성화된 경우 WPF property 경로는 mapper, 쓰기 가능한 CLR property 및 attached-property fallback이 모두 실패한 뒤에만 `RuntimeLogKind.UnsupportedProperty`를 기록합니다. Host-only window property는 의도적인 제외 상태를 유지합니다. Message에는 property와 native control type을 포함하며 `NuriDiagnostics.ClearLogs()`가 호출될 때까지 native control CLR type과 property 이름 조합으로 중복을 억제합니다.
+
 ## 성능 기준
 
 2026-07-11 Release 빌드에서 측정했습니다. 이 값은 로컬 비교 기준이며 모든 환경에 적용되는 성능 예산은 아닙니다. 같은 장비와 workload에서 전후 결과를 비교하고, 정확성 카운터는 반드시 유지해야 합니다.

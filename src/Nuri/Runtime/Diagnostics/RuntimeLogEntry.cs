@@ -82,6 +82,7 @@ namespace Nuri.Runtime.Diagnostics
         ComponentRendered,
         ComponentUnmounted,
         DuplicateKey,
+        UnsupportedProperty,
         StoreChanged,
         SubtreeRebuild,
         FullRebuild,
