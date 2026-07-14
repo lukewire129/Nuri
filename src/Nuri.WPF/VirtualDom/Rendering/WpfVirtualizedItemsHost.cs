@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using Nuri.Runtime.Lifecycle;
+using Nuri.Runtime.Diagnostics;
 using Nuri.UI;
 using Nuri.UI.Values;
 using Nuri.UI.Virtualization;
@@ -17,6 +18,7 @@ namespace Nuri.WPF
 {
     internal sealed class WpfVirtualizedItemsHost : ListBox
     {
+        private const int IncrementalReconcileLimit = 256;
         private readonly BulkObservableCollection<ItemHandle> _items = new BulkObservableCollection<ItemHandle>();
         private readonly Dictionary<ListBoxItem, RealizedRow> _rows = new Dictionary<ListBoxItem, RealizedRow>();
         private IVirtualizedItemsSource? _source;
@@ -36,10 +38,19 @@ namespace Nuri.WPF
             var panelFactory = new FrameworkElementFactory(typeof(VirtualizingStackPanel));
             ItemsPanel = new ItemsPanelTemplate(panelFactory);
             Loaded += (_, __) => RestoreRealizedRows();
-            Unloaded += (_, __) => ClearRealizedRows();
+            Unloaded += (_, __) =>
+            {
+                ClearRealizedRows();
+                NuriDiagnostics.RemoveVirtualizedItems(this.GetUniqueId());
+            };
         }
 
         internal int RealizedCount => _rows.Count;
+
+        internal void RemoveDiagnostics()
+        {
+            NuriDiagnostics.RemoveVirtualizedItems(this.GetUniqueId());
+        }
 
         internal void SetSource(IVirtualizedItemsSource source)
         {
@@ -49,6 +60,7 @@ namespace Nuri.WPF
             _source = source;
             Reconcile(source);
             RefreshRealized(new HashSet<string>(source.GetIdentities(), StringComparer.Ordinal));
+            RecordDiagnostics();
         }
 
         internal void ApplyPatch(UpdateVirtualizedItemsPatch patch)
@@ -64,6 +76,7 @@ namespace Nuri.WPF
                         .Select(change => change.Key),
                     StringComparer.Ordinal);
             RefreshRealized(changed);
+            RecordDiagnostics();
         }
 
         protected override DependencyObject GetContainerForItemOverride()
@@ -98,12 +111,61 @@ namespace Nuri.WPF
         private void Reconcile(IVirtualizedItemsSource source)
         {
             var identities = source.GetIdentities();
+            if (_items.Count == identities.Count)
+            {
+                var sameOrder = true;
+                for (var index = 0; index < identities.Count; index++)
+                {
+                    if (!string.Equals(_items[index].Identity, identities[index], StringComparison.Ordinal))
+                    {
+                        sameOrder = false;
+                        break;
+                    }
+                }
+
+                if (sameOrder)
+                {
+                    for (var index = 0; index < _items.Count; index++)
+                        _items[index].Update(source, index);
+                    return;
+                }
+            }
+
+            var currentByIdentity = _items.ToDictionary(item => item.Identity, StringComparer.Ordinal);
+            var desired = new ItemHandle[identities.Count];
+            var retainedOldIndexes = new List<int>(Math.Min(_items.Count, identities.Count));
+            var oldIndexes = new Dictionary<string, int>(currentByIdentity.Count, StringComparer.Ordinal);
+            for (var index = 0; index < _items.Count; index++)
+                oldIndexes[_items[index].Identity] = index;
+
+            var added = 0;
+            for (var index = 0; index < identities.Count; index++)
+            {
+                var identity = identities[index];
+                if (currentByIdentity.TryGetValue(identity, out var retainedHandle))
+                {
+                    retainedHandle.Update(source, index);
+                    desired[index] = retainedHandle;
+                    retainedOldIndexes.Add(oldIndexes[identity]);
+                }
+                else
+                {
+                    desired[index] = new ItemHandle(identity, source, index);
+                    added++;
+                }
+            }
+
             if (_items.Count == 0)
             {
-                var initialItems = new ItemHandle[identities.Count];
-                for (var index = 0; index < identities.Count; index++)
-                    initialItems[index] = new ItemHandle(identities[index], source, index);
-                _items.ReplaceAll(initialItems);
+                _items.ReplaceAll(desired);
+                return;
+            }
+
+            var removed = _items.Count - retainedOldIndexes.Count;
+            var moved = retainedOldIndexes.Count - LongestIncreasingSubsequenceLength(retainedOldIndexes);
+            if (added + removed + moved > IncrementalReconcileLimit)
+            {
+                _items.ReplaceAll(desired);
                 return;
             }
 
@@ -135,6 +197,34 @@ namespace Nuri.WPF
 
             for (var index = 0; index < _items.Count; index++)
                 _items[index].Update(source, index);
+        }
+
+        private static int LongestIncreasingSubsequenceLength(IReadOnlyList<int> values)
+        {
+            if (values.Count == 0)
+                return 0;
+
+            var tails = new int[values.Count];
+            var length = 0;
+            foreach (var value in values)
+            {
+                var low = 0;
+                var high = length;
+                while (low < high)
+                {
+                    var middle = low + ((high - low) / 2);
+                    if (tails[middle] < value)
+                        low = middle + 1;
+                    else
+                        high = middle;
+                }
+
+                tails[low] = value;
+                if (low == length)
+                    length++;
+            }
+
+            return length;
         }
 
         private int FindIdentity(string identity, int startIndex)
@@ -192,6 +282,7 @@ namespace Nuri.WPF
             var nativeRoot = WpfVirtualEntryRenderer.Build(nextEntry);
             container.Content = nativeRoot;
             _rows[container] = new RealizedRow(handle.Identity, nextEntry, nativeRoot);
+            RecordDiagnostics();
         }
 
         private void ClearRow(ListBoxItem container)
@@ -202,6 +293,7 @@ namespace Nuri.WPF
             ComponentLifecycle.DisposeSubtree(row.Entry.Id);
             _rows.Remove(container);
             container.Content = null;
+            RecordDiagnostics();
         }
 
         private void ClearRealizedRows()
@@ -216,6 +308,11 @@ namespace Nuri.WPF
                 return;
 
             RefreshRealized(new HashSet<string>(_source.GetIdentities(), StringComparer.Ordinal));
+        }
+
+        private void RecordDiagnostics()
+        {
+            NuriDiagnostics.RecordVirtualizedItems(this.GetUniqueId(), _source?.Count ?? 0, _rows.Count);
         }
 
         private sealed class ItemHandle

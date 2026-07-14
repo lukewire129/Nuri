@@ -34,6 +34,7 @@ internal static class Program
         RuntimeAncestryRegistryReleasesDisposedSubtrees();
         ComponentCachesAndRefreshesItsRuntimeNode();
         DiagnosticsPreserveHookSummaryWhenEnabled();
+        DiagnosticsTrackPatchBatchesAndVirtualizedRows();
         DuplicateComponentKeysUseIndependentHookIdentity();
         RemovingHooksFromARenderCleansUpTheirState();
         StoreSetInvalidatesOnlySubscribedComponents();
@@ -980,6 +981,49 @@ internal static class Program
         public override IElement Render()
         {
             return Div();
+        }
+    }
+
+    private static void DiagnosticsTrackPatchBatchesAndVirtualizedRows()
+    {
+        const string rootId = "diagnostics-patch-root";
+        const string hostId = "diagnostics-virtualized-host";
+        var entry = Parent().WithIdentity(rootId, null);
+
+        NuriDiagnostics.Enable();
+        NuriDiagnostics.RegisterRoot(rootId, "Test", () => entry);
+        try
+        {
+            NuriDiagnostics.RecordPatchBatch(rootId, new PatchOperation[]
+            {
+                new UpdatePropertyPatch(entry, "Text", "updated"),
+                new UpdatePropertyPatch(entry, "Opacity", 0.5),
+                new RemovePropertyPatch(entry, "Margin")
+            });
+            NuriDiagnostics.RecordVirtualizedItems(hostId, 10_000, 19);
+
+            var snapshot = NuriDiagnostics.GetSnapshot();
+            var root = snapshot.Roots.Single(item => item.RootId == rootId);
+            var virtualized = snapshot.VirtualizedItems.Single(item => item.HostId == hostId);
+
+            AssertEqual(1L, root.PatchBatchCount, "Diagnostics should count applied patch batches.");
+            AssertEqual(3L, root.PatchCount, "Diagnostics should accumulate applied patches.");
+            AssertEqual(3, root.LastPatchCount, "Diagnostics should retain the last patch batch size.");
+            AssertEqual(2, root.LastPatchCounts[PatchOperationType.UpdateProperty], "Diagnostics should group the last batch by patch type.");
+            AssertEqual(1, root.LastPatchCounts[PatchOperationType.RemoveProperty], "Diagnostics should retain every patch type in the last batch.");
+            AssertEqual(10_000, virtualized.ItemCount, "Diagnostics should report the virtual item count.");
+            AssertEqual(19, virtualized.RealizedCount, "Diagnostics should report the realized native row count.");
+
+            NuriDiagnostics.Disable();
+            NuriDiagnostics.RemoveVirtualizedItems(hostId);
+            AssertEqual(false, NuriDiagnostics.GetSnapshot().VirtualizedItems.Any(item => item.HostId == hostId), "Virtualized diagnostics cleanup should remain deterministic after diagnostics are disabled.");
+            NuriDiagnostics.Enable();
+        }
+        finally
+        {
+            NuriDiagnostics.RemoveVirtualizedItems(hostId);
+            NuriDiagnostics.UnregisterRoot(rootId);
+            NuriDiagnostics.Disable();
         }
     }
 

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Avalonia.Animation;
 using Nuri.Platform.Abstractions;
+using Nuri.Runtime.Diagnostics;
 using Nuri.UI.Controls;
 using Nuri.UI.Dsl;
 using Nuri.UI.Values;
@@ -34,6 +35,8 @@ internal static class Program
     private static void Main()
     {
         RunSuite(() => new WpfDriver());
+        WpfDiagnosticsTrackAppliedPatchBatches();
+        WpfRootDisposalRemovesVirtualizedDiagnostics();
         WpfTransitionsReplaceAndClearNativeAnimations(new WpfDriver());
         WpfVirtualizedItemsStayLazyAndRecycleContainers();
         RunSuite(() => new AvaloniaDriver());
@@ -42,6 +45,7 @@ internal static class Program
 
     private static void WpfVirtualizedItemsStayLazyAndRecycleContainers()
     {
+        NuriDiagnostics.Enable();
         var templateCalls = 0;
         var items = Enumerable.Range(0, 10_000).Select(index => new VirtualizedRow(index, false)).ToArray();
         var oldElement = Component.VirtualizedItems(
@@ -72,7 +76,9 @@ internal static class Program
         native.UpdateLayout();
 
         var realizedBefore = CountRealized(native);
+        var initialMetrics = NuriDiagnostics.GetSnapshot().VirtualizedItems.Single(item => item.HostId == oldEntry.Id);
         AssertEqual(true, realizedBefore > 0 && realizedBefore <= 100, $"WPF: a 700px viewport should realize a bounded number of 32px rows (actual {realizedBefore}).");
+        AssertEqual(realizedBefore, initialMetrics.RealizedCount, "WPF: diagnostics should report the current realized row count.");
         AssertEqual(true, templateCalls <= 100, "WPF: initial template calls should be proportional to realized rows.");
 
         var firstContainer = (WpfListBoxItem?)native.ItemContainerGenerator.ContainerFromIndex(0);
@@ -121,6 +127,15 @@ internal static class Program
         AssertEqual(5_000, native.Items.Count, "WPF: filtering should remove every missing virtual item.");
         AssertEqual("selected:0", GetRealizedText(native, 0), "WPF: filtering should keep retained keyed row content current.");
 
+        var reversedEntry = VirtualizedEntry(
+            filteredItems.Reverse().ToArray(),
+            item => item.Selected ? $"selected:{item.Index}" : item.Index.ToString(),
+            () => templateCalls++);
+        ApplyVirtualizedDiff(native, ref newEntry, reversedEntry);
+        native.UpdateLayout();
+        AssertEqual(5_000, native.Items.Count, "WPF: a large keyed reversal should retain every virtual item.");
+        AssertEqual("9998", GetRealizedText(native, 0), "WPF: a large keyed reversal should materialize the requested order.");
+
         var emptyEntry = VirtualizedEntry(
             Array.Empty<VirtualizedRow>(),
             item => item.Index.ToString(),
@@ -166,7 +181,44 @@ internal static class Program
         window.UpdateLayout();
         AssertEqual(true, CountRealized(native) > 0, "WPF: reloading a virtualized host should restore realized rows.");
         AssertEqual(true, native.ItemContainerGenerator.ContainerFromIndex(500) is WpfListBoxItem reloaded && reloaded.Content != null, "WPF: reloaded containers should restore their row content.");
+        window.Content = null;
+        window.UpdateLayout();
         window.Close();
+        NuriDiagnostics.Disable();
+    }
+
+    private static void WpfDiagnosticsTrackAppliedPatchBatches()
+    {
+        NuriDiagnostics.Enable();
+        var component = new PatchDiagnosticsComponent();
+        using (var root = new WpfDriver().Initialize(component))
+        {
+            component.Value = "updated";
+            root.Rebuild();
+
+            var metrics = NuriDiagnostics.GetSnapshot().Roots.Single();
+            AssertEqual(1L, metrics.PatchBatchCount, "WPF: diagnostics should record one applied rebuild batch.");
+            AssertEqual(1, metrics.LastPatchCount, "WPF: a text-only rebuild should apply one patch.");
+            AssertEqual(1, metrics.LastPatchCounts[PatchOperationType.UpdateProperty], "WPF: diagnostics should identify the applied property patch.");
+        }
+
+        NuriDiagnostics.Disable();
+    }
+
+    private static void WpfRootDisposalRemovesVirtualizedDiagnostics()
+    {
+        NuriDiagnostics.Enable();
+        var element = Component.VirtualizedItems(
+            Enumerable.Range(0, 100).ToArray(),
+            item => item.ToString(),
+            32,
+            item => Component.Text(item.ToString()));
+        var root = new WpfDriver().Initialize(element);
+
+        AssertEqual(1, NuriDiagnostics.GetSnapshot().VirtualizedItems.Count, "WPF: a mounted virtualized host should register diagnostics.");
+        root.Dispose();
+        AssertEqual(0, NuriDiagnostics.GetSnapshot().VirtualizedItems.Count, "WPF: root disposal should remove virtualized diagnostics deterministically.");
+        NuriDiagnostics.Disable();
     }
 
     private static VirtualEntry VirtualizedEntry(
@@ -635,6 +687,13 @@ internal static class Program
 
             return Grid(margin, background, foreground, rotate);
         }
+    }
+
+    private sealed class PatchDiagnosticsComponent : Component
+    {
+        public string Value { get; set; } = "initial";
+
+        public override IElement Render() => Text(Value);
     }
 
     private sealed class OpacityTransitionComponent : Component

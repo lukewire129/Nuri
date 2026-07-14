@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Nuri.VirtualDom;
 
 namespace Nuri.Runtime.Diagnostics
 {
@@ -10,11 +11,22 @@ namespace Nuri.Runtime.Diagnostics
             IReadOnlyList<ApplicationRootSnapshot> roots,
             IReadOnlyList<StoreSnapshot> stores,
             IReadOnlyList<RuntimeLogEntry> recentLogs)
+            : this(capturedAt, roots, stores, recentLogs, Array.Empty<VirtualizedItemsSnapshot>())
+        {
+        }
+
+        public RuntimeSnapshot(
+            DateTimeOffset capturedAt,
+            IReadOnlyList<ApplicationRootSnapshot> roots,
+            IReadOnlyList<StoreSnapshot> stores,
+            IReadOnlyList<RuntimeLogEntry> recentLogs,
+            IReadOnlyList<VirtualizedItemsSnapshot> virtualizedItems)
         {
             CapturedAt = capturedAt;
             Roots = roots;
             Stores = stores;
             RecentLogs = recentLogs;
+            VirtualizedItems = virtualizedItems;
         }
 
         public DateTimeOffset CapturedAt { get; }
@@ -24,15 +36,33 @@ namespace Nuri.Runtime.Diagnostics
         public IReadOnlyList<StoreSnapshot> Stores { get; }
 
         public IReadOnlyList<RuntimeLogEntry> RecentLogs { get; }
+
+        public IReadOnlyList<VirtualizedItemsSnapshot> VirtualizedItems { get; }
     }
 
     public sealed class ApplicationRootSnapshot
     {
         public ApplicationRootSnapshot(string rootId, string renderer, ComponentSnapshot? rootComponent)
+            : this(rootId, renderer, rootComponent, 0, 0, 0, new Dictionary<PatchOperationType, int>())
+        {
+        }
+
+        public ApplicationRootSnapshot(
+            string rootId,
+            string renderer,
+            ComponentSnapshot? rootComponent,
+            long patchBatchCount,
+            long patchCount,
+            int lastPatchCount,
+            IReadOnlyDictionary<PatchOperationType, int> lastPatchCounts)
         {
             RootId = rootId;
             Renderer = renderer;
             RootComponent = rootComponent;
+            PatchBatchCount = patchBatchCount;
+            PatchCount = patchCount;
+            LastPatchCount = lastPatchCount;
+            LastPatchCounts = lastPatchCounts;
         }
 
         public string RootId { get; }
@@ -40,6 +70,30 @@ namespace Nuri.Runtime.Diagnostics
         public string Renderer { get; }
 
         public ComponentSnapshot? RootComponent { get; }
+
+        public long PatchBatchCount { get; }
+
+        public long PatchCount { get; }
+
+        public int LastPatchCount { get; }
+
+        public IReadOnlyDictionary<PatchOperationType, int> LastPatchCounts { get; }
+    }
+
+    public sealed class VirtualizedItemsSnapshot
+    {
+        public VirtualizedItemsSnapshot(string hostId, int itemCount, int realizedCount)
+        {
+            HostId = hostId;
+            ItemCount = itemCount;
+            RealizedCount = realizedCount;
+        }
+
+        public string HostId { get; }
+
+        public int ItemCount { get; }
+
+        public int RealizedCount { get; }
     }
 
     public sealed class ComponentSnapshot

@@ -132,7 +132,8 @@ namespace Nuri.WPF
                 host,
                 () => _currentRootVisual,
                 root => _currentRootVisual = root,
-                applyHostProperties);
+                applyHostProperties,
+                _treePrefix);
 
             Coordinator.Initialize();
             NuriDiagnostics.RegisterRoot(_treePrefix, "WPF", () => _runtime?.CurrentVirtualEntry);
@@ -253,10 +254,24 @@ namespace Nuri.WPF
             if (_disposed)
                 return;
 
+            if (_currentRootVisual != null)
+                RemoveVirtualizationDiagnostics(_currentRootVisual);
             ComponentLifecycle.DisposeSubtree(_treePrefix + "_0");
             NuriDiagnostics.UnregisterRoot(_treePrefix);
             WpfDevToolsRuntime.UnregisterRoot(_treePrefix);
             _disposed = true;
+        }
+
+        private static void RemoveVirtualizationDiagnostics(FrameworkElement element)
+        {
+            if (element is WpfVirtualizedItemsHost virtualizedItems)
+                virtualizedItems.RemoveDiagnostics();
+
+            foreach (var child in LogicalTreeHelper.GetChildren(element))
+            {
+                if (child is FrameworkElement childElement)
+                    RemoveVirtualizationDiagnostics(childElement);
+            }
         }
     }
 }

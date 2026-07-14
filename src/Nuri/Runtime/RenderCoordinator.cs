@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using Nuri.Platform.Abstractions;
+using Nuri.Runtime.Diagnostics;
 using Nuri.Runtime.Lifecycle;
 using Nuri.VirtualDom;
 
@@ -13,6 +15,7 @@ namespace Nuri.Runtime
         private readonly Func<TNativeRoot?> _getCurrentRoot;
         private readonly Action<TNativeRoot> _setCurrentRoot;
         private readonly Action<TElement> _applyHostProperties;
+        private readonly string? _diagnosticsRootId;
 
         public RenderCoordinator(
             ApplicationRuntime<TElement> runtime,
@@ -20,7 +23,8 @@ namespace Nuri.Runtime
             IHostAdapter<TNativeRoot> host,
             Func<TNativeRoot?> getCurrentRoot,
             Action<TNativeRoot> setCurrentRoot,
-            Action<TElement> applyHostProperties)
+            Action<TElement> applyHostProperties,
+            string? diagnosticsRootId = null)
         {
             _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
             _renderer = renderer ?? throw new ArgumentNullException(nameof(renderer));
@@ -28,6 +32,7 @@ namespace Nuri.Runtime
             _getCurrentRoot = getCurrentRoot ?? throw new ArgumentNullException(nameof(getCurrentRoot));
             _setCurrentRoot = setCurrentRoot ?? throw new ArgumentNullException(nameof(setCurrentRoot));
             _applyHostProperties = applyHostProperties ?? throw new ArgumentNullException(nameof(applyHostProperties));
+            _diagnosticsRootId = diagnosticsRootId;
         }
 
         public VirtualEntry CurrentVirtualEntry => _runtime.CurrentVirtualEntry;
@@ -52,6 +57,7 @@ namespace Nuri.Runtime
             ComponentLifecycle.CleanupRemovedComponentState(renderResult.Operations);
             _applyHostProperties(renderResult.VisualNode);
             _renderer.ApplyDiff(root, renderResult.Operations);
+            RecordPatchBatch(renderResult.Operations);
             _runtime.Commit(renderResult);
             ComponentLifecycle.FlushPendingEffects();
         }
@@ -73,6 +79,7 @@ namespace Nuri.Runtime
             var operations = VirtualTreeDiff.Diff(oldEntry, newEntry);
             ComponentLifecycle.CleanupRemovedComponentState(operations);
             _renderer.ApplyDiff(root, operations);
+            RecordPatchBatch(operations);
 
             if (!_runtime.CurrentVirtualEntry.ReplaceDescendantByComponentId(componentId, newEntry)
                 && !_runtime.CurrentVirtualEntry.ReplaceDescendant(oldEntry.Id, newEntry))
@@ -81,6 +88,12 @@ namespace Nuri.Runtime
             _runtime.CommitVirtualEntry(_runtime.CurrentVirtualEntry);
             ComponentLifecycle.FlushPendingEffects();
             return true;
+        }
+
+        private void RecordPatchBatch(IReadOnlyList<PatchOperation> operations)
+        {
+            if (!string.IsNullOrWhiteSpace(_diagnosticsRootId))
+                NuriDiagnostics.RecordPatchBatch(_diagnosticsRootId!, operations);
         }
     }
 }

@@ -55,7 +55,15 @@ Large renderer-owned lists use the platform-neutral `VirtualizedItems<T>(items, 
 
 The WPF adapter materializes this contract with a recycling `VirtualizingStackPanel`, fixed item extent, and viewport-driven row preparation. Same-key source updates and visible keyed moves preserve the native item container, while filtering, empty/full replacement, duplicate-key fallback rows, repeated scrolling, and unload/reload restoration retain bounded realized work. Regular `Items(...)`, `ItemsTypes.Tree`, and eager child reconciliation remain unchanged. Avalonia does not materialize `ItemsTypes.Virtualized` yet.
 
+WPF reconciliation keeps small structural edits incremental. It estimates the retained-key move count from the longest increasing subsequence of previous indexes; when adds, removes, and required moves exceed 256, it reuses retained item handles in one collection reset instead of issuing a quadratic sequence of native moves. The WPF Large List sample exercises 10,000-row update, swap, reverse, filter, add, remove, replace, reset, and selection paths.
+
 The warmed `--explorer-comparison` WPF harness measured the same two-button row UI with 10,101 visible rows in a 700px viewport on 2026-07-14. Eager materialization took 4414.35 ms, allocated 543.17 MB, and created 10,101 native rows. Fixed-extent virtualization took 269.10 ms, allocated 3.27 MB, and created 19 native rows: 16.4x less materialization time and 166.2x less allocation in this local workload.
+
+## Runtime Diagnostics
+
+When `NuriDiagnostics` is enabled, each registered application root records applied diff-batch count, cumulative patch count, the last batch size, and its counts grouped by `PatchOperationType`. These counters cover `RenderCoordinator` rebuild batches after initial native materialization; renderer-internal realized-row diffs are not counted as root patch batches.
+
+Renderer-owned virtualized hosts may also publish neutral `VirtualizedItemsSnapshot` entries containing host id, virtual item count, and realized native row count. WPF root disposal removes these entries deterministically. The WPF Large List stress screen displays the previous committed patch batch, cumulative patches, component render count, and realized row count so interactive operations expose full rebuilds or unbounded materialization.
 
 ## Performance Baseline
 

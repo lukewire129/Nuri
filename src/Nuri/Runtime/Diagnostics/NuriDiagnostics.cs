@@ -12,6 +12,7 @@ namespace Nuri.Runtime.Diagnostics
         private static readonly Dictionary<string, RootRecord> Roots = new Dictionary<string, RootRecord>();
         private static readonly Dictionary<string, ComponentRecord> Components = new Dictionary<string, ComponentRecord>();
         private static readonly Dictionary<string, StoreRecord> Stores = new Dictionary<string, StoreRecord>();
+        private static readonly Dictionary<string, VirtualizedItemsSnapshot> VirtualizedItems = new Dictionary<string, VirtualizedItemsSnapshot>();
         private static readonly RuntimeLogBuffer Logs = new RuntimeLogBuffer(5000);
         private static long _sequence;
 
@@ -38,7 +39,11 @@ namespace Nuri.Runtime.Diagnostics
                     .Select(root => new ApplicationRootSnapshot(
                         root.RootId,
                         root.Renderer,
-                        CreateComponentTree(root.GetCurrentVirtualEntry())))
+                        CreateComponentTree(root.GetCurrentVirtualEntry()),
+                        root.PatchBatchCount,
+                        root.PatchCount,
+                        root.LastPatchCount,
+                        new Dictionary<PatchOperationType, int>(root.LastPatchCounts)))
                     .ToArray();
 
                 var stores = Stores.Values
@@ -61,7 +66,8 @@ namespace Nuri.Runtime.Diagnostics
                     DateTimeOffset.UtcNow,
                     roots,
                     stores,
-                    Logs.Snapshot());
+                    Logs.Snapshot(),
+                    VirtualizedItems.Values.ToArray());
             }
         }
 
@@ -111,6 +117,58 @@ namespace Nuri.Runtime.Diagnostics
             }
 
             Log(RuntimeLogKind.ComponentRendered, null, componentId, "Component rendered.");
+        }
+
+        public static void RecordPatchBatch(string rootId, IReadOnlyList<PatchOperation> operations)
+        {
+            if (!IsEnabled || string.IsNullOrWhiteSpace(rootId) || operations == null)
+                return;
+
+            lock (SyncRoot)
+            {
+                if (!Roots.TryGetValue(rootId, out var root))
+                    return;
+
+                root.PatchBatchCount++;
+                root.PatchCount += operations.Count;
+                root.LastPatchCount = operations.Count;
+                root.LastPatchCounts.Clear();
+                foreach (var operation in operations)
+                {
+                    root.LastPatchCounts.TryGetValue(operation.Type, out var count);
+                    root.LastPatchCounts[operation.Type] = count + 1;
+                }
+            }
+
+            Changed?.Invoke(null, EventArgs.Empty);
+        }
+
+        public static void RecordVirtualizedItems(string hostId, int itemCount, int realizedCount)
+        {
+            if (!IsEnabled || string.IsNullOrWhiteSpace(hostId))
+                return;
+
+            lock (SyncRoot)
+            {
+                VirtualizedItems[hostId] = new VirtualizedItemsSnapshot(hostId, itemCount, realizedCount);
+            }
+
+            Changed?.Invoke(null, EventArgs.Empty);
+        }
+
+        public static void RemoveVirtualizedItems(string hostId)
+        {
+            if (string.IsNullOrWhiteSpace(hostId))
+                return;
+
+            bool removed;
+            lock (SyncRoot)
+            {
+                removed = VirtualizedItems.Remove(hostId);
+            }
+
+            if (removed && IsEnabled)
+                Changed?.Invoke(null, EventArgs.Empty);
         }
 
         public static void RecordHook(string componentId, int index, HookKind kind, string displayType, string summary)
@@ -380,6 +438,14 @@ namespace Nuri.Runtime.Diagnostics
             public string Renderer { get; }
 
             public Func<VirtualEntry?> GetCurrentVirtualEntry { get; }
+
+            public long PatchBatchCount { get; set; }
+
+            public long PatchCount { get; set; }
+
+            public int LastPatchCount { get; set; }
+
+            public Dictionary<PatchOperationType, int> LastPatchCounts { get; } = new Dictionary<PatchOperationType, int>();
         }
 
         private sealed class ComponentRecord

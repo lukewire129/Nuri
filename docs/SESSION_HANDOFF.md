@@ -71,7 +71,9 @@ Maintain Nuri as a platform-neutral Core virtual UI/runtime/diff model, with WPF
 - `Nuri.WPFAnimatedDashboardSample` exercises WPF Margin, background, foreground, and Rotate transition replacement. WPF now preserves the latest Rotate base angle through native animation replacement and removal.
 - `Nuri.RendererTests` covers cross-renderer opacity transition add, replacement, and removal behavior.
 - `Nuri.RendererTests` also covers WPF Margin, background, foreground, and Rotate native animation replacement, base values, and removal.
-- Runtime diagnostics already track component render counts and duplicate keys. Patch-count and unsupported property/event diagnostics remain candidates when a concrete sample needs them.
+- Runtime diagnostics track component render counts, duplicate keys, root patch batches grouped by `PatchOperationType`, and virtualized item/realized-row counts. Unsupported property/event diagnostics remain candidates when a concrete sample needs them.
+- `Nuri.LargeListSample` is now the WPF 10,000-row stress screen for update, swap, reverse, filter, add, remove, replace, reset, and selection operations. It displays the previous committed patch batch, cumulative patches, component renders, and realized native rows.
+- WPF virtualized reconciliation keeps small keyed edits incremental and switches to one retained-handle collection reset when adds, removes, and LIS-derived moves exceed 256, avoiding quadratic large-reorder behavior.
 
 ## Important Files
 
@@ -140,8 +142,8 @@ Expected baseline sanity for keyed reorder:
    - Keep all native materialization outside Core.
 
 5. Add diagnostics where they solve observed debugging problems.
-   - Render count and duplicate-key diagnostics already exist.
-   - Patch count and unsupported property/event warnings are the main remaining candidates.
+   - Render count, duplicate-key, patch-count, and virtualized-row diagnostics already exist.
+   - Unsupported property/event warnings are the main remaining candidates.
 
 6. Drive the next Core refinements from focused samples.
    - Explorer Tree for recursive keyed subtrees and lifecycle cleanup.
