@@ -1,3 +1,5 @@
 .vscode/**
 node_modules/**
 *.vsix
+preview-host/**/*.pdb
+preview-host/**/*.resources.dll

@@ -7,7 +7,7 @@ using Microsoft.VisualStudio.Shell.Interop;
 namespace Nuri.VisualStudioPreview;
 
 [PackageRegistration(UseManagedResourcesOnly = true, AllowsBackgroundLoading = true)]
-[InstalledProductRegistration("Nuri Preview", "Visual Studio Tool Window for Nuri component preview.", "0.1.9")]
+[InstalledProductRegistration("Nuri Preview", "Visual Studio Tool Window for Nuri component preview.", "0.2.0")]
 [ProvideMenuResource("Menus.ctmenu", 1)]
 [ProvideAutoLoad(UIContextGuids80.NoSolution, PackageAutoLoadFlags.BackgroundLoad)]
 [ProvideAutoLoad(UIContextGuids80.SolutionExists, PackageAutoLoadFlags.BackgroundLoad)]

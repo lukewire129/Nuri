@@ -86,7 +86,7 @@ if ($instances.Count -eq 0) {
     throw "No Visual Studio instance with devenv.exe was found."
 }
 
-Write-Host "[1/4] Building Nuri Preview ($Configuration)..." -ForegroundColor Cyan
+Write-Host "[1/3] Building Nuri Preview ($Configuration)..." -ForegroundColor Cyan
 Push-Location $repositoryRoot
 try {
     & dotnet build $previewProjectPath -c $Configuration -p:RestoreBuildInParallel=false
@@ -106,7 +106,7 @@ if (-not (Test-Path -LiteralPath $vsixInstallerPath)) {
     throw "VSIXInstaller.exe was not found: $vsixInstallerPath"
 }
 
-Write-Host "[2/4] Removing an existing Nuri Preview installation when present..." -ForegroundColor Cyan
+Write-Host "[2/3] Removing an existing Nuri Preview installation when present..." -ForegroundColor Cyan
 foreach ($instance in $instances) {
     if (-not (Test-NuriPreviewInstalled -Instance $instance)) {
         continue
@@ -126,32 +126,18 @@ foreach ($instance in $instances) {
 
 Assert-ProcessIsNotRunning -Name "VSIXInstaller" -Message "The previous VSIX uninstall has not finished. Wait for it to exit and retry."
 
-Write-Host "[3/4] Installing the new VSIX..." -ForegroundColor Cyan
-$installer = Start-Process -FilePath $vsixInstallerPath -ArgumentList @("/quiet", "`"$vsixPath`"") -WindowStyle Hidden -PassThru
-$spinnerFrames = @("|", "/", "-", "\")
-$spinnerIndex = 0
-while (-not $installer.HasExited) {
-    $frame = $spinnerFrames[$spinnerIndex % $spinnerFrames.Count]
-    Write-Host "`r  $frame Installing..." -NoNewline
-    $spinnerIndex++
-    Start-Sleep -Milliseconds 150
-}
-$installer.WaitForExit()
-Write-Host "`r                    `r" -NoNewline
-if ($installer.ExitCode -ne 0) {
-    throw "VSIX installation did not complete successfully. Exit code: $($installer.ExitCode)"
-}
-Write-Host "  Installed." -ForegroundColor Green
-
-Assert-ProcessIsNotRunning -Name "devenv" -Message "Visual Studio started before configuration refresh. Close it and run this script again."
-
-Write-Host "[4/4] Refreshing Visual Studio configuration..." -ForegroundColor Cyan
+Write-Host "[3/3] Installing the new VSIX..." -ForegroundColor Cyan
 foreach ($instance in $instances) {
     Write-Host "  $($instance.DisplayName)"
-    $configurationUpdate = Start-Process -FilePath $instance.DevenvPath -ArgumentList "/updateconfiguration" -WindowStyle Hidden -Wait -PassThru
-    if ($configurationUpdate.ExitCode -ne 0) {
-        throw "Configuration refresh failed for $($instance.DisplayName). Exit code: $($configurationUpdate.ExitCode)"
+    $installArguments = @(
+        "/quiet"
+        "/instanceIds:$($instance.InstanceId)"
+        "`"$vsixPath`""
+    )
+    $installer = Start-Process -FilePath $vsixInstallerPath -ArgumentList $installArguments -WindowStyle Hidden -Wait -PassThru
+    if ($installer.ExitCode -ne 0) {
+        throw "Nuri Preview installation failed for $($instance.DisplayName). Exit code: $($installer.ExitCode)"
     }
 }
 
-Write-Host "Nuri Preview installation and Visual Studio configuration refresh completed." -ForegroundColor Green
+Write-Host "Nuri Preview installation completed. Start Visual Studio to load the updated extension." -ForegroundColor Green
