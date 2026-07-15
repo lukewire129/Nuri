@@ -3,7 +3,7 @@
   "displayName": "Nuri Preview",
   "description": "Live WPF preview panel for Nuri components",
   "version": "0.2.0",
-  "publisher": "nuri",
+  "publisher": "lukewire129",
   "engines": {
     "vscode": "^1.85.0"
   },
