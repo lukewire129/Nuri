@@ -1,5 +1,8 @@
 # Nuri
 
+[![NuGet](https://img.shields.io/nuget/v/Nuri.WPF.svg)](https://www.nuget.org/packages/Nuri.WPF/) 
+[![NuGet Downloads](https://img.shields.io/nuget/dt/Nuri.WPF.svg)](https://www.nuget.org/packages/Nuri.WPF/)
+
 Nuri is a C# MVU UI library. Components describe UI with platform-neutral virtual elements, and renderer adapters materialize those descriptions into native controls.
 
 The current supported renderer path is WPF through `Nuri.WPF`.
