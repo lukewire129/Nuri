@@ -9,6 +9,7 @@ using Nuri.UI.Navigation;
 using Nuri.UI.Values;
 using Nuri.UI.Virtualization;
 using Nuri.Constants;
+using Nuri.Platform.Abstractions;
 using Nuri.UI.Controls;
 
 namespace Nuri.Tests;
@@ -19,6 +20,7 @@ internal static class Program
     {
         KeyedReorderPreservesPatchTargetIdentity();
         KeyedSlidingWindowPreservesRetainedChildIdentities();
+        SubtreeRebuildPreservesRenderedDescendantIdentities();
         UseReducerDispatchesFromCurrentState();
         UseStateReusesSetterForStableLogicalComponent();
         UseStateSetterTracksLatestComponentOwner();
@@ -83,6 +85,54 @@ internal static class Program
         AssertEqual(1, patch.Changes.Count(change => change.Type == VirtualizedItemChangeType.Add), "A new key should produce one virtualized add change.");
         AssertEqual(2, patch.Changes.Count(change => change.Type == VirtualizedItemChangeType.Move), "Retained keys should report their new positions.");
         AssertEqual(1, patch.Changes.Count(change => change.Type == VirtualizedItemChangeType.Update), "A changed snapshot with the same key should produce one update.");
+    }
+
+    private static void SubtreeRebuildPreservesRenderedDescendantIdentities()
+    {
+        var oldTitle = new VirtualEntry(
+                "Text",
+                properties: new[] { new KeyValuePair<string, object?>("Text", "Title") })
+            .WithIdentity("component_1", "component", rewriteChildren: false);
+        var oldStatus = new VirtualEntry(
+                "Text",
+                key: "status",
+                properties: new[] { new KeyValuePair<string, object?>("Text", "Before") })
+            .WithIdentity("component_2", "component", rewriteChildren: false);
+        var oldComponent = new VirtualEntry("Div", children: new[] { oldTitle, oldStatus })
+            .WithIdentity("component", "root", rewriteChildren: false)
+            .WithComponentId("component");
+        var oldRoot = new VirtualEntry("Window", children: new[] { oldComponent })
+            .WithIdentity("root", null, rewriteChildren: false);
+
+        var newTitle = new VirtualEntry(
+                "Text",
+                properties: new[] { new KeyValuePair<string, object?>("Text", "Title") })
+            .WithIdentity("component_1", "component", rewriteChildren: false);
+        var newStatus = new VirtualEntry(
+                "Text",
+                key: "status",
+                properties: new[] { new KeyValuePair<string, object?>("Text", "After") })
+            .WithIdentity("component_2", "component", rewriteChildren: false);
+        var newComponent = new VirtualEntry("Div", children: new[] { newTitle, newStatus })
+            .WithIdentity("component", "root", rewriteChildren: false);
+
+        var runtime = new ApplicationRuntime<VirtualEntry>(() => oldRoot, entry => entry);
+        var renderer = new CapturingRenderer();
+        object? nativeRoot = null;
+        var coordinator = new RenderCoordinator<VirtualEntry, object>(
+            runtime,
+            renderer,
+            new CapturingHost(),
+            () => nativeRoot,
+            root => nativeRoot = root,
+            _ => { });
+
+        coordinator.Initialize();
+        AssertEqual(true, coordinator.RebuildSubtree(oldComponent, newComponent, "component"), "The component subtree should remain replaceable by component identity.");
+
+        var update = renderer.Operations.OfType<UpdatePropertyPatch>().Single();
+        AssertEqual("component_2", update.Target.Id, "Subtree rebuilds must retain the rendered descendant identity used by the native control index.");
+        AssertEqual(0, renderer.Operations.OfType<ReplaceEntryPatch>().Count(), "Stable mixed keyed and unkeyed descendants should not be replaced because of identity rewriting.");
     }
 
     private static void VirtualizedItemsCaptureAnImmutableSnapshot()
@@ -1170,6 +1220,25 @@ internal static class Program
     }
 
     private sealed record VirtualizedProbe(string Id, int Version);
+
+    private sealed class CapturingRenderer : IRendererAdapter<object>
+    {
+        public IReadOnlyList<PatchOperation> Operations { get; private set; } = Array.Empty<PatchOperation>();
+
+        public object Build(VirtualEntry entry) => new object();
+
+        public void ApplyDiff(object root, IReadOnlyList<PatchOperation> operations)
+        {
+            Operations = operations;
+        }
+    }
+
+    private sealed class CapturingHost : IHostAdapter<object>
+    {
+        public void SetContent(object root)
+        {
+        }
+    }
 
     private sealed class VirtualizedComponentProbe : Component
     {

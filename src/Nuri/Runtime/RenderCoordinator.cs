@@ -73,7 +73,7 @@ namespace Nuri.Runtime
             if (root == null)
                 return true;
 
-            newEntry.RewriteIdentity(oldEntry.Id, oldEntry.ParentId);
+            newEntry.WithIdentity(oldEntry.Id, oldEntry.ParentId, rewriteChildren: false);
             newEntry.WithComponentId(componentId);
 
             var operations = VirtualTreeDiff.Diff(oldEntry, newEntry);
