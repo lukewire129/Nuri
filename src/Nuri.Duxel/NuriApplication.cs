@@ -6,7 +6,7 @@ using Nuri.UI.Dsl;
 namespace Nuri.Duxel;
 
 [SupportedOSPlatform("windows")]
-public static class NuriDuxelApplication
+public static class NuriApplication
 {
     public static void Run<TComponent>(
         string title = "Nuri Duxel",
