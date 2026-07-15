@@ -5,9 +5,9 @@ using System.Linq;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-namespace Nuri.WPF.PreviewHost;
+namespace Nuri.PreviewHost;
 
-internal static class RootComponentDiscovery
+public static class RootComponentDiscovery
 {
     public static ComponentDescriptor ResolveRoot(string projectPath, IReadOnlyList<ComponentDescriptor> components)
     {

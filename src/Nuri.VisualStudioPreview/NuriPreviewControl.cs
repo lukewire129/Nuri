@@ -197,10 +197,18 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
             return;
         }
 
-        var previewHostPath = ResolvePreviewHostPath(dte);
+        var hostSelection = PreviewHostCatalog.Select(projectPath!);
+        if (hostSelection.Host == null)
+        {
+            SetStatus(hostSelection.ErrorMessage ?? "No supported Nuri preview renderer was detected.");
+            return;
+        }
+
+        var previewHost = hostSelection.Host;
+        var previewHostPath = ResolvePreviewHostPath(dte, previewHost);
         if (string.IsNullOrWhiteSpace(previewHostPath))
         {
-            SetStatus("Build Nuri.WPF.PreviewHost first, then open Nuri Preview again.");
+            SetStatus("Build " + previewHost.ExecutableName + " first, then open Nuri Preview again.");
             return;
         }
 
@@ -642,14 +650,17 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
         return null;
     }
 
-    private static string? ResolvePreviewHostPath(DTE2 dte)
+    private static string? ResolvePreviewHostPath(DTE2 dte, PreviewHostDefinition host)
     {
         ThreadHelper.ThrowIfNotOnUIThread();
 
         var extensionDirectory = Path.GetDirectoryName(typeof(NuriPreviewControl).Assembly.Location);
         if (!string.IsNullOrWhiteSpace(extensionDirectory))
         {
-            var installedHost = Path.Combine(extensionDirectory, "PreviewHost", "Nuri.WPF.PreviewHost.exe");
+            var installedHost = Path.Combine(
+                extensionDirectory,
+                host.InstalledDirectoryName,
+                host.ExecutableName);
             if (File.Exists(installedHost))
                 return installedHost;
         }
@@ -662,13 +673,17 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
         if (string.IsNullOrWhiteSpace(solutionDirectory))
             return null;
 
-        var candidates = new[]
-        {
-            Path.Combine(solutionDirectory, "src", "Nuri.WPF.PreviewHost", "bin", "Debug", "net8.0-windows", "Nuri.WPF.PreviewHost.exe"),
-            Path.Combine(solutionDirectory, "src", "Nuri.WPF.PreviewHost", "bin", "Release", "net8.0-windows", "Nuri.WPF.PreviewHost.exe"),
-            Path.Combine(solutionDirectory, "src", "Nuri.WPF.PreviewHost", "bin", "Debug", "net9.0-windows", "Nuri.WPF.PreviewHost.exe"),
-            Path.Combine(solutionDirectory, "src", "Nuri.WPF.PreviewHost", "bin", "Release", "net9.0-windows", "Nuri.WPF.PreviewHost.exe")
-        };
+        var configurations = new[] { "Debug", "Release" };
+        var candidates = configurations
+            .SelectMany(configuration => host.TargetFrameworkDirectories.Select(targetFramework =>
+                Path.Combine(
+                    solutionDirectory,
+                    "src",
+                    host.SourceProjectDirectoryName,
+                    "bin",
+                    configuration,
+                    targetFramework,
+                    host.ExecutableName)));
 
         return candidates.FirstOrDefault(File.Exists);
     }

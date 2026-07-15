@@ -1,6 +1,6 @@
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011">
   <Metadata>
-    <Identity Id="Nuri.VisualStudioPreview" Version="0.0.1" Language="en-US" Publisher="lukewire129" />
+    <Identity Id="Nuri.VisualStudioPreview" Version="0.2.0" Language="en-US" Publisher="lukewire129" />
     <DisplayName>Nuri Preview</DisplayName>
     <Description xml:space="preserve">Visual Studio Tool Window for Nuri component preview.</Description>
     <Icon>Assets\icon.png</Icon>

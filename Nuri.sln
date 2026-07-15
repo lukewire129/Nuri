@@ -89,6 +89,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Duxel", "Duxel", "{32D11B4C
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nuri.DuxelSample", "samples\Duxel\Nuri.DuxelSample\Nuri.DuxelSample.csproj", "{BE7B5E79-A5BE-409D-AD94-1D3E5F5E2F7D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Nuri.PreviewHost.Core", "src\Nuri.PreviewHost.Core\Nuri.PreviewHost.Core.csproj", "{86ABA634-976E-412A-B268-3F7CF2DAF731}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -531,6 +533,18 @@ Global
 		{BE7B5E79-A5BE-409D-AD94-1D3E5F5E2F7D}.Release|x64.Build.0 = Release|Any CPU
 		{BE7B5E79-A5BE-409D-AD94-1D3E5F5E2F7D}.Release|x86.ActiveCfg = Release|Any CPU
 		{BE7B5E79-A5BE-409D-AD94-1D3E5F5E2F7D}.Release|x86.Build.0 = Release|Any CPU
+		{86ABA634-976E-412A-B268-3F7CF2DAF731}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{86ABA634-976E-412A-B268-3F7CF2DAF731}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{86ABA634-976E-412A-B268-3F7CF2DAF731}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{86ABA634-976E-412A-B268-3F7CF2DAF731}.Debug|x64.Build.0 = Debug|Any CPU
+		{86ABA634-976E-412A-B268-3F7CF2DAF731}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{86ABA634-976E-412A-B268-3F7CF2DAF731}.Debug|x86.Build.0 = Debug|Any CPU
+		{86ABA634-976E-412A-B268-3F7CF2DAF731}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{86ABA634-976E-412A-B268-3F7CF2DAF731}.Release|Any CPU.Build.0 = Release|Any CPU
+		{86ABA634-976E-412A-B268-3F7CF2DAF731}.Release|x64.ActiveCfg = Release|Any CPU
+		{86ABA634-976E-412A-B268-3F7CF2DAF731}.Release|x64.Build.0 = Release|Any CPU
+		{86ABA634-976E-412A-B268-3F7CF2DAF731}.Release|x86.ActiveCfg = Release|Any CPU
+		{86ABA634-976E-412A-B268-3F7CF2DAF731}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -574,6 +588,7 @@ Global
 		{0CF3DF71-FCD5-44E3-A937-BCB4C1C4AEA6} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{32D11B4C-00F7-D8E2-AE32-62CBDB4A0924} = {E3D23626-57FC-497B-BECB-678708C21BF0}
 		{BE7B5E79-A5BE-409D-AD94-1D3E5F5E2F7D} = {32D11B4C-00F7-D8E2-AE32-62CBDB4A0924}
+		{86ABA634-976E-412A-B268-3F7CF2DAF731} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {60E634DF-C48E-4831-AB77-BDA337A7DF2C}

@@ -1,19 +1,26 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Runtime.Loader;
 
-namespace Nuri.WPF.PreviewHost;
+namespace Nuri.PreviewHost;
 
-internal sealed class PreviewAssemblyLoadContext : AssemblyLoadContext
+public sealed class PreviewAssemblyLoadContext : AssemblyLoadContext
 {
     private readonly AssemblyDependencyResolver? _resolver;
     private readonly string _mainAssemblyDirectory;
+    private readonly HashSet<string> _sharedAssemblyNames;
 
-    public PreviewAssemblyLoadContext(string mainAssemblyPath)
+    public PreviewAssemblyLoadContext(
+        string mainAssemblyPath,
+        IEnumerable<string>? sharedAssemblyNames = null)
         : base(isCollectible: true)
     {
         _mainAssemblyDirectory = Path.GetDirectoryName(mainAssemblyPath) ?? Directory.GetCurrentDirectory();
+        _sharedAssemblyNames = new HashSet<string>(
+            sharedAssemblyNames ?? Array.Empty<string>(),
+            StringComparer.OrdinalIgnoreCase);
         var depsFilePath = Path.ChangeExtension(mainAssemblyPath, ".deps.json");
         if (File.Exists(depsFilePath))
             _resolver = new AssemblyDependencyResolver(mainAssemblyPath);
@@ -21,7 +28,7 @@ internal sealed class PreviewAssemblyLoadContext : AssemblyLoadContext
 
     protected override Assembly? Load(AssemblyName assemblyName)
     {
-        if (assemblyName.Name is "Nuri" or "Nuri.WPF")
+        if (assemblyName.Name != null && _sharedAssemblyNames.Contains(assemblyName.Name))
             return null;
 
         if (_resolver == null)

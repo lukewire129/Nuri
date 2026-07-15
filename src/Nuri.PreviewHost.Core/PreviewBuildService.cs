@@ -11,9 +11,9 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
 
-namespace Nuri.WPF.PreviewHost;
+namespace Nuri.PreviewHost;
 
-internal sealed class PreviewBuildService
+public sealed class PreviewBuildService
 {
     private readonly string _projectPath;
     private readonly string _projectDirectory;
@@ -239,7 +239,7 @@ global using global::System.Threading.Tasks;
     }
 }
 
-internal sealed class PreviewBuildResult
+public sealed class PreviewBuildResult
 {
     private PreviewBuildResult(bool succeeded, string? assemblyPath, string log)
     {

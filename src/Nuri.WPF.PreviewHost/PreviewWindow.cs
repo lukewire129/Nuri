@@ -560,7 +560,9 @@ internal sealed class PreviewWindow : Window
     private RenderSession CreateRenderSession(string assemblyPath)
     {
         var shadowAssemblyPath = PreviewAssemblyLoadContext.ShadowCopy(assemblyPath);
-        var loadContext = new PreviewAssemblyLoadContext(shadowAssemblyPath);
+        var loadContext = new PreviewAssemblyLoadContext(
+            shadowAssemblyPath,
+            new[] { "Nuri", "Nuri.WPF" });
         var assembly = loadContext.LoadFromAssemblyPath(shadowAssemblyPath);
         var root = ResolveRootComponent(assembly);
         var rootElement = CreateRootElement(root);

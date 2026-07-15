@@ -13,7 +13,6 @@ namespace Nuri.WPF.PreviewHost;
 
 internal sealed class PreviewCaptureServer : IDisposable
 {
-    private const string Protocol = "nuri-preview-v1";
     private readonly Window _window;
     private readonly FrameworkElement _captureTarget;
     private readonly Func<PreviewCaptureStatus> _getStatus;
@@ -133,7 +132,7 @@ internal sealed class PreviewCaptureServer : IDisposable
 
         var json = JsonSerializer.Serialize(new
         {
-            protocol = Protocol,
+            protocol = PreviewProtocol.Name,
             port = Port,
             token = _authToken,
             processId = Environment.ProcessId
@@ -438,7 +437,7 @@ internal sealed class PreviewCaptureServer : IDisposable
         var status = _getStatus();
         var json = JsonSerializer.Serialize(new
         {
-            protocol = Protocol,
+            protocol = PreviewProtocol.Name,
             message = status.Message,
             isBuilding = status.IsBuilding,
             hasError = status.HasError
@@ -486,5 +485,3 @@ internal sealed class PreviewCaptureServer : IDisposable
         response.Close();
     }
 }
-
-internal sealed record PreviewCaptureStatus(string Message, bool IsBuilding, bool HasError);

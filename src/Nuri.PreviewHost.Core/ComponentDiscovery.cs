@@ -4,9 +4,9 @@ using System.Linq;
 using System.Reflection;
 using Nuri.UI.Dsl;
 
-namespace Nuri.WPF.PreviewHost;
+namespace Nuri.PreviewHost;
 
-internal static class ComponentDiscovery
+public static class ComponentDiscovery
 {
     public static IReadOnlyList<ComponentDescriptor> Discover(Assembly assembly)
     {
@@ -37,7 +37,7 @@ internal static class ComponentDiscovery
     }
 }
 
-internal sealed class ComponentDescriptor
+public sealed class ComponentDescriptor
 {
     public ComponentDescriptor(Type componentType)
     {
