@@ -30,6 +30,8 @@ internal sealed class PreviewWindow : Window
     private readonly DispatcherTimer _reloadTimer;
     private readonly FileSystemWatcher? _commandWatcher;
     private readonly List<PreviewAssemblyLoadContext> _retiredLoadContexts = new();
+    private readonly object _statusGate = new();
+    private PreviewCaptureServer? _captureServer;
     private ApplicationRoot? _currentRoot;
     private PreviewAssemblyLoadContext? _loadContext;
     private string? _rootComponentFullName;
@@ -45,6 +47,9 @@ internal sealed class PreviewWindow : Window
     private double _panStartHorizontalOffset;
     private double _panStartVerticalOffset;
     private double _zoom = 1;
+    private string _latestStatus = "Starting preview...";
+    private bool _isBuilding;
+    private bool _hasError;
     private const double MinimumZoom = 0.25;
     private const double MaximumZoom = 4;
     private const double ZoomStep = 0.1;
@@ -172,6 +177,17 @@ internal sealed class PreviewWindow : Window
             Component.AnyStateChanged += OnAnyComponentStateChanged;
             if (_commandWatcher != null)
                 _commandWatcher.EnableRaisingEvents = true;
+
+            if (_options.CaptureEnabled)
+            {
+                _captureServer = new PreviewCaptureServer(
+                    this,
+                    _previewSurface,
+                    GetCaptureStatus,
+                    _options.ConnectionFilePath!,
+                    _options.CaptureFramesPerSecond);
+                _captureServer.Start();
+            }
 
             await ReloadAsync(resetState: true);
         };
@@ -482,6 +498,7 @@ internal sealed class PreviewWindow : Window
     private void OnAnyComponentStateChanged(object? sender, Component component)
     {
         _currentRoot?.ScheduleComponentRebuild(component);
+        _captureServer?.RequestCapture();
     }
 
     private async Task ReloadAsync(bool resetState)
@@ -496,13 +513,17 @@ internal sealed class PreviewWindow : Window
         _isReloading = true;
         try
         {
-            ReportStatus(resetState ? "Rendering preview..." : "Applying preview changes...");
+            ReportStatus(
+                resetState ? "Rendering preview..." : "Applying preview changes...",
+                isBuilding: true);
             ShowMessage(resetState ? "Rendering preview..." : "Applying preview changes...");
 
             var result = await _buildService.BuildAsync(CancellationToken.None, preferRoslyn: true);
             if (!result.Succeeded || result.AssemblyPath == null)
             {
-                ReportStatus("Preview build failed." + Environment.NewLine + result.Log);
+                ReportStatus(
+                    "Preview build failed." + Environment.NewLine + result.Log,
+                    hasError: true);
                 ShowMessage("Preview build failed." + Environment.NewLine + result.Log);
                 return;
             }
@@ -513,7 +534,7 @@ internal sealed class PreviewWindow : Window
         }
         catch (Exception ex)
         {
-            ReportStatus(ex.ToString());
+            ReportStatus(ex.ToString(), hasError: true);
             ShowMessage(ex.ToString());
         }
         finally
@@ -587,6 +608,7 @@ internal sealed class PreviewWindow : Window
 
         ReportStatus("Previewing " + session.Root.FullName);
         ShowMessageIfSurfaceIsEmpty("Previewing " + session.Root.FullName);
+        _captureServer?.RequestCapture();
     }
 
     private void RetirePreviousLoadContext(PreviewAssemblyLoadContext nextLoadContext)
@@ -627,10 +649,24 @@ internal sealed class PreviewWindow : Window
             Margin = new Thickness(16),
             TextWrapping = TextWrapping.Wrap
         };
+        _captureServer?.RequestCapture();
     }
 
-    private void ReportStatus(string message)
+    private PreviewCaptureStatus GetCaptureStatus()
     {
+        lock (_statusGate)
+            return new PreviewCaptureStatus(_latestStatus, _isBuilding, _hasError);
+    }
+
+    private void ReportStatus(string message, bool isBuilding = false, bool hasError = false)
+    {
+        lock (_statusGate)
+        {
+            _latestStatus = message;
+            _isBuilding = isBuilding;
+            _hasError = hasError;
+        }
+
         if (string.IsNullOrWhiteSpace(_options.StatusFilePath))
             return;
 
@@ -694,6 +730,8 @@ internal sealed class PreviewWindow : Window
     private void Cleanup()
     {
         Component.AnyStateChanged -= OnAnyComponentStateChanged;
+        _captureServer?.Dispose();
+        _captureServer = null;
         _commandWatcher?.Dispose();
         DisposeCurrentRoot();
         UnloadCurrentAssembly();

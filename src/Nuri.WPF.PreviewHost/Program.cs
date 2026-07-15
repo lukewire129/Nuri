@@ -25,11 +25,20 @@ internal static class Program
 
 internal sealed class PreviewOptions
 {
-    private PreviewOptions(string projectPath, string? commandFilePath, string? statusFilePath, bool embedded, IntPtr parentHandle)
+    private PreviewOptions(
+        string projectPath,
+        string? commandFilePath,
+        string? statusFilePath,
+        string? connectionFilePath,
+        int captureFramesPerSecond,
+        bool embedded,
+        IntPtr parentHandle)
     {
         ProjectPath = projectPath;
         CommandFilePath = commandFilePath;
         StatusFilePath = statusFilePath;
+        ConnectionFilePath = connectionFilePath;
+        CaptureFramesPerSecond = captureFramesPerSecond;
         Embedded = embedded;
         ParentHandle = parentHandle;
     }
@@ -40,6 +49,12 @@ internal sealed class PreviewOptions
 
     public string? StatusFilePath { get; }
 
+    public string? ConnectionFilePath { get; }
+
+    public int CaptureFramesPerSecond { get; }
+
+    public bool CaptureEnabled => !string.IsNullOrWhiteSpace(ConnectionFilePath);
+
     public bool Embedded { get; }
     public IntPtr ParentHandle { get; }
     public static PreviewOptions Parse(string[] args)
@@ -47,6 +62,8 @@ internal sealed class PreviewOptions
         string? projectPath = null;
         string? commandFilePath = null;
         string? statusFilePath = null;
+        string? connectionFilePath = null;
+        var captureFramesPerSecond = 15;
         var embedded = false;
         IntPtr parentHandle = IntPtr.Zero;
 
@@ -82,6 +99,19 @@ internal sealed class PreviewOptions
                 continue;
             }
 
+            if (string.Equals(arg, "--connection-file", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            {
+                connectionFilePath = args[++i];
+                continue;
+            }
+
+            if (string.Equals(arg, "--capture-fps", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+            {
+                if (int.TryParse(args[++i], out var parsedFramesPerSecond))
+                    captureFramesPerSecond = Math.Clamp(parsedFramesPerSecond, 1, 30);
+                continue;
+            }
+
             if (!arg.StartsWith("-", StringComparison.Ordinal) && projectPath == null)
                 projectPath = arg;
         }
@@ -94,6 +124,13 @@ internal sealed class PreviewOptions
         if (!File.Exists(fullPath))
             throw new FileNotFoundException("Project file was not found.", fullPath);
 
-        return new PreviewOptions(fullPath, commandFilePath, statusFilePath, embedded, parentHandle);
+        return new PreviewOptions(
+            fullPath,
+            commandFilePath,
+            statusFilePath,
+            connectionFilePath,
+            captureFramesPerSecond,
+            embedded,
+            parentHandle);
     }
 }

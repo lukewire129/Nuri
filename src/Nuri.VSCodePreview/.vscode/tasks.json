@@ -1,0 +1,17 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build Nuri PreviewHost",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "../Nuri.WPF.PreviewHost/Nuri.WPF.PreviewHost.csproj",
+        "-c",
+        "Debug"
+      ],
+      "problemMatcher": "$msCompile"
+    }
+  ]
+}

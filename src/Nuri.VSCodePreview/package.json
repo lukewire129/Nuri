@@ -1,0 +1,70 @@
+{
+  "name": "nuri-preview",
+  "displayName": "Nuri Preview",
+  "description": "Live WPF preview panel for Nuri components",
+  "version": "0.1.0",
+  "publisher": "nuri",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./src/extension.js",
+  "activationEvents": [
+    "onCommand:nuri.preview.start",
+    "onCommand:nuri.preview.refresh",
+    "onCommand:nuri.preview.focus",
+    "onCommand:nuri.preview.stop"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "nuri.preview.start",
+        "title": "Nuri: Start Preview"
+      },
+      {
+        "command": "nuri.preview.refresh",
+        "title": "Nuri: Refresh Preview"
+      },
+      {
+        "command": "nuri.preview.focus",
+        "title": "Nuri: Focus Native Preview"
+      },
+      {
+        "command": "nuri.preview.stop",
+        "title": "Nuri: Stop Preview"
+      }
+    ],
+    "configuration": {
+      "title": "Nuri Preview",
+      "properties": {
+        "nuri.preview.previewHostPath": {
+          "type": "string",
+          "default": "",
+          "description": "Optional absolute path to Nuri.WPF.PreviewHost.exe."
+        },
+        "nuri.preview.refreshOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Refresh the current preview when a C# file in the preview project is saved."
+        },
+        "nuri.preview.framesPerSecond": {
+          "type": "integer",
+          "default": 15,
+          "minimum": 1,
+          "maximum": 30,
+          "description": "Maximum capture rate while the preview is changing. Capture pauses automatically when the surface becomes idle."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "test": "node --check src/extension.js"
+  }
+}
