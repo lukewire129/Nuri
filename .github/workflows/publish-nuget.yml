@@ -23,7 +23,7 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@v4
         with:
-          global-json-file: global.json
+          dotnet-version: '9.0.x'
 
       - name: Restore package projects
         run: dotnet restore src/Nuri.WPF/Nuri.WPF.csproj
