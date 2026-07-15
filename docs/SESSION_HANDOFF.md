@@ -61,6 +61,8 @@ Maintain Nuri as a platform-neutral Core virtual UI/runtime/diff model, with WPF
 - Component cleanup is stronger now: removed and replaced component subtrees are disposed.
 - `src/Nuri.Avalonia` contains the Avalonia renderer and references Avalonia desktop packages.
 - The Avalonia adapter includes application-root scheduling, virtual-entry rendering, control/property/event mapping, hot reload support, and a smoke-test sample. It is no longer a renderer skeleton.
+- `src/Nuri.Duxel` contains the Duxel immediate-mode adapter. It references `Duxel.Windows.App` `0.2.5-preview`, targets `net10.0-windows`, projects committed Nuri virtual entries into `UiImmediateContext`, and requests Duxel frames for Nuri state invalidations. The mapping covers text, buttons, text input, check/toggle/radio values, row/column traversal, Grid columns and placement, Scroll child regions, widget size, padding/spacing, font size, and solid foreground/input background colors. Grid row heights and row/column spans are not yet materialized.
+- `samples/Duxel/Nuri.DuxelSample` validates Nuri hook state, neutral click/text/check events, Grid, Scroll, size, padding/spacing, and scoped text styling through Duxel. Duxel requires .NET 10, so the Duxel source and sample directories pin SDK `10.0.301` locally.
 - `tests/Nuri.RendererTests` validates post-commit effects, subtree and key-replacement cleanup, repeated keyed native moves, and idempotent root disposal without external test packages. WPF coverage also runs 50-cycle mount/unmount, key replacement, and move stress cases.
 - WPF root disposal clears pending component invalidations and ignores Dispatcher callbacks that were posted before disposal, preventing effects from remounting on a closed root.
 - WPF input-event coverage raises click, text/check, hover, mouse, keyboard, and focus events on native controls, replaces handlers through 50 rebuilds without duplication, and verifies recursive handler detachment on subtree removal and root disposal.
@@ -107,6 +109,9 @@ Maintain Nuri as a platform-neutral Core virtual UI/runtime/diff model, with WPF
 - `src/Nuri.Avalonia/AvaloniaControlRegistry.cs`
 - `src/Nuri.Avalonia/AvaloniaPropertyMapper.cs`
 - `src/Nuri.Avalonia/AvaloniaEventMapper.cs`
+- `src/Nuri.Duxel/NuriApplication.cs`
+- `src/Nuri.Duxel/NuriDuxelScreen.cs`
+- `src/Nuri.Duxel/DuxelVirtualEntryRenderer.cs`
 - `perf/Nuri.Performance/Program.cs`
 - `perf/Nuri.WPFPerformance/Program.cs`
 

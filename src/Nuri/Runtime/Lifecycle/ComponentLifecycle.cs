@@ -26,6 +26,11 @@ namespace Nuri.Runtime.Lifecycle
             Component.DisposeHookState(rootComponentId);
         }
 
+        public static bool IsInSubtree(string componentId, string rootComponentId)
+        {
+            return RuntimeTreeIdentity.IsDescendantOrSelf(componentId, rootComponentId);
+        }
+
         private static void DisposeEntryHookState(VirtualEntry entry)
         {
             foreach (var componentId in EnumerateComponentIds(entry).Distinct())

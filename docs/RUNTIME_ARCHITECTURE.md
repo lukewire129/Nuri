@@ -45,6 +45,8 @@ Strings such as `Component.Id` and `VirtualEntry.Id` remain for compatibility, d
 
 WPF and Avalonia application roots share `RenderCoordinator` for native build, patch, commit, and post-commit effect flushing. Both roots also use `ComponentInvalidationQueue`, so dirty-subtree coverage follows `RuntimeTreeIdentity` instead of renderer-specific string ancestry checks.
 
+`Nuri.Duxel` is an immediate-mode renderer adapter and intentionally does not retain or patch a native control tree. A Nuri state invalidation requests a Duxel frame and renders/diffs only the covered dirty component virtual subtrees; every Duxel frame projects the latest committed `VirtualEntry` tree into `UiImmediateContext` commands. Effects flush after that projection is committed, and removed component state is still cleaned from the Nuri diff. The current projection covers linear layouts, Grid placement and column lengths, Scroll child regions, scoped padding and spacing, explicit widget size, font size, solid foreground color, and the baseline text/input/button/check event path. Grid row heights and row/column spans remain future renderer work. The adapter depends on `Duxel.Windows.App` and therefore targets `net10.0-windows`; Duxel types remain outside Core.
+
 See [RUNTIME_IDENTITY.md](RUNTIME_IDENTITY.md) for key, lifecycle, duplicate-key, and cleanup invariants.
 
 ## Flat Virtualized Items

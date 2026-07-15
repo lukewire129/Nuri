@@ -45,6 +45,8 @@ Runtime tree node는 메모리에 유지되는 identity입니다. state, reducer
 
 WPF와 Avalonia application root는 native build, patch, commit 및 commit 이후 effect 실행에 `RenderCoordinator`를 공통으로 사용합니다. 두 root 모두 `ComponentInvalidationQueue`를 사용하므로 dirty subtree 포함 관계는 renderer별 문자열 ancestry 검사가 아니라 `RuntimeTreeIdentity`를 따릅니다.
 
+`Nuri.Duxel`은 immediate-mode renderer adapter이며 native control tree를 유지하거나 patch하지 않습니다. Nuri state invalidation은 Duxel frame을 요청하고 포함 관계로 정리된 dirty component virtual subtree만 render/diff하며, 각 Duxel frame은 최신 commit된 `VirtualEntry` tree를 `UiImmediateContext` command로 투영합니다. Effect는 이 투영이 commit된 뒤 실행되고, 제거된 component state는 계속 Nuri diff에서 cleanup됩니다. 현재 투영은 linear layout, Grid placement와 column length, Scroll child region, scoped padding과 spacing, 명시적인 widget size, font size, solid foreground color 및 기본 text/input/button/check event 경로를 지원합니다. Grid row height와 row/column span은 향후 renderer 작업으로 남아 있습니다. Adapter는 `Duxel.Windows.App`에 의존하므로 `net10.0-windows`를 target으로 하며 Duxel type은 Core 밖에 유지합니다.
+
 key, lifecycle, 중복 key 및 cleanup 불변식은 [RUNTIME_IDENTITY.md](RUNTIME_IDENTITY.md)를 참고합니다.
 
 ## 평탄화 Virtualized Items

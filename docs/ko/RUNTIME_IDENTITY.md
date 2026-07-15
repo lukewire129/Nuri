@@ -38,6 +38,8 @@ Component key는 렌더 결과 root에 별도 key가 없을 때 virtual root로 
 
 `StartsWith`, `_`, `#key:`, ID 길이 등 문자열 형식을 이용한 부모 판정을 다시 도입하면 안 됩니다. ancestry는 node number 할당 시 등록하고 subtree dispose 시 제거해야 합니다.
 
+전역 component invalidation을 받는 renderer adapter는 이 registry를 통해 root 포함 관계를 검사하는 `ComponentLifecycle.IsInSubtree(componentId, rootComponentId)`를 사용합니다. Component ID를 파싱하거나 prefix 비교로 root를 filtering하면 안 됩니다.
+
 ## Hook 및 Effect
 
 - Hook slot은 순서 기반이며 render 사이에 일관되게 호출해야 합니다.

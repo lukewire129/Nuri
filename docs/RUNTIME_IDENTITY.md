@@ -40,6 +40,8 @@ It is the source of truth for:
 
 Do not restore checks based on `StartsWith`, `_`, `#key:`, ID length, or other string formatting. Public and diagnostic IDs may change without changing ancestry semantics.
 
+Renderer adapters that receive a global component invalidation use `ComponentLifecycle.IsInSubtree(componentId, rootComponentId)` to test root membership through this registry. They must not filter roots by parsing or prefix-matching component IDs.
+
 Ancestry entries must be registered when node numbers are assigned and removed when their subtree is disposed.
 
 ## Hooks and Effects

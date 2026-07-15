@@ -2,6 +2,7 @@ using Nuri.VirtualDom;
 using Nuri.Runtime;
 using Nuri.Runtime.Invalidation;
 using Nuri.Runtime.Diagnostics;
+using Nuri.Runtime.Lifecycle;
 using Nuri.UI;
 using Nuri.UI.Dsl;
 using Nuri.UI.Navigation;
@@ -575,6 +576,8 @@ internal static class Program
 
         AssertEqual(1, invalidations.Count, "A parent invalidation should cover keyed descendants using runtime ancestry.");
         AssertEqual(parent.Id, invalidations[0].ComponentId, "The parent should be the retained subtree invalidation.");
+        AssertEqual(true, ComponentLifecycle.IsInSubtree(child.Id, parent.Id), "Renderer root membership should follow runtime ancestry.");
+        AssertEqual(false, ComponentLifecycle.IsInSubtree(parent.Id, child.Id), "Renderer root membership should not treat an ancestor as its child's subtree.");
 
         Component.DisposeHookState(parent.Id);
         AssertEqual("cleanup:child", log.Last(), "Disposing a parent subtree should clean up keyed descendants without parsing their ids.");
