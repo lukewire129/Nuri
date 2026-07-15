@@ -98,6 +98,17 @@ namespace Nuri.WPF
                     return TrySetStretch(element, value);
                 case "Orientation":
                     return TrySetOrientation(element, value);
+                case PropertyKeys.Spacing:
+                    return TrySetSpacing(element, value);
+                case PropertyKeys.JustifyContent:
+                    return TrySetJustifyContent(element, value);
+                case PropertyKeys.Grow:
+                    WpfDistributedStackPanel.SetGrow(element, ToDouble(value));
+                    return true;
+                case PropertyKeys.RowSpacing:
+                    return TrySetRowSpacing(element, value);
+                case PropertyKeys.ColumnSpacing:
+                    return TrySetColumnSpacing(element, value);
                 case "HorizontalContentAlignment":
                     return TrySetHorizontalContentAlignment(element, value);
                 case "VerticalContentAlignment":
@@ -195,6 +206,17 @@ namespace Nuri.WPF
                     return TryClearStretch(element);
                 case "Orientation":
                     return TryClearOrientation(element);
+                case PropertyKeys.Spacing:
+                    return TryClearSpacing(element);
+                case PropertyKeys.JustifyContent:
+                    return TryClearJustifyContent(element);
+                case PropertyKeys.Grow:
+                    element.ClearValue(WpfDistributedStackPanel.GrowProperty);
+                    return true;
+                case PropertyKeys.RowSpacing:
+                    return TryClearRowSpacing(element);
+                case PropertyKeys.ColumnSpacing:
+                    return TryClearColumnSpacing(element);
                 case "HorizontalContentAlignment":
                     return TryClearHorizontalContentAlignment(element);
                 case "VerticalContentAlignment":
@@ -571,19 +593,105 @@ namespace Nuri.WPF
 
         private static bool TrySetOrientation(FrameworkElement element, object? value)
         {
-            if (element is not StackPanel stackPanel)
-                return false;
+            if (element is WpfDistributedStackPanel distributedPanel)
+            {
+                distributedPanel.Orientation = (Orientation)value!;
+                return true;
+            }
 
-            stackPanel.Orientation = (Orientation)value!;
-            return true;
+            if (element is StackPanel stackPanel)
+            {
+                stackPanel.Orientation = (Orientation)value!;
+                return true;
+            }
+
+            return false;
         }
 
         private static bool TryClearOrientation(FrameworkElement element)
         {
+            if (element is WpfDistributedStackPanel distributedPanel)
+            {
+                distributedPanel.Orientation = Orientation.Vertical;
+                return true;
+            }
+
             if (element is not StackPanel stackPanel)
                 return false;
 
             stackPanel.ClearValue(StackPanel.OrientationProperty);
+            return true;
+        }
+
+        private static bool TrySetSpacing(FrameworkElement element, object? value)
+        {
+            if (element is not WpfDistributedStackPanel panel)
+                return false;
+
+            panel.Spacing = ToDouble(value);
+            return true;
+        }
+
+        private static bool TryClearSpacing(FrameworkElement element)
+        {
+            if (element is not WpfDistributedStackPanel panel)
+                return false;
+
+            panel.Spacing = 0;
+            return true;
+        }
+
+        private static bool TrySetJustifyContent(FrameworkElement element, object? value)
+        {
+            if (element is not WpfDistributedStackPanel panel || value is not Nuri.UI.Values.ContentDistribution distribution)
+                return false;
+
+            panel.JustifyContent = distribution;
+            return true;
+        }
+
+        private static bool TryClearJustifyContent(FrameworkElement element)
+        {
+            if (element is not WpfDistributedStackPanel panel)
+                return false;
+
+            panel.JustifyContent = Nuri.UI.Values.ContentDistribution.Start;
+            return true;
+        }
+
+        private static bool TrySetRowSpacing(FrameworkElement element, object? value)
+        {
+            if (element is not NuriGrid grid)
+                return false;
+
+            grid.RowSpacing = ToDouble(value);
+            return true;
+        }
+
+        private static bool TryClearRowSpacing(FrameworkElement element)
+        {
+            if (element is not NuriGrid grid)
+                return false;
+
+            grid.RowSpacing = 0;
+            return true;
+        }
+
+        private static bool TrySetColumnSpacing(FrameworkElement element, object? value)
+        {
+            if (element is not NuriGrid grid)
+                return false;
+
+            grid.ColumnSpacing = ToDouble(value);
+            return true;
+        }
+
+        private static bool TryClearColumnSpacing(FrameworkElement element)
+        {
+            if (element is not NuriGrid grid)
+                return false;
+
+            grid.ColumnSpacing = 0;
             return true;
         }
 

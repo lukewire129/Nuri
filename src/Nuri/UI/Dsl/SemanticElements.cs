@@ -6,6 +6,8 @@ namespace Nuri.UI.Dsl
 {
     public sealed class Div : Panel, IDiv
     {
+        private bool _autoFlowApplied;
+
         public Div() : this(DivTypes.Column)
         {
         }
@@ -55,6 +57,36 @@ namespace Nuri.UI.Dsl
             return Columns(GridLengthParser.Parse(definitions, nameof(definitions)));
         }
 
+        public Div AutoFlow()
+        {
+            if (Kind != DivTypes.Grid)
+                throw new System.InvalidOperationException($"AutoFlow is supported only by Grid layouts, not '{Kind}'.");
+
+            var columns = GetRequiredLengthList("ColumnDefinitions", "AutoFlow requires at least one explicit Grid column.");
+            if (!_autoFlowApplied)
+                EnsureChildrenDoNotHaveExplicitPlacement();
+
+            var requiredRowCount = Children.Count == 0 ? 0 : (Children.Count + columns.Count - 1) / columns.Count;
+            var rows = GetLengthList("RowDefinitions");
+            if (rows.Count > 0 && rows.Count < requiredRowCount)
+                throw new System.InvalidOperationException($"AutoFlow requires {requiredRowCount} rows for {Children.Count} children and {columns.Count} columns, but the Grid defines only {rows.Count} rows.");
+
+            if (rows.Count == 0)
+            {
+                while (rows.Count < requiredRowCount)
+                    rows.Add(LengthValue.Auto());
+            }
+
+            for (var index = 0; index < Children.Count; index++)
+            {
+                Children[index].SetProperty("Grid.Row", index / columns.Count);
+                Children[index].SetProperty("Grid.Column", index % columns.Count);
+            }
+
+            _autoFlowApplied = true;
+            return this;
+        }
+
         private List<LengthValue> GetLengthList(string propertyName)
         {
             if (!Properties.TryGetValue(propertyName, out var value) || value is not List<LengthValue> lengths)
@@ -64,6 +96,28 @@ namespace Nuri.UI.Dsl
             }
 
             return lengths;
+        }
+
+        private List<LengthValue> GetRequiredLengthList(string propertyName, string message)
+        {
+            if (!Properties.TryGetValue(propertyName, out var value)
+                || value is not List<LengthValue> lengths
+                || lengths.Count == 0)
+                throw new System.InvalidOperationException(message);
+
+            return lengths;
+        }
+
+        private void EnsureChildrenDoNotHaveExplicitPlacement()
+        {
+            foreach (var child in Children)
+            {
+                if (child.Properties.ContainsKey("Grid.Row")
+                    || child.Properties.ContainsKey("Grid.Column")
+                    || child.Properties.ContainsKey("Grid.RowSpan")
+                    || child.Properties.ContainsKey("Grid.ColumnSpan"))
+                    throw new System.InvalidOperationException("AutoFlow cannot be combined with explicit Grid Row, Column, RowSpan, or ColumnSpan placement.");
+            }
         }
 
         private void SetLengthList(string propertyName, LengthValue[] values)

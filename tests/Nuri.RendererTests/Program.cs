@@ -841,7 +841,197 @@ internal static class Program
         KeyReplacementCleansUpBeforeMount(createDriver());
         KeyedMovesPreserveNativeControlsAndEffects(createDriver());
         OpacityTransitionsAreMaterializedReplacedAndRemoved(createDriver());
+        ContentDistributionLayoutsRemainConsistent(createDriver());
+        GrowLayoutsRemainConsistent(createDriver());
+        GridSpacingLayoutsRemainConsistent(createDriver());
         RootDisposeCleansDescendantsExactlyOnce(createDriver());
+    }
+
+    private static void GridSpacingLayoutsRemainConsistent(RendererDriver driver)
+    {
+        var columns = Component.Grid(
+                Component.Div().Column(0).Size(10, 10).Start().Top(),
+                Component.Div().Column(1).Size(10, 10).Start().Top())
+            .Rows("*")
+            .Columns("*,*")
+            .Size(100, 20)
+            .ColumnSpacing(10);
+
+        using (driver.Initialize(columns))
+        {
+            AssertOffsets(
+                new[] { 0d, 55d },
+                driver.ArrangeAndGetMainOffsets(100, 20, horizontal: true),
+                $"{driver.Name}: ColumnSpacing should reserve space between Grid columns.");
+        }
+
+        var rows = Component.Grid(
+                Component.Div().Row(0).Size(10, 10).Start().Top(),
+                Component.Div().Row(1).Size(10, 10).Start().Top())
+            .Rows("*,*")
+            .Columns("*")
+            .Size(20, 100)
+            .RowSpacing(10);
+
+        using (driver.Initialize(rows))
+        {
+            AssertOffsets(
+                new[] { 0d, 55d },
+                driver.ArrangeAndGetMainOffsets(100, 20, horizontal: false),
+                $"{driver.Name}: RowSpacing should reserve space between Grid rows.");
+        }
+
+        var autoFlow = Component.Grid(
+                Component.Div().Size(10, 10).Start().Top(),
+                Component.Div().Size(10, 10).Start().Top(),
+                Component.Div().Size(10, 10).Start().Top(),
+                Component.Div().Size(10, 10).Start().Top())
+            .Columns("*,*")
+            .AutoFlow()
+            .Size(100, 100)
+            .Spacing(10);
+
+        using (driver.Initialize(autoFlow))
+        {
+            AssertOffsets(
+                new[] { 0d, 55d, 0d, 55d },
+                driver.ArrangeAndGetMainOffsets(100, 100, horizontal: true),
+                $"{driver.Name}: AutoFlow should fill Grid columns in row-major order.");
+            AssertAutoFlowRows(
+                driver.ArrangeAndGetMainOffsets(100, 100, horizontal: false),
+                $"{driver.Name}: AutoFlow should continue in generated Auto rows.");
+        }
+    }
+
+    private static void GrowLayoutsRemainConsistent(RendererDriver driver)
+    {
+        var equalRow = Component.Div(
+                DivTypes.Row,
+                Component.Div().Height(10).Grow(),
+                Component.Div().Height(10).Grow())
+            .Size(100, 20)
+            .Spacing(10)
+            .SpaceEvenly();
+
+        using (driver.Initialize(equalRow))
+        {
+            AssertOffsets(
+                new[] { 0d, 55d },
+                driver.ArrangeAndGetMainOffsets(100, 20, horizontal: true),
+                $"{driver.Name}: equal Grow children should fill the Row without remaining distributed space.");
+            AssertOffsets(
+                new[] { 45d, 45d },
+                driver.ArrangeAndGetMainSizes(100, 20, horizontal: true),
+                $"{driver.Name}: equal Grow weights should create equal Row slots.");
+        }
+
+        var weightedRow = Component.Div(
+                DivTypes.Row,
+                Component.Div().Height(10).Grow(),
+                Component.Div().Height(10).Grow(2))
+            .Size(100, 20)
+            .Spacing(10);
+
+        using (driver.Initialize(weightedRow))
+        {
+            AssertOffsets(
+                new[] { 30d, 60d },
+                driver.ArrangeAndGetMainSizes(100, 20, horizontal: true),
+                $"{driver.Name}: weighted Grow children should divide Row space proportionally.");
+        }
+
+        var fixedAndGrow = Component.Div(
+                DivTypes.Row,
+                Component.Div().Size(20, 10),
+                Component.Div().Height(10).Grow())
+            .Size(100, 20)
+            .Spacing(10);
+
+        using (driver.Initialize(fixedAndGrow))
+        {
+            AssertOffsets(
+                new[] { 20d, 70d },
+                driver.ArrangeAndGetMainSizes(100, 20, horizontal: true),
+                $"{driver.Name}: Grow should consume the Row space left by fixed children.");
+        }
+
+        var equalColumn = Component.Div(
+                Component.Div().Width(10).Grow(),
+                Component.Div().Width(10).Grow())
+            .Size(20, 100)
+            .Spacing(10);
+
+        using (driver.Initialize(equalColumn))
+        {
+            AssertOffsets(
+                new[] { 45d, 45d },
+                driver.ArrangeAndGetMainSizes(100, 20, horizontal: false),
+                $"{driver.Name}: equal Grow weights should create equal Column slots.");
+        }
+    }
+
+    private static void AssertAutoFlowRows(IReadOnlyList<double> offsets, string message)
+    {
+        AssertEqual(4, offsets.Count, message + " Child count differs.");
+        if (Math.Abs(offsets[0] - offsets[1]) > 0.001
+            || Math.Abs(offsets[2] - offsets[3]) > 0.001
+            || offsets[2] - offsets[0] < 20)
+            throw new InvalidOperationException($"{message} Actual offsets: [{string.Join(", ", offsets)}].");
+    }
+
+    private static void ContentDistributionLayoutsRemainConsistent(RendererDriver driver)
+    {
+        var cases = new[]
+        {
+            (ContentDistribution.Start, new[] { 0d, 15d, 30d }),
+            (ContentDistribution.Center, new[] { 30d, 45d, 60d }),
+            (ContentDistribution.End, new[] { 60d, 75d, 90d }),
+            (ContentDistribution.SpaceBetween, new[] { 0d, 45d, 90d }),
+            (ContentDistribution.SpaceAround, new[] { 10d, 45d, 80d }),
+            (ContentDistribution.SpaceEvenly, new[] { 15d, 45d, 75d })
+        };
+
+        foreach (var (distribution, expectedOffsets) in cases)
+        {
+            var element = Component.Div(
+                    DivTypes.Row,
+                    Component.Div().Size(10, 10),
+                    Component.Div().Size(10, 10),
+                    Component.Div().Size(10, 10))
+                .Size(100, 20)
+                .Spacing(5)
+                .JustifyContent(distribution);
+
+            using var root = driver.Initialize(element);
+            AssertOffsets(
+                expectedOffsets,
+                driver.ArrangeAndGetMainOffsets(100, 20, horizontal: true),
+                $"{driver.Name}: {distribution} should distribute horizontal children consistently.");
+        }
+
+        var column = Component.Div(
+                Component.Div().Size(10, 10),
+                Component.Div().Size(10, 10),
+                Component.Div().Size(10, 10))
+            .Size(20, 100)
+            .Spacing(5)
+            .SpaceEvenly();
+
+        using var columnRoot = driver.Initialize(column);
+        AssertOffsets(
+            new[] { 15d, 45d, 75d },
+            driver.ArrangeAndGetMainOffsets(100, 20, horizontal: false),
+            $"{driver.Name}: SpaceEvenly should use the vertical axis for a column.");
+    }
+
+    private static void AssertOffsets(IReadOnlyList<double> expected, IReadOnlyList<double> actual, string message)
+    {
+        AssertEqual(expected.Count, actual.Count, message + " Child count differs.");
+        for (var index = 0; index < expected.Count; index++)
+        {
+            if (Math.Abs(expected[index] - actual[index]) > 0.001)
+                throw new InvalidOperationException($"{message} Expected offset {expected[index]} at index {index}; Actual: {actual[index]}.");
+        }
     }
 
     private static void OpacityTransitionsAreMaterializedReplacedAndRemoved(RendererDriver driver)
@@ -1018,6 +1208,10 @@ internal static class Program
         public abstract string GetText(object control);
 
         public abstract int GetOpacityTransitionCount(object control);
+
+        public abstract IReadOnlyList<double> ArrangeAndGetMainOffsets(double mainSize, double crossSize, bool horizontal);
+
+        public abstract IReadOnlyList<double> ArrangeAndGetMainSizes(double mainSize, double crossSize, bool horizontal);
     }
 
     private sealed class WpfDriver : RendererDriver
@@ -1045,6 +1239,39 @@ internal static class Program
         public override int GetOpacityTransitionCount(object control)
         {
             return control is WpfUIElement element && element.HasAnimatedProperties ? 1 : 0;
+        }
+
+        public override IReadOnlyList<double> ArrangeAndGetMainOffsets(double mainSize, double crossSize, bool horizontal)
+        {
+            if (_host.Content == null || GetRootPanel(_host.Content) is not WpfPanel panel)
+                return Array.Empty<double>();
+
+            var width = horizontal ? mainSize : crossSize;
+            var height = horizontal ? crossSize : mainSize;
+            _host.Content.Measure(new System.Windows.Size(width, height));
+            _host.Content.Arrange(new System.Windows.Rect(0, 0, width, height));
+
+            return panel.Children
+                .OfType<WpfFrameworkElement>()
+                .Select(child => child.TranslatePoint(new System.Windows.Point(), panel))
+                .Select(point => horizontal ? point.X : point.Y)
+                .ToArray();
+        }
+
+        public override IReadOnlyList<double> ArrangeAndGetMainSizes(double mainSize, double crossSize, bool horizontal)
+        {
+            if (_host.Content == null || GetRootPanel(_host.Content) is not WpfPanel panel)
+                return Array.Empty<double>();
+
+            var width = horizontal ? mainSize : crossSize;
+            var height = horizontal ? crossSize : mainSize;
+            _host.Content.Measure(new System.Windows.Size(width, height));
+            _host.Content.Arrange(new System.Windows.Rect(0, 0, width, height));
+
+            return panel.Children
+                .OfType<WpfFrameworkElement>()
+                .Select(child => horizontal ? child.ActualWidth : child.ActualHeight)
+                .ToArray();
         }
 
         private static string? FindText(WpfFrameworkElement element)
@@ -1104,6 +1331,36 @@ internal static class Program
             return control is AvaloniaControl element
                 ? element.Transitions?.OfType<TransitionBase>().Count(transition => transition.Property == AvaloniaVisual.OpacityProperty) ?? 0
                 : 0;
+        }
+
+        public override IReadOnlyList<double> ArrangeAndGetMainOffsets(double mainSize, double crossSize, bool horizontal)
+        {
+            if (_host.Content is not AvaloniaPanel panel)
+                return Array.Empty<double>();
+
+            var width = horizontal ? mainSize : crossSize;
+            var height = horizontal ? crossSize : mainSize;
+            panel.Measure(new global::Avalonia.Size(width, height));
+            panel.Arrange(new global::Avalonia.Rect(0, 0, width, height));
+
+            return panel.Children
+                .Select(child => horizontal ? child.Bounds.X : child.Bounds.Y)
+                .ToArray();
+        }
+
+        public override IReadOnlyList<double> ArrangeAndGetMainSizes(double mainSize, double crossSize, bool horizontal)
+        {
+            if (_host.Content is not AvaloniaPanel panel)
+                return Array.Empty<double>();
+
+            var width = horizontal ? mainSize : crossSize;
+            var height = horizontal ? crossSize : mainSize;
+            panel.Measure(new global::Avalonia.Size(width, height));
+            panel.Arrange(new global::Avalonia.Rect(0, 0, width, height));
+
+            return panel.Children
+                .Select(child => horizontal ? child.Bounds.Width : child.Bounds.Height)
+                .ToArray();
         }
 
         private static string? FindText(AvaloniaControl control)

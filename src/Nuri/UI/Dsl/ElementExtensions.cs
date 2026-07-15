@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Nuri.Constants;
+using Nuri.UI.Controls;
 using Nuri.UI.Events;
 using Nuri.UI.Values;
 
@@ -184,6 +185,92 @@ namespace Nuri.UI.Dsl
         {
             node.SetProperty("Padding", new ThicknessValue(left, top, right, bottom));
             return node;
+        }
+
+        public static T Spacing<T>(this T node, double value) where T : IDiv
+        {
+            ValidateSpacing(value);
+
+            if (node.Kind == DivTypes.Grid)
+            {
+                node.SetProperty(PropertyKeys.RowSpacing, value);
+                node.SetProperty(PropertyKeys.ColumnSpacing, value);
+                return node;
+            }
+
+            EnsureLinearLayout(node, PropertyKeys.Spacing);
+
+            node.SetProperty(PropertyKeys.Spacing, value);
+            return node;
+        }
+
+        public static T RowSpacing<T>(this T node, double value) where T : IDiv
+        {
+            EnsureGridLayout(node, PropertyKeys.RowSpacing);
+            ValidateSpacing(value);
+            node.SetProperty(PropertyKeys.RowSpacing, value);
+            return node;
+        }
+
+        public static T ColumnSpacing<T>(this T node, double value) where T : IDiv
+        {
+            EnsureGridLayout(node, PropertyKeys.ColumnSpacing);
+            ValidateSpacing(value);
+            node.SetProperty(PropertyKeys.ColumnSpacing, value);
+            return node;
+        }
+
+        public static T Grow<T>(this T node, double weight = 1) where T : IElement
+        {
+            if (double.IsNaN(weight) || double.IsInfinity(weight) || weight < 0)
+                throw new ArgumentOutOfRangeException(nameof(weight), weight, "Grow weight must be a finite, non-negative value.");
+
+            node.SetProperty(PropertyKeys.Grow, weight);
+            return node;
+        }
+
+        public static T JustifyContent<T>(this T node, ContentDistribution distribution) where T : IDiv
+        {
+            EnsureLinearLayout(node, PropertyKeys.JustifyContent);
+            node.SetProperty(PropertyKeys.JustifyContent, distribution);
+            return node;
+        }
+
+        public static T SpaceBetween<T>(this T node) where T : IDiv
+        {
+            return node.JustifyContent(ContentDistribution.SpaceBetween);
+        }
+
+        public static T SpaceAround<T>(this T node) where T : IDiv
+        {
+            return node.JustifyContent(ContentDistribution.SpaceAround);
+        }
+
+        public static T SpaceEvenly<T>(this T node) where T : IDiv
+        {
+            return node.JustifyContent(ContentDistribution.SpaceEvenly);
+        }
+
+        private static void EnsureLinearLayout(IDiv node, string propertyName)
+        {
+            if (string.IsNullOrEmpty(node.Kind) || node.Kind == DivTypes.Column || node.Kind == DivTypes.Row)
+                return;
+
+            throw new InvalidOperationException($"{propertyName} is supported only by Row and Column Div layouts, not '{node.Kind}'.");
+        }
+
+        private static void EnsureGridLayout(IDiv node, string propertyName)
+        {
+            if (node.Kind == DivTypes.Grid)
+                return;
+
+            throw new InvalidOperationException($"{propertyName} is supported only by Grid layouts, not '{node.Kind}'.");
+        }
+
+        private static void ValidateSpacing(double value)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value) || value < 0)
+                throw new ArgumentOutOfRangeException(nameof(value), value, "Spacing must be a finite, non-negative value.");
         }
 
         public static T CornerRadius<T>(this T node, double value) where T : IDiv

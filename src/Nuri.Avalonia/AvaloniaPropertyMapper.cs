@@ -8,6 +8,7 @@ using Avalonia.Media;
 using Nuri.UI.Values;
 using AvaloniaThickness = Avalonia.Thickness;
 using AvaloniaCornerRadius = Avalonia.CornerRadius;
+using Nuri.Constants;
 
 namespace Nuri.Avalonia
 {
@@ -69,6 +70,19 @@ namespace Nuri.Avalonia
                     return TrySetRowDefinitions(control, value);
                 case "ColumnDefinitions":
                     return TrySetColumnDefinitions(control, value);
+                case PropertyKeys.Spacing:
+                    return TrySetSpacing(control, value);
+                case PropertyKeys.JustifyContent:
+                    return TrySetJustifyContent(control, value);
+                case PropertyKeys.Grow:
+                    AvaloniaDistributedStackPanel.SetGrow(control, ToDouble(value));
+                    if (control.Parent is AvaloniaDistributedStackPanel growParent)
+                        growParent.InvalidateMeasure();
+                    return true;
+                case PropertyKeys.RowSpacing:
+                    return TrySetRowSpacing(control, value);
+                case PropertyKeys.ColumnSpacing:
+                    return TrySetColumnSpacing(control, value);
                 default:
                     return false;
             }
@@ -90,6 +104,19 @@ namespace Nuri.Avalonia
                 case "Margin":
                     control.ClearValue(Layoutable.MarginProperty);
                     return true;
+                case PropertyKeys.Spacing:
+                    return TryClearSpacing(control);
+                case PropertyKeys.JustifyContent:
+                    return TryClearJustifyContent(control);
+                case PropertyKeys.Grow:
+                    control.ClearValue(AvaloniaDistributedStackPanel.GrowProperty);
+                    if (control.Parent is AvaloniaDistributedStackPanel resetGrowParent)
+                        resetGrowParent.InvalidateMeasure();
+                    return true;
+                case PropertyKeys.RowSpacing:
+                    return TryClearRowSpacing(control);
+                case PropertyKeys.ColumnSpacing:
+                    return TryClearColumnSpacing(control);
                 case "Text" when control is TextBlock textBlock:
                     textBlock.Text = null;
                     return true;
@@ -324,6 +351,78 @@ namespace Nuri.Avalonia
             return true;
         }
 
+        private static bool TrySetSpacing(Control control, object? value)
+        {
+            if (control is not AvaloniaDistributedStackPanel panel)
+                return false;
+
+            panel.Spacing = ToDouble(value);
+            return true;
+        }
+
+        private static bool TryClearSpacing(Control control)
+        {
+            if (control is not AvaloniaDistributedStackPanel panel)
+                return false;
+
+            panel.Spacing = 0;
+            return true;
+        }
+
+        private static bool TrySetJustifyContent(Control control, object? value)
+        {
+            if (control is not AvaloniaDistributedStackPanel panel || value is not ContentDistribution distribution)
+                return false;
+
+            panel.JustifyContent = distribution;
+            return true;
+        }
+
+        private static bool TryClearJustifyContent(Control control)
+        {
+            if (control is not AvaloniaDistributedStackPanel panel)
+                return false;
+
+            panel.JustifyContent = ContentDistribution.Start;
+            return true;
+        }
+
+        private static bool TrySetRowSpacing(Control control, object? value)
+        {
+            if (control is not Grid grid)
+                return false;
+
+            grid.RowSpacing = ToDouble(value);
+            return true;
+        }
+
+        private static bool TryClearRowSpacing(Control control)
+        {
+            if (control is not Grid grid)
+                return false;
+
+            grid.ClearValue(Grid.RowSpacingProperty);
+            return true;
+        }
+
+        private static bool TrySetColumnSpacing(Control control, object? value)
+        {
+            if (control is not Grid grid)
+                return false;
+
+            grid.ColumnSpacing = ToDouble(value);
+            return true;
+        }
+
+        private static bool TryClearColumnSpacing(Control control)
+        {
+            if (control is not Grid grid)
+                return false;
+
+            grid.ClearValue(Grid.ColumnSpacingProperty);
+            return true;
+        }
+
         private static AvaloniaThickness ToThickness(object? value)
         {
             if (value is ThicknessValue thickness)
@@ -361,7 +460,8 @@ namespace Nuri.Avalonia
 
         private static HorizontalAlignment MapHorizontalAlignment(object? value)
         {
-            return value?.ToString() switch
+            var kind = value is HorizontalAlignmentValue alignment ? alignment.Kind.ToString() : value?.ToString();
+            return kind switch
             {
                 "Start" => HorizontalAlignment.Left,
                 "Center" => HorizontalAlignment.Center,
@@ -373,7 +473,8 @@ namespace Nuri.Avalonia
 
         private static VerticalAlignment MapVerticalAlignment(object? value)
         {
-            return value?.ToString() switch
+            var kind = value is VerticalAlignmentValue alignment ? alignment.Kind.ToString() : value?.ToString();
+            return kind switch
             {
                 "Start" => VerticalAlignment.Top,
                 "Center" => VerticalAlignment.Center,

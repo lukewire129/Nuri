@@ -237,9 +237,9 @@ namespace Nuri.WPF
             switch (kind)
             {
                 case DivTypes.Grid:
-                    return new System.Windows.Controls.Grid();
+                    return new NuriGrid();
                 case DivTypes.Row:
-                    return new StackPanel { Orientation = Orientation.Horizontal };
+                    return new WpfDistributedStackPanel(Orientation.Horizontal);
                 case DivTypes.Wrap:
                     return new WrapPanel();
                 case DivTypes.Scroll:
@@ -248,7 +248,7 @@ namespace Nuri.WPF
                     return new System.Windows.Controls.Grid();
                 case DivTypes.Column:
                 case "":
-                    return new StackPanel { Orientation = Orientation.Vertical };
+                    return new WpfDistributedStackPanel(Orientation.Vertical);
                 default:
                     throw new InvalidOperationException($"Unknown Div kind: {kind}");
             }
@@ -275,6 +275,10 @@ namespace Nuri.WPF
         private static bool IsHostProperty(string propertyName)
         {
             return propertyName == "Orientation"
+                || propertyName == Nuri.Constants.PropertyKeys.Spacing
+                || propertyName == Nuri.Constants.PropertyKeys.JustifyContent
+                || propertyName == Nuri.Constants.PropertyKeys.RowSpacing
+                || propertyName == Nuri.Constants.PropertyKeys.ColumnSpacing
                 || propertyName == "RowDefinitions"
                 || propertyName == "ColumnDefinitions";
         }

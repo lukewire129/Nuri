@@ -46,6 +46,7 @@ internal static class Program
         MultipleNavigationHooksKeepIndependentState();
         NestedNavigationComponentsKeepIndependentState();
         RouterAssignsSelectedRouteKey();
+        LayoutDistributionDslUsesNeutralProperties();
         GridLengthDslTreatsNumbersAsPixels();
         GridLengthDslParsesStringDefinitions();
         GridLengthDslRejectsInvalidStringDefinitions();
@@ -794,6 +795,106 @@ internal static class Program
         AssertEqual(1.1d, element.Animations["ScaleX"].To, "ScaleX animation should use the configured value.");
         AssertEqual(0.9d, element.Animations["ScaleY"].To, "ScaleY animation should use the configured value.");
         AssertEqual(TimeSpan.FromMilliseconds(200), background.Duration, "Transition should use the configured duration.");
+    }
+
+    private static void LayoutDistributionDslUsesNeutralProperties()
+    {
+        var element = Component.Div(DivTypes.Row)
+            .Spacing(12)
+            .JustifyContent(ContentDistribution.SpaceEvenly);
+        var growingChild = Component.Div().Grow(2);
+
+        AssertEqual(12d, element.Properties[PropertyKeys.Spacing], "Spacing should retain its neutral scalar value.");
+        AssertEqual(ContentDistribution.SpaceEvenly, element.Properties[PropertyKeys.JustifyContent], "JustifyContent should retain its neutral distribution value.");
+        AssertEqual(2d, growingChild.Properties[PropertyKeys.Grow], "Grow should retain its neutral proportional weight.");
+
+        AssertEqual(
+            ContentDistribution.SpaceBetween,
+            Component.Div(DivTypes.Row).SpaceBetween().Properties[PropertyKeys.JustifyContent],
+            "SpaceBetween should configure the matching content distribution.");
+        AssertEqual(
+            ContentDistribution.SpaceAround,
+            Component.Div(DivTypes.Row).SpaceAround().Properties[PropertyKeys.JustifyContent],
+            "SpaceAround should configure the matching content distribution.");
+        AssertEqual(
+            ContentDistribution.SpaceEvenly,
+            Component.Div(DivTypes.Row).SpaceEvenly().Properties[PropertyKeys.JustifyContent],
+            "SpaceEvenly should configure the matching content distribution.");
+
+        AssertThrows<ArgumentOutOfRangeException>(
+            () => Component.Div().Spacing(-1),
+            "Negative spacing should fail before reaching a renderer.");
+        AssertThrows<ArgumentOutOfRangeException>(
+            () => Component.Div().Grow(-1),
+            "Negative Grow weights should fail before reaching a renderer.");
+        var grid = Component.Grid()
+            .Spacing(8)
+            .RowSpacing(6);
+        AssertEqual(6d, grid.Properties[PropertyKeys.RowSpacing], "RowSpacing should override uniform Grid spacing for rows.");
+        AssertEqual(8d, grid.Properties[PropertyKeys.ColumnSpacing], "Uniform Grid spacing should configure column spacing.");
+
+        AssertThrows<InvalidOperationException>(
+            () => Component.Div().RowSpacing(8),
+            "RowSpacing should remain specific to Grid layouts.");
+        AssertThrows<InvalidOperationException>(
+            () => Component.Grid().SpaceEvenly(),
+            "Grid should continue using row and column definitions instead of main-axis content distribution.");
+        AssertThrows<InvalidOperationException>(
+            () => Component.Div(DivTypes.Scroll).SpaceBetween(),
+            "Scroll layouts should reject main-axis content distribution.");
+        AssertThrows<InvalidOperationException>(
+            () => Component.Div(DivTypes.Scroll).Spacing(8),
+            "Scroll layouts should reject child spacing directly.");
+
+        var first = Component.Text("first");
+        var second = Component.Text("second");
+        var third = Component.Text("third");
+        var fourth = Component.Text("fourth");
+        var autoGrid = Component.Grid(first, second, third, fourth)
+            .Columns("*,*,*")
+            .AutoFlow();
+        var autoRows = (List<LengthValue>)autoGrid.Properties["RowDefinitions"];
+
+        AssertEqual(2, autoRows.Count, "AutoFlow should add enough Auto rows for every child.");
+        AssertEqual(LengthUnit.Auto, autoRows[0].Unit, "AutoFlow should use Auto for generated rows.");
+        AssertEqual(0, first.Properties["Grid.Row"], "AutoFlow should start in the first row.");
+        AssertEqual(0, first.Properties["Grid.Column"], "AutoFlow should start in the first column.");
+        AssertEqual(0, third.Properties["Grid.Row"], "AutoFlow should fill the first row before advancing.");
+        AssertEqual(2, third.Properties["Grid.Column"], "AutoFlow should use every configured column.");
+        AssertEqual(1, fourth.Properties["Grid.Row"], "AutoFlow should continue on the next row.");
+        AssertEqual(0, fourth.Properties["Grid.Column"], "AutoFlow should restart from the first column on a new row.");
+
+        AssertThrows<InvalidOperationException>(
+            () => Component.Grid(Component.Text("missing columns")).AutoFlow(),
+            "AutoFlow should require an explicit column count.");
+        AssertThrows<InvalidOperationException>(
+            () => Component.Grid(Component.Text("explicit").Row(0)).Columns("*").AutoFlow(),
+            "AutoFlow should reject mixed explicit placement in its first version.");
+
+        var sizedRows = Component.Grid(
+                Component.Text("a"),
+                Component.Text("b"),
+                Component.Text("c"),
+                Component.Text("d"))
+            .Columns("*,*")
+            .Rows("*,2*")
+            .AutoFlow();
+        var retainedRows = (List<LengthValue>)sizedRows.Properties["RowDefinitions"];
+        AssertEqual(2, retainedRows.Count, "AutoFlow should retain explicitly configured rows.");
+        AssertEqual(1d, retainedRows[0].Value, "AutoFlow should retain the first explicit row size.");
+        AssertEqual(2d, retainedRows[1].Value, "AutoFlow should retain the second explicit row size.");
+
+        AssertThrows<InvalidOperationException>(
+            () => Component.Grid(
+                    Component.Text("a"),
+                    Component.Text("b"),
+                    Component.Text("c"),
+                    Component.Text("d"),
+                    Component.Text("overflow"))
+                .Columns("*,*")
+                .Rows("*,*")
+                .AutoFlow(),
+            "AutoFlow should reject children that exceed an explicitly sized Grid.");
     }
 
     private static void GridLengthDslTreatsNumbersAsPixels()

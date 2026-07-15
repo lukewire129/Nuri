@@ -140,10 +140,13 @@ namespace Nuri.Avalonia
             if (kind == DivTypes.Grid)
                 return new Grid();
 
-            return new StackPanel
-            {
-                Orientation = kind == DivTypes.Row ? Orientation.Horizontal : Orientation.Vertical
-            };
+            if (kind == DivTypes.Row)
+                return new AvaloniaDistributedStackPanel(Orientation.Horizontal);
+
+            if (kind == DivTypes.Column || string.IsNullOrEmpty(kind))
+                return new AvaloniaDistributedStackPanel(Orientation.Vertical);
+
+            return new StackPanel { Orientation = Orientation.Vertical };
         }
     }
 }
