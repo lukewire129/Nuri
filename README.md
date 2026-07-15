@@ -32,13 +32,14 @@ namespace NuriSample;
 
 internal static class Program
 {
-    [STAThread]
     private static void Main()
     {
         NuriApplication.Run<CounterComponent>("Nuri Sample", width: 480, height: 320);
     }
 }
 ```
+
+`NuriApplication.Run<TComponent>` uses the current thread when it is already STA. Otherwise it creates and owns a WPF STA application thread, so a Program.cs entry point does not need `[STAThread]` or manual `SetApartmentState` calls. APIs that return native WPF objects, such as `Show` and `Attach`, still need to be called from their owning WPF STA thread.
 
 Create components by inheriting `Component` and returning `IElement` from `Render()`:
 

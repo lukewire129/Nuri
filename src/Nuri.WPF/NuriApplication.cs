@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ExceptionServices;
+using System.Threading;
 using System.Windows;
 using Nuri.UI;
 using Nuri.UI.Dsl;
@@ -16,6 +18,18 @@ namespace Nuri.WPF
         private static bool _configurationLocked;
 
         public static void Run<TComponent>(string title, double width = 800, double height = 600)
+            where TComponent : Component, new()
+        {
+            if (Thread.CurrentThread.GetApartmentState() != ApartmentState.STA)
+            {
+                RunFromNonStaThread(() => RunCore<TComponent>(title, width, height));
+                return;
+            }
+
+            RunCore<TComponent>(title, width, height);
+        }
+
+        private static void RunCore<TComponent>(string title, double width, double height)
             where TComponent : Component, new()
         {
             EnsureHotReloadAttached();
@@ -34,6 +48,44 @@ namespace Nuri.WPF
             application.ShutdownMode = ShutdownMode.OnMainWindowClose;
             var window = Show<TComponent>(title, width, height);
             application.MainWindow ??= window;
+        }
+
+        private static void RunFromNonStaThread(Action run)
+        {
+            var existingApplication = Application.Current;
+            if (existingApplication != null)
+            {
+                if (existingApplication.Dispatcher.CheckAccess())
+                {
+                    throw new InvalidOperationException(
+                        "The existing WPF Application was created on a non-STA thread and cannot be repaired by NuriApplication.Run.");
+                }
+
+                existingApplication.Dispatcher.Invoke(run);
+                return;
+            }
+
+            ExceptionDispatchInfo? failure = null;
+            var applicationThread = new Thread(() =>
+            {
+                try
+                {
+                    run();
+                }
+                catch (Exception exception)
+                {
+                    failure = ExceptionDispatchInfo.Capture(exception);
+                }
+            })
+            {
+                IsBackground = false,
+                Name = "Nuri WPF Application"
+            };
+
+            applicationThread.SetApartmentState(ApartmentState.STA);
+            applicationThread.Start();
+            applicationThread.Join();
+            failure?.Throw();
         }
 
         public static Window Show<TComponent>(string title, double width = 800, double height = 600)

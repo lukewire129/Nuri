@@ -54,11 +54,11 @@ internal static class Program
         WpfTransitionsReplaceAndClearNativeAnimations(new WpfDriver());
         WpfVirtualizedItemsStayLazyAndRecycleContainers();
         RunSuite(() => new AvaloniaDriver());
-        WpfRunClosesEveryWindowWithTheMainWindow();
+        WpfRunBootstrapsStaAndClosesEveryWindowWithTheMainWindow();
         Console.WriteLine("Nuri.RendererTests passed.");
     }
 
-    private static void WpfRunClosesEveryWindowWithTheMainWindow()
+    private static void WpfRunBootstrapsStaAndClosesEveryWindowWithTheMainWindow()
     {
         NuriDiagnostics.Enable();
         NuriDiagnostics.ClearLogs();
@@ -69,9 +69,12 @@ internal static class Program
         var configuredShutdownMode = System.Windows.ShutdownMode.OnLastWindowClose;
         var childWasVisible = false;
         var childClosed = false;
+        var callerApartmentState = System.Threading.ApartmentState.Unknown;
+        var applicationApartmentState = System.Threading.ApartmentState.Unknown;
 
         ApplicationLifetimeProbe.OnMainMounted = () =>
         {
+            applicationApartmentState = System.Threading.Thread.CurrentThread.GetApartmentState();
             var dispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
             dispatcher.BeginInvoke(new Action(() =>
             {
@@ -105,6 +108,7 @@ internal static class Program
         {
             try
             {
+                callerApartmentState = System.Threading.Thread.CurrentThread.GetApartmentState();
                 NuriApplication.Run<ApplicationLifetimeMainComponent>(
                     "Nuri.RendererTests.ApplicationLifetime.Main",
                     width: 1,
@@ -115,7 +119,6 @@ internal static class Program
                 threadFailure = exception;
             }
         });
-        applicationThread.SetApartmentState(System.Threading.ApartmentState.STA);
         applicationThread.Start();
 
         if (!applicationThread.Join(TimeSpan.FromSeconds(15)))
@@ -128,6 +131,8 @@ internal static class Program
         if (threadFailure != null)
             throw new InvalidOperationException("WPF: the application-lifetime probe failed.", threadFailure);
 
+        AssertEqual(System.Threading.ApartmentState.MTA, callerApartmentState, "WPF: the application-lifetime probe should call Run from a default MTA thread.");
+        AssertEqual(System.Threading.ApartmentState.STA, applicationApartmentState, "WPF: Run should bootstrap a dedicated STA application thread when its caller is not STA.");
         AssertEqual(System.Windows.ShutdownMode.OnMainWindowClose, configuredShutdownMode, "WPF: Run should select main-window shutdown semantics.");
         AssertEqual(true, childWasVisible, "WPF: the lifetime probe should show a child window before closing the main window.");
         AssertEqual(true, childClosed, "WPF: closing the main window should close every remaining application window.");
