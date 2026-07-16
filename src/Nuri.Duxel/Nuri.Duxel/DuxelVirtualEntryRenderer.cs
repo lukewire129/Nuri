@@ -14,9 +14,12 @@ public sealed class DuxelVirtualEntryRenderer
     private const float ScrollImpulsePerStep = 12f;
     private const float ScrollStopVelocity = 4f;
     private const float MaximumScrollSpeedInSteps = 42f;
+    private const float ScrollbarWidth = 12f;
+    private const float ScrollbarInset = 2f;
     private readonly DuxelInputEventQueue? _inputEvents;
     private readonly Dictionary<string, ScrollRegionState> _scrollRegions = new(StringComparer.Ordinal);
     private readonly List<DuxelInputEvent> _deferredInputEvents = new();
+    private readonly Stack<UiRect> _panelClipRects = new();
     private long _frameNumber;
     private int _scrollOrder;
     private double _lastFrameTime;
@@ -207,6 +210,7 @@ public sealed class DuxelVirtualEntryRenderer
 
         var isScroll = string.Equals(entry.Kind, DivTypes.Scroll, StringComparison.Ordinal);
         var useNuriScroll = isScroll && _inputEvents is not null;
+        var directScrollClipPushed = false;
         if (isScroll && !useNuriScroll)
         {
             var requestedSize = GetSize(entry);
@@ -220,6 +224,13 @@ public sealed class DuxelVirtualEntryRenderer
                 requestedSize = requestedSize with { Y = constrainedHeight };
             }
 
+            var scrollStart = ui.GetCursorScreenPos();
+            PushPanelClip(new UiRect(
+                scrollStart.X,
+                scrollStart.Y,
+                MathF.Max(1f, requestedSize.X),
+                MathF.Max(1f, requestedSize.Y)));
+            directScrollClipPushed = true;
             _ = ui.BeginChild(
                 string.IsNullOrWhiteSpace(entry.Id) ? "NuriScroll" : entry.Id,
                 requestedSize,
@@ -254,6 +265,10 @@ public sealed class DuxelVirtualEntryRenderer
             if (isScroll && !useNuriScroll)
             {
                 ui.EndChild();
+                if (directScrollClipPushed)
+                {
+                    _panelClipRects.Pop();
+                }
             }
 
             if (decorate)
@@ -281,7 +296,10 @@ public sealed class DuxelVirtualEntryRenderer
                     panelStart.Y,
                     MathF.Max(0f, panelRight - panelStart.X),
                     MathF.Max(1f, panelBottom - panelStart.Y));
-                decorations!.Add(CreatePanelDecoration(entry, rect, effectiveOpacity));
+                var clipRect = _panelClipRects.TryPeek(out var activeClip)
+                    ? activeClip
+                    : (UiRect?)null;
+                decorations!.Add(CreatePanelDecoration(entry, rect, effectiveOpacity, clipRect));
             }
         }
     }
@@ -329,6 +347,7 @@ public sealed class DuxelVirtualEntryRenderer
         var contentEndY = contentStartY;
 
         ui.PushClipRect(contentBounds, true);
+        PushPanelClip(contentBounds);
         try
         {
             ui.SetCursorPos(new UiVector2(contentBounds.X, contentStartY));
@@ -343,6 +362,7 @@ public sealed class DuxelVirtualEntryRenderer
         }
         finally
         {
+            _panelClipRects.Pop();
             ui.PopClipRect();
             ui.SetCursorPos(cursor);
         }
@@ -372,25 +392,36 @@ public sealed class DuxelVirtualEntryRenderer
             return;
         }
 
-        const float barWidth = 12f;
         const float minimumHandleHeight = 20f;
         var track = new UiRect(
-            bounds.X + bounds.Width - barWidth,
-            bounds.Y,
-            barWidth,
-            bounds.Height);
+            bounds.X + bounds.Width - ScrollbarInset - ScrollbarWidth,
+            bounds.Y + ScrollbarInset,
+            ScrollbarWidth,
+            MathF.Max(0f, bounds.Height - (ScrollbarInset * 2f)));
         var handleHeight = Math.Clamp(
-            bounds.Height * (bounds.Height / contentHeight),
-            MathF.Min(minimumHandleHeight, bounds.Height),
-            bounds.Height);
-        var travel = MathF.Max(0f, bounds.Height - handleHeight);
-        var handleY = bounds.Y + (state.Offset / state.MaxOffset) * travel;
+            track.Height * (track.Height / contentHeight),
+            MathF.Min(minimumHandleHeight, track.Height),
+            track.Height);
+        var travel = MathF.Max(0f, track.Height - handleHeight);
+        var handleY = track.Y + (state.Offset / state.MaxOffset) * travel;
         var handle = new UiRect(track.X, handleY, track.Width, handleHeight);
         state.ScrollbarTrack = track;
         state.ScrollbarHandle = handle;
         var drawList = ui.GetWindowDrawList();
-        drawList.AddRectFilled(track, ui.GetColorU32(UiStyleColor.ScrollbarBg));
-        drawList.AddRectFilled(handle, ui.GetColorU32(UiStyleColor.ScrollbarGrab));
+        var trackRounding = MathF.Min(track.Width * 0.5f, track.Height * 0.5f);
+        var handleRounding = MathF.Min(handle.Width * 0.5f, handle.Height * 0.5f);
+        drawList.AddRectFilledRounded(
+            track,
+            ui.GetColorU32(UiStyleColor.ScrollbarBg),
+            ui.WhiteTextureId,
+            trackRounding,
+            bounds);
+        drawList.AddRectFilledRounded(
+            handle,
+            ui.GetColorU32(UiStyleColor.ScrollbarGrab),
+            ui.WhiteTextureId,
+            handleRounding,
+            bounds);
     }
 
     private void RenderDivContent(
@@ -1517,6 +1548,29 @@ public sealed class DuxelVirtualEntryRenderer
         }
     }
 
+    private void PushPanelClip(UiRect clipRect)
+    {
+        if (_panelClipRects.TryPeek(out var parentClip))
+        {
+            clipRect = Intersect(parentClip, clipRect);
+        }
+
+        _panelClipRects.Push(clipRect);
+    }
+
+    private static UiRect Intersect(UiRect left, UiRect right)
+    {
+        var x = MathF.Max(left.X, right.X);
+        var y = MathF.Max(left.Y, right.Y);
+        var rightEdge = MathF.Min(left.X + left.Width, right.X + right.Width);
+        var bottomEdge = MathF.Min(left.Y + left.Height, right.Y + right.Height);
+        return new UiRect(
+            x,
+            y,
+            MathF.Max(0f, rightEdge - x),
+            MathF.Max(0f, bottomEdge - y));
+    }
+
     private static bool Contains(UiRect bounds, UiVector2 position)
     {
         return position.X >= bounds.X
@@ -1647,7 +1701,8 @@ public sealed class DuxelVirtualEntryRenderer
     private static PanelDecoration CreatePanelDecoration(
         VirtualEntry entry,
         UiRect rect,
-        float effectiveOpacity)
+        float effectiveOpacity,
+        UiRect? clipRect)
     {
         UiColor? background = TryGetColor(entry, PropertyKeys.Background, out var backgroundColor)
             ? WithOpacity(ToUiColor(backgroundColor), effectiveOpacity)
@@ -1666,7 +1721,7 @@ public sealed class DuxelVirtualEntryRenderer
                     Math.Max(radius.BottomRight, radius.BottomLeft)))
                 : 0f;
 
-        return new PanelDecoration(rect, background, border, borderThickness, cornerRadius);
+        return new PanelDecoration(rect, background, border, borderThickness, cornerRadius, clipRect);
     }
 
     private static void DrawPanel(
@@ -1674,30 +1729,46 @@ public sealed class DuxelVirtualEntryRenderer
         UiDrawListBuilder drawList,
         PanelDecoration decoration)
     {
-        if (decoration.Background is UiColor background)
+        var clipRect = decoration.ClipRect;
+        if (clipRect is UiRect activeClip)
         {
-            if (decoration.CornerRadius > 0f)
-            {
-                drawList.AddRectFilledRounded(
-                    decoration.Rect,
-                    background,
-                    ui.WhiteTextureId,
-                    decoration.CornerRadius,
-                    new UiRect(0f, 0f, 1f, 1f));
-            }
-            else
-            {
-                drawList.AddRectFilled(decoration.Rect, background);
-            }
+            drawList.PushClipRect(activeClip, intersectWithCurrentClipRect: true);
         }
 
-        if (decoration.Border is UiColor border && decoration.BorderThickness > 0f)
+        try
         {
-            drawList.AddRect(
-                decoration.Rect,
-                border,
-                decoration.CornerRadius,
-                decoration.BorderThickness);
+            if (decoration.Background is UiColor background)
+            {
+                if (decoration.CornerRadius > 0f)
+                {
+                    drawList.AddRectFilledRounded(
+                        decoration.Rect,
+                        background,
+                        ui.WhiteTextureId,
+                        decoration.CornerRadius,
+                        decoration.ClipRect ?? decoration.Rect);
+                }
+                else
+                {
+                    drawList.AddRectFilled(decoration.Rect, background);
+                }
+            }
+
+            if (decoration.Border is UiColor border && decoration.BorderThickness > 0f)
+            {
+                drawList.AddRect(
+                    decoration.Rect,
+                    border,
+                    decoration.CornerRadius,
+                    decoration.BorderThickness);
+            }
+        }
+        finally
+        {
+            if (clipRect is not null)
+            {
+                drawList.PopClipRect();
+            }
         }
     }
 
@@ -1930,7 +2001,8 @@ public sealed class DuxelVirtualEntryRenderer
         UiColor? Background,
         UiColor? Border,
         float BorderThickness,
-        float CornerRadius);
+        float CornerRadius,
+        UiRect? ClipRect);
 
     private sealed class ScrollRegionState
     {

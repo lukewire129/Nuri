@@ -26,6 +26,8 @@ internal static class Program
             ("grid rows advance by their tallest cell", GridRowsAdvanceByTallestCell),
             ("grid has no implicit track spacing", GridHasNoImplicitTrackSpacing),
             ("scroll projects one spaced Column child", ScrollProjectsOneSpacedColumnChild),
+            ("scroll clips deferred panel decorations", ScrollClipsDeferredPanelDecorations),
+            ("scrollbar respects viewport corners", ScrollbarRespectsViewportCorners),
             ("fixed grid tracks do not expand to overflowing content", FixedGridTracksDoNotExpand),
             ("implicit grid row fills its arranged height", ImplicitGridRowFillsArrangedHeight),
             ("measured auto row reduces remaining star height", MeasuredAutoRowReducesRemainingStarHeight),
@@ -176,6 +178,63 @@ internal static class Program
         return input.GetScrollRegions().Single().MaxOffset;
     }
 
+    private static void ScrollClipsDeferredPanelDecorations()
+    {
+        using var context = CreateContext();
+        var input = new DuxelInputEventQueue();
+        using var screen = new NuriDuxelScreen(
+            new DecoratedScrollComponent(),
+            () => { },
+            "scroll-decoration-clip-test",
+            input);
+
+        RenderFrame(context, screen);
+        var initial = input.GetScrollRegions().Single();
+        AssertTrue(initial.MaxOffset > 0f, "The decorated Scroll test must contain overflow.");
+
+        var handleCenter = Center(initial.ScrollbarHandle);
+        var trackBottom = new UiVector2(
+            initial.ScrollbarTrack.X + (initial.ScrollbarTrack.Width * 0.5f),
+            initial.ScrollbarTrack.Y + initial.ScrollbarTrack.Height - 1f);
+        input.Enqueue(1, DuxelInputEventKind.PointerDown, handleCenter, code: 0, capturedByNuri: true);
+        input.Enqueue(2, DuxelInputEventKind.PointerMove, trackBottom, capturedByNuri: true);
+        input.Enqueue(3, DuxelInputEventKind.PointerUp, trackBottom, code: 0, capturedByNuri: true);
+
+        var drawData = RenderFrameWithDrawData(context, screen, FrameInfo);
+        try
+        {
+            var region = input.GetScrollRegions().Single();
+            AssertTrue(
+                MathF.Abs(region.Offset - region.MaxOffset) <= 1f,
+                "The decorated Scroll test must inspect the maximum offset.");
+            var contentBounds = new UiRect(
+                region.Bounds.X + 2f,
+                region.Bounds.Y + 2f,
+                MathF.Max(0f, region.Bounds.Width - 4f),
+                MathF.Max(0f, region.Bounds.Height - 4f));
+            var decorations = drawData.DrawLists
+                .SelectMany(drawList => drawList.Commands)
+                .Where(command => command.Kind == UiDrawCommandKind.RectFilledPrimitives
+                    && command.HasBounds
+                    && command.Bounds.Width >= 150f
+                    && command.Bounds.Height >= 40f
+                    && (command.Bounds.Y < contentBounds.Y
+                        || command.Bounds.Y + command.Bounds.Height > contentBounds.Y + contentBounds.Height))
+                .ToArray();
+
+            AssertTrue(
+                decorations.Length > 0,
+                "The test must include a deferred panel decoration crossing a Scroll boundary.");
+            AssertTrue(
+                decorations.All(command => Contains(contentBounds, command.ClipRect)),
+                "Every deferred panel decoration must retain the Scroll content clip rect.");
+        }
+        finally
+        {
+            drawData.ReleasePooled();
+        }
+    }
+
     private static void FixedGridTracksDoNotExpand()
     {
         var normalBottom = RenderGridBottom(new FixedTrackOverflowComponent(40), "grid-fixed-track-normal-test");
@@ -185,6 +244,47 @@ internal static class Program
             normalBottom,
             overflowBottom,
             "Pixel Grid tracks must keep their assigned size when a child draws beyond its cell.");
+    }
+
+    private static void ScrollbarRespectsViewportCorners()
+    {
+        using var context = CreateContext();
+        var input = new DuxelInputEventQueue();
+        using var screen = new NuriDuxelScreen(
+            new DecoratedScrollComponent(),
+            () => { },
+            "scrollbar-corner-test",
+            input);
+
+        var drawData = RenderFrameWithDrawData(context, screen, FrameInfo);
+        try
+        {
+            var region = input.GetScrollRegions().Single();
+
+            AssertTrue(region.MaxOffset > 0f, "The Scroll test must contain overflow.");
+            AssertTrue(
+                region.ScrollbarTrack.X > region.Bounds.X
+                    && region.ScrollbarTrack.Y > region.Bounds.Y
+                    && region.ScrollbarTrack.X + region.ScrollbarTrack.Width
+                        < region.Bounds.X + region.Bounds.Width
+                    && region.ScrollbarTrack.Y + region.ScrollbarTrack.Height
+                        < region.Bounds.Y + region.Bounds.Height,
+                "The scrollbar track must stay inside the viewport edges so it cannot square off rounded corners.");
+
+            var squareScrollbarPrimitives = drawData.DrawLists
+                .SelectMany(drawList => drawList.RectFilledPrimitives?.ToArray()
+                    ?? Array.Empty<UiRectFilledPrimitive>())
+                .Where(primitive => primitive.Rect.Equals(region.ScrollbarTrack)
+                    || primitive.Rect.Equals(region.ScrollbarHandle))
+                .ToArray();
+            AssertTrue(
+                squareScrollbarPrimitives.Length == 0,
+                "The scrollbar track and handle must use rounded geometry instead of square filled rectangles.");
+        }
+        finally
+        {
+            drawData.ReleasePooled();
+        }
     }
 
     private static void ImplicitGridRowFillsArrangedHeight()
@@ -655,6 +755,26 @@ internal static class Program
         _ = context.GetDrawData();
     }
 
+    private static UiDrawData RenderFrameWithDrawData(
+        UiContext context,
+        UiScreen screen,
+        UiFrameInfo frameInfo)
+    {
+        context.SetClipRect(new UiRect(0, 0, frameInfo.DisplaySize.X, frameInfo.DisplaySize.Y));
+        context.NewFrame(frameInfo);
+        context.Render(screen);
+        return context.GetDrawData();
+    }
+
+    private static bool Contains(UiRect outer, UiRect inner)
+    {
+        const float epsilon = 0.01f;
+        return inner.X >= outer.X - epsilon
+            && inner.Y >= outer.Y - epsilon
+            && inner.X + inner.Width <= outer.X + outer.Width + epsilon
+            && inner.Y + inner.Height <= outer.Y + outer.Height + epsilon;
+    }
+
     private static UiFontAtlas CreateFontAtlas()
     {
         var glyphs = new Dictionary<int, UiGlyphInfo>();
@@ -894,6 +1014,31 @@ internal static class Program
                 .Rows(Auto, Star, Auto)
                 .Columns(Pixels(200))
                 .Size(200, 200);
+        }
+    }
+
+    private sealed class DecoratedScrollComponent : Component
+    {
+        public override IElement Render()
+        {
+            return Div(
+                    Text("Header").Margin(bottom: 60),
+                    Div(
+                            DivTypes.Scroll,
+                            Div(
+                                    DecoratedPanel("top"),
+                                    DecoratedPanel("middle"),
+                                    DecoratedPanel("bottom"))
+                                .Spacing(0))
+                        .Size(200, 120))
+                .Spacing(0);
+        }
+
+        private static IElement DecoratedPanel(string label)
+        {
+            return Div(Text(label))
+                .Padding(30)
+                .Background("#7c3aed");
         }
     }
 
