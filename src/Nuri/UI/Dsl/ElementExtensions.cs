@@ -198,7 +198,7 @@ namespace Nuri.UI.Dsl
                 return node;
             }
 
-            EnsureLinearLayout(node, PropertyKeys.Spacing);
+            EnsureSpacingLayout(node);
 
             node.SetProperty(PropertyKeys.Spacing, value);
             return node;
@@ -257,6 +257,16 @@ namespace Nuri.UI.Dsl
                 return;
 
             throw new InvalidOperationException($"{propertyName} is supported only by Row and Column Div layouts, not '{node.Kind}'.");
+        }
+
+        private static void EnsureSpacingLayout(IDiv node)
+        {
+            if (string.IsNullOrEmpty(node.Kind)
+                || node.Kind == DivTypes.Column
+                || node.Kind == DivTypes.Row)
+                return;
+
+            throw new InvalidOperationException($"{PropertyKeys.Spacing} is supported only by Row and Column Div layouts, not '{node.Kind}'.");
         }
 
         private static void EnsureGridLayout(IDiv node, string propertyName)

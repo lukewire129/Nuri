@@ -26,7 +26,7 @@ Do not merge these responsibilities. Renderer patch identity must not decide hoo
 - Duplicate component keys never share hook identity. They emit `RuntimeLogKind.DuplicateKey` and fall back to position-based hook identity.
 - Duplicate keys have no state-preservation guarantee across reorder. They should be fixed by the caller.
 
-Component keys are copied to the rendered virtual root when that root has no explicit key. WPF and Avalonia adapters must apply the same rule.
+Component keys are copied to the rendered virtual root when that root has no explicit key. All renderer adapters, including WPF, Avalonia, and Duxel, must apply the same rule.
 
 ## Runtime Ancestry
 

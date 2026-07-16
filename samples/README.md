@@ -12,6 +12,8 @@ Build samples from large user-visible scenarios down into small Core refinements
 Do not start by adding hooks speculatively.
 Add Core features only after a sample makes the need obvious and repeatable.
 
+Duxel is the next UI backend development priority. Keep existing Avalonia samples as regression baselines, and direct new cross-renderer sample slices to WPF and Duxel first.
+
 ## Current Samples
 
 - `RouterSample`: component composition and nested router sample
@@ -31,9 +33,13 @@ Add Core features only after a sample makes the need obvious and repeatable.
 - `Nuri.LargeListSample`: larger keyed-list rendering
 - `Nuri.DevToolsSample`: runtime diagnostics and developer tooling
 - `Nuri.ExplorerTreeSample`: recursive keyed folders/files with expand, selection, rename, add/delete, and lifecycle cleanup
-- `Nuri.AnimatedDashboardSample`: shared WPF/Avalonia opacity transition and interruption baseline
+- `Nuri.AnimatedDashboardSample`: shared WPF/Avalonia/Duxel opacity transition and interruption baseline
 - `Nuri.WPFAnimatedDashboardSample`: WPF Margin, background, foreground, and Rotate transition replacement coverage
 - `Nuri.AvaloniaHotReloadSample`: minimal Avalonia renderer and C# Hot Reload smoke test
+- `Nuri.DuxelSample`: Duxel immediate-mode hook state, Hot Reload, neutral events, nested Grid tracks, Scroll, sizing, spacing, and text-style smoke test
+- `Nuri.DuxelThemeGallerySample`: runtime Duxel theme switching across the currently materialized text, button, input, selection, Grid, and Scroll controls
+- `Nuri.DuxelExplorerTreeSample`: the WPF Explorer component sources projected through the Duxel host, including keyed subtree state, effect cleanup, work-area sizing, ordered wheel routing, and independent Nuri-owned tree/detail Scroll regions
+- `Nuri.DuxelAnimatedDashboardSample`: the shared scrollable Animated Dashboard projected through Duxel `AnimateFloat` opacity tracks and constrained to the viewport work area
 - `Nuri.MultiWindowSample`: WPF root registration, local state isolation, shared Store updates, and per-window lifecycle cleanup
 
 ## Next Sample Roadmap
@@ -43,16 +49,16 @@ Todo Notes, Settings Preferences, and Explorer Tree now cover the first three ro
 ### 1. Animated Dashboard Sample
 
 Goal:
-Pressure the existing neutral transition model across WPF and Avalonia.
+Pressure the existing neutral transition model across WPF and Duxel.
 
 What it should pressure:
 
 - supported animated properties and easing values
 - interruption and replacement of active transitions
-- renderer parity
+- WPF/Duxel semantic parity
 - unsupported-animation diagnostics
 
-The first slice covers shared WPF/Avalonia opacity transitions. Margin, color, rotation, and diagnostics remain follow-up slices driven by this sample.
+Shared WPF/Avalonia/Duxel opacity transitions and interruption/replacement are now regression baselines. The next slice should close Duxel background, foreground, Margin, transform, and remaining easing gaps without moving Duxel types into Core.
 
 ### 2. Stress Sample
 
@@ -65,6 +71,7 @@ What it should pressure:
 - keyed identity under repeated mixed updates
 - cleanup and invalidation coalescing
 - unsupported property/event reporting
+- Duxel frame invalidation and immediate-mode projection under repeated mixed updates
 
 ## Promotion Rule For Core Features
 

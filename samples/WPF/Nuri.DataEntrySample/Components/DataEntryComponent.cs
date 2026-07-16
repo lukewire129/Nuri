@@ -32,6 +32,7 @@ public sealed class DataEntryComponent : Component
         return Grid(Rows(Auto, Star),
                 Header().Row(0),
                 Div(DivTypes.Scroll,
+                    Div(
                     Section("Account",
                         Label("Name"),
                         TextBox(state.Name, value => Update(current => current with { Name = value }))
@@ -78,7 +79,7 @@ public sealed class DataEntryComponent : Component
                                 Button("Submit", Submit).Height(36).Background("#111827").FontColor("#ffffff").Brush("#111827").Thickness(1).Column(1)
                             )
                             .Columns(Star, Pixels(100))
-                            .Margin(top: 16)))
+                            .Margin(top: 16))))
                     .Row(1))
             .Padding(24)
             .Background("#f3f4f6");

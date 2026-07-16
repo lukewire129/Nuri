@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\\..\\samples\\Avalonia\\Nuri.AnimatedDashboardSample\\Components\\AnimatedDashboardComponent.cs" Link="Dashboard\\AnimatedDashboardComponent.cs" />
+    <Compile Include="..\\..\\samples\\WPF\\Nuri.ExplorerTreeSample\\Components\\ExplorerTreeComponent.cs" Link="Explorer\\ExplorerTreeComponent.cs" />
+    <Compile Include="..\\..\\samples\\WPF\\Nuri.ExplorerTreeSample\\Components\\TreeNodeComponent.cs" Link="Explorer\\TreeNodeComponent.cs" />
+    <ProjectReference Include="..\\..\\src\\Nuri.Duxel\\Nuri.Duxel\\Nuri.Duxel.csproj" />
+  </ItemGroup>
+</Project>

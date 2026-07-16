@@ -1,5 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net9.0-windows</TargetFramework>
@@ -8,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Nuri.Duxel\Nuri.Duxel.Windows\Nuri.Duxel.Windows.csproj" />
+    <Compile Include="..\\..\\Avalonia\\Nuri.AnimatedDashboardSample\\Components\\AnimatedDashboardComponent.cs" Link="Components\\AnimatedDashboardComponent.cs" />
+    <ProjectReference Include="..\\..\\..\\src\\Nuri.Duxel\\Nuri.Duxel.Windows\\Nuri.Duxel.Windows.csproj" />
   </ItemGroup>
-
 </Project>

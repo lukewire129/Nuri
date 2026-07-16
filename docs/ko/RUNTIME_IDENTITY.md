@@ -24,7 +24,7 @@ Renderer patch identity가 hook 소유권을 결정하거나 lifecycle 코드가
 - 중복 component key는 hook identity를 공유하지 않습니다. `RuntimeLogKind.DuplicateKey`를 기록하고 위치 기반 hook identity로 fallback합니다.
 - 중복 key reorder에서는 state 보존을 보장하지 않습니다.
 
-Component key는 렌더 결과 root에 별도 key가 없을 때 virtual root로 전달됩니다. WPF와 Avalonia adapter는 동일한 규칙을 적용해야 합니다.
+Component key는 렌더 결과 root에 별도 key가 없을 때 virtual root로 전달됩니다. WPF, Avalonia 및 Duxel을 포함한 모든 renderer adapter는 동일한 규칙을 적용해야 합니다.
 
 ## Runtime Ancestry
 

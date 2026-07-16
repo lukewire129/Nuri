@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Nuri.UI.Controls;
 using Nuri.UI.Values;
 
@@ -12,9 +13,22 @@ namespace Nuri.UI.Dsl
         {
         }
 
-        public Div(string kind, params IElement[] children) : base(VirtualControlTypes.Div, children)
+        public Div(string kind, params IElement[] children) : base(VirtualControlTypes.Div)
         {
             Kind = kind;
+            AddChildren(children);
+        }
+
+        public override void AddChildren(IElement[] children)
+        {
+            if (Kind == DivTypes.Scroll)
+            {
+                var addedChildren = children.Count(child => child != null);
+                if (Children.Count + addedChildren > 1)
+                    throw new System.InvalidOperationException("Scroll Div supports at most one child. Wrap multiple elements in a Column Div.");
+            }
+
+            base.AddChildren(children);
         }
 
         public Div RowDefinition(params LengthValue[] heights)

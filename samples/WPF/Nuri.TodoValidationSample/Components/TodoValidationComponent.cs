@@ -151,7 +151,7 @@ public sealed class TodoValidationComponent : Component
                     .Thickness(1)
                     .CornerRadius(16)
                     .Row(1),
-                Div(DivTypes.Scroll, listChildren)
+                Div(DivTypes.Scroll, Div(listChildren))
                     .Margin(top: 18)
                     .Row(2)
             )

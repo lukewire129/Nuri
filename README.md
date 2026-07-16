@@ -7,6 +7,8 @@ Nuri is a C# MVU UI library. Components describe UI with platform-neutral virtua
 
 The current supported renderer path is WPF through `Nuri.WPF`.
 
+The next UI backend development priority is Duxel through `Nuri.Duxel`. The existing Avalonia adapter remains available as a regression baseline, but new backend parity, materialization, and sample work should target Duxel first.
+
 ## What Nuri Does
 
 - Component `Render()` methods return virtual UI descriptions, not native WPF controls.
@@ -20,7 +22,11 @@ The current supported renderer path is WPF through `Nuri.WPF`.
 
 - `src/Nuri`: platform-neutral runtime, DSL, virtual DOM, diffing, patch operations, values, events, routing, and lifecycle hooks.
 - `src/Nuri.WPF`: WPF renderer adapter, WPF control registry, WPF property/event mapping, WPF animation materialization, and application host.
+- `src/Nuri.Duxel/Nuri.Duxel`: Duxel immediate-mode renderer adapter over `Duxel.App`.
+- `src/Nuri.Duxel/Nuri.Duxel.Windows`: Windows application/frame integration over `Duxel.Windows.App`.
+- `src/Nuri.Avalonia`: existing Avalonia renderer adapter retained as a regression baseline rather than the next backend expansion target.
 - `samples/WPF`: focused WPF samples that exercise concrete behavior.
+- `samples/Duxel`: focused Duxel samples used to drive the next backend implementation slices.
 - `tests/Nuri.Tests`: lightweight Core behavior tests.
 - `perf`: performance sanity harnesses.
 
@@ -162,12 +168,14 @@ Numeric row and column values use pixels. A comma-separated string can combine
 pixel values with `Auto`, `*`, and weighted star values such as `2*`.
 The explicit `Pixels(240)` form remains available for compatibility.
 
-Use `Div(DivTypes.Scroll, ...)` for scrollable vertical content:
+`Scroll` is a single-content viewport. Put vertical layout and spacing on its one `Column` child:
 
 ```csharp
 return Grid(Rows(Auto, Star),
     Toolbar().Row(0),
-    Div(DivTypes.Scroll, rows).Row(1));
+    Div(DivTypes.Scroll,
+        Div(rows).Spacing(8))
+        .Row(1));
 ```
 
 ## Keys

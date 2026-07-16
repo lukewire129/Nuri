@@ -2,6 +2,8 @@
 
 Minimal Avalonia renderer smoke test for Nuri Core DSL and C# Hot Reload rebuild behavior.
 
+Avalonia is retained as a regression baseline. The next UI backend development priority is Duxel.
+
 Run it with:
 
 ```powershell

@@ -897,7 +897,14 @@ internal static class Program
             "Scroll layouts should reject main-axis content distribution.");
         AssertThrows<InvalidOperationException>(
             () => Component.Div(DivTypes.Scroll).Spacing(8),
-            "Scroll layouts should reject child spacing directly.");
+            "Scroll layouts should delegate spacing to their single content child.");
+        AssertThrows<InvalidOperationException>(
+            () => Component.Div(DivTypes.Scroll, Component.Text("first"), Component.Text("second")),
+            "Scroll layouts should reject multiple direct children.");
+        AssertEqual(
+            1,
+            Component.Div(DivTypes.Scroll, Component.Div(Component.Text("content"))).Children.Count,
+            "Scroll layouts should accept one content child.");
 
         var first = Component.Text("first");
         var second = Component.Text("second");

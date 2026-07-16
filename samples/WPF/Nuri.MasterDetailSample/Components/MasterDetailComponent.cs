@@ -30,7 +30,7 @@ public sealed class MasterDetailComponent : Component
         return Grid(Rows(Auto, Star),
                 Div(Text("Master / Detail").FontSize(26).FontWeight(FontWeightValue.Bold), Text("list selection, detail edit, delete selected, empty state 검증").FontColor("#6b7280").Margin(top: 6, bottom: 18)).Row(0),
                 Grid(
-                        Div(DivTypes.Scroll, state.Items.Select(item => (IElement)Row(item, item.Id == state.SelectedId, () => Update(current => current with { SelectedId = item.Id }))).ToArray())
+                        Div(DivTypes.Scroll, Div(state.Items.Select(item => (IElement)Row(item, item.Id == state.SelectedId, () => Update(current => current with { SelectedId = item.Id }))).ToArray()))
                             .Padding(12)
                             .Background("#ffffff")
                             .Brush("#e5e7eb")

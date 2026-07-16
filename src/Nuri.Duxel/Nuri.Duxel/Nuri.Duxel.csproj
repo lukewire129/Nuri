@@ -1,17 +1,17 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
   <PropertyGroup>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <PackageId>Nuri.Duxel</PackageId>
     <Title>Nuri Duxel Renderer</Title>
-    <Description>Duxel immediate-mode renderer and Windows application host for the Nuri MVU runtime.</Description>
+    <Description>Duxel immediate-mode renderer adapter for the Nuri MVU runtime.</Description>
     <PackageProjectUrl>https://github.com/lukewire129/Nuri</PackageProjectUrl>
     <RepositoryUrl>https://github.com/lukewire129/Nuri</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -23,8 +23,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Nuri\Nuri.csproj" />
-    <PackageReference Include="Duxel.Windows.App" Version="0.2.5-preview" />
+    <ProjectReference Include="..\..\Nuri\Nuri.csproj" />
+    <PackageReference Include="Duxel.App" Version="0.2.8-preview" />
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Version>0.2.0</Version>
+    <PackageId>Nuri.Duxel.Windows</PackageId>
+    <Title>Nuri Duxel Windows Host</Title>
+    <Description>Windows application and frame-loop host for the Nuri Duxel renderer.</Description>
+    <PackageProjectUrl>https://github.com/lukewire129/Nuri</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/lukewire129/Nuri</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>nuri;duxel;windows;mvu;immediate-mode;vulkan;csharp;dotnet</PackageTags>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Nuri.Duxel\Nuri.Duxel.csproj" />
+    <PackageReference Include="Duxel.Windows.App" Version="0.2.8-preview" />
+  </ItemGroup>
+
+</Project>

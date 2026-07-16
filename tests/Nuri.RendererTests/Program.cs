@@ -11,6 +11,8 @@ using Nuri.UI.Values;
 using Nuri.VirtualDom;
 using Nuri.WPF;
 using AvaloniaControl = Avalonia.Controls.Control;
+using AvaloniaContentControl = Avalonia.Controls.ContentControl;
+using AvaloniaDecorator = Avalonia.Controls.Decorator;
 using AvaloniaPanel = Avalonia.Controls.Panel;
 using AvaloniaTextBlock = Avalonia.Controls.TextBlock;
 using AvaloniaVisual = Avalonia.Visual;
@@ -31,6 +33,7 @@ using WpfListBox = System.Windows.Controls.ListBox;
 using WpfListBoxItem = System.Windows.Controls.ListBoxItem;
 using WpfButton = System.Windows.Controls.Button;
 using WpfCheckBox = System.Windows.Controls.CheckBox;
+using WpfContentControl = System.Windows.Controls.ContentControl;
 using WpfTextBox = System.Windows.Controls.TextBox;
 
 namespace Nuri.RendererTests;
@@ -844,7 +847,25 @@ internal static class Program
         ContentDistributionLayoutsRemainConsistent(createDriver());
         GrowLayoutsRemainConsistent(createDriver());
         GridSpacingLayoutsRemainConsistent(createDriver());
+        ScrollSingleContentLayoutsRemainConsistent(createDriver());
         RootDisposeCleansDescendantsExactlyOnce(createDriver());
+    }
+
+    private static void ScrollSingleContentLayoutsRemainConsistent(RendererDriver driver)
+    {
+        var scroll = Component.Div(
+                DivTypes.Scroll,
+                Component.Div(
+                        Component.Div().Size(10, 10),
+                        Component.Div().Size(10, 10))
+                    .Spacing(10))
+            .Size(20, 100);
+
+        using var root = driver.Initialize(scroll);
+        AssertOffsets(
+            new[] { 0d, 20d },
+            driver.ArrangeAndGetMainOffsets(100, 20, horizontal: false),
+            $"{driver.Name}: Scroll should host one Column whose spacing separates its children.");
     }
 
     private static void GridSpacingLayoutsRemainConsistent(RendererDriver driver)
@@ -1300,7 +1321,12 @@ internal static class Program
             if (element is WpfPanel panel)
                 return panel;
 
-            return element is WpfDecorator decorator ? decorator.Child as WpfPanel : null;
+            if (element is WpfDecorator decorator && decorator.Child is WpfFrameworkElement decoratorChild)
+                return GetRootPanel(decoratorChild);
+
+            return element is WpfContentControl contentControl && contentControl.Content is WpfFrameworkElement content
+                ? GetRootPanel(content)
+                : null;
         }
     }
 
@@ -1335,7 +1361,7 @@ internal static class Program
 
         public override IReadOnlyList<double> ArrangeAndGetMainOffsets(double mainSize, double crossSize, bool horizontal)
         {
-            if (_host.Content is not AvaloniaPanel panel)
+            if (_host.Content == null || GetRootPanel(_host.Content) is not AvaloniaPanel panel)
                 return Array.Empty<double>();
 
             var width = horizontal ? mainSize : crossSize;
@@ -1350,7 +1376,7 @@ internal static class Program
 
         public override IReadOnlyList<double> ArrangeAndGetMainSizes(double mainSize, double crossSize, bool horizontal)
         {
-            if (_host.Content is not AvaloniaPanel panel)
+            if (_host.Content == null || GetRootPanel(_host.Content) is not AvaloniaPanel panel)
                 return Array.Empty<double>();
 
             var width = horizontal ? mainSize : crossSize;
@@ -1379,6 +1405,19 @@ internal static class Program
             }
 
             return null;
+        }
+
+        private static AvaloniaPanel? GetRootPanel(AvaloniaControl? control)
+        {
+            if (control is AvaloniaPanel panel)
+                return panel;
+
+            if (control is AvaloniaContentControl contentControl && contentControl.Content is AvaloniaControl content)
+                return GetRootPanel(content);
+
+            return control is AvaloniaDecorator decorator && decorator.Child is AvaloniaControl child
+                ? GetRootPanel(child)
+                : null;
         }
     }
 

@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Nuri.Avalonia\Nuri.Avalonia.csproj" />
+    <ProjectReference Include="..\..\..\src\Nuri.WPF\Nuri.WPF.csproj" />
   </ItemGroup>
 
 </Project>

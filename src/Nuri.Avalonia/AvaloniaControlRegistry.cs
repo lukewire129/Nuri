@@ -146,6 +146,13 @@ namespace Nuri.Avalonia
             if (kind == DivTypes.Column || string.IsNullOrEmpty(kind))
                 return new AvaloniaDistributedStackPanel(Orientation.Vertical);
 
+            if (kind == DivTypes.Scroll)
+                return new ScrollViewer
+                {
+                    VerticalScrollBarVisibility = global::Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+                    HorizontalScrollBarVisibility = global::Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled
+                };
+
             return new StackPanel { Orientation = Orientation.Vertical };
         }
     }

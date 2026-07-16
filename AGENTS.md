@@ -15,8 +15,9 @@ These instructions apply to AI agents working in this repository, including Open
 ## Project Direction
 
 - `Nuri` must stay platform-neutral.
-- Do not add WPF, Avalonia, Uno, OpenSilver, MAUI, or other UI framework types to `Nuri`.
+- Do not add WPF, Avalonia, Duxel, Uno, OpenSilver, MAUI, or other UI framework types to `Nuri`.
 - `Nuri.WPF` is the WPF renderer adapter and retains compatibility overloads where needed.
+- `Nuri.Duxel` is the next UI backend development priority. Keep its immediate-mode materialization and Duxel package types outside Core.
 - Component `Render()` methods should produce virtual UI descriptions, not native WPF controls.
 - Native WPF controls should be created only by the WPF renderer/registry path.
 - Preserve existing user-facing DSL compatibility unless the user explicitly approves a breaking change.
@@ -36,6 +37,10 @@ These instructions apply to AI agents working in this repository, including Open
   - WPF property mapping
   - WPF event delegate materialization
   - WPF animation materialization
+- Keep Duxel materialization in `src/Nuri.Duxel`:
+  - Duxel application/frame integration
+  - immediate-mode virtual-entry projection
+  - Duxel property, event, and animation materialization
 - Future renderers should attach through Core contracts instead of depending on WPF code.
 
 ## Compatibility Rules
@@ -88,20 +93,21 @@ dotnet run --project "perf\Nuri.WPFPerformance\Nuri.WPFPerformance.csproj" -c Re
 
 ## Current Feature Priorities
 
-1. Validate and refine existing Core-neutral event semantics across WPF and Avalonia.
+1. Validate and refine existing Core-neutral event semantics across WPF and Duxel.
    - The baseline already includes click, text/content/check changes, hover, mouse down/up, keyboard down/up, focus changes, and loaded/unloaded compatibility events.
    - Prefer `useEffect(..., [])` and its cleanup for component mount/unmount behavior; do not expand loaded/unloaded as component lifecycle APIs.
    - Add richer pointer or keyboard payloads only when samples require modifiers, repeat state, handled semantics, coordinates, or device information.
+   - Keep Avalonia as an existing regression baseline, not the next backend expansion target.
 2. Complete platform-neutral animation support.
    - Keep `AnimationValue` renderer-neutral.
-   - Expand supported properties and Avalonia materialization based on sample needs.
+   - Expand supported properties and Duxel materialization based on sample needs.
    - Diagnose unsupported animation properties where actionable.
 3. Strengthen renderer-level lifecycle/effect validation.
-   - Verify effect flush after commit and deterministic cleanup across subtree removal, key replacement, and repeated moves in both renderers.
-4. Improve WPF/Avalonia renderer parity.
-   - Close property, event, animation, hot reload, and control-behavior gaps without moving framework types into Core.
+   - Verify effect flush after WPF native commit and Duxel frame projection, plus deterministic cleanup across subtree removal, key replacement, and repeated moves.
+4. Improve WPF/Duxel semantic parity.
+   - Close property, event, animation, lifecycle, and host-behavior gaps without forcing retained-control mechanics onto Duxel or moving framework types into Core.
 5. Add diagnostics only where useful.
    - Render count and duplicate-key diagnostics already exist.
    - Prioritize patch count and unsupported property/event warnings when they help real samples.
 6. Use the next samples to expose concrete gaps.
-   - Prioritize Explorer Tree, Animated Dashboard, Stress, and Multi-Window scenarios.
+   - Prioritize Duxel-focused Explorer Tree, Animated Dashboard, Stress, and Multi-Window scenarios as host capabilities allow.

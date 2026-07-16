@@ -2,16 +2,14 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
-    <UseWPF>true</UseWPF>
+    <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Include="..\\Shared\\PerfTreeFactory.cs" Link="PerfTreeFactory.cs" />
-    <ProjectReference Include="..\..\src\Nuri\Nuri.csproj" />
-    <ProjectReference Include="..\..\src\Nuri.WPF\Nuri.WPF.csproj" />
+    <ProjectReference Include="..\..\src\Nuri.Duxel\Nuri.Duxel\Nuri.Duxel.csproj" />
   </ItemGroup>
 
 </Project>

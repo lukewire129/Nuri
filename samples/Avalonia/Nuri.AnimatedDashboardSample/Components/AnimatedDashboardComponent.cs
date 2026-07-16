@@ -1,3 +1,4 @@
+using Nuri.UI.Controls;
 using Nuri.UI.Dsl;
 using Nuri.UI.Values;
 
@@ -11,11 +12,13 @@ public sealed class AnimatedDashboardComponent : Component
         var cardOpacity = focused ? 1.0 : 0.35;
 
         return Div(
+                DivTypes.Scroll,
+                Div(
                 Text("Animated Dashboard")
                     .FontSize(30)
                     .FontWeight(FontWeightValue.Bold)
                     .FontColor("#f8fafc"),
-                Text("The same Core component runs through the WPF and Avalonia renderers.")
+                Text("The same Core component runs through the WPF, Avalonia, and Duxel renderers.")
                     .FontSize(14)
                     .FontColor("#94a3b8")
                     .Margin(top: 8, bottom: 24),
@@ -32,7 +35,7 @@ public sealed class AnimatedDashboardComponent : Component
                     .FontColor("#ffffff")
                     .Brush("#1d4ed8")
                     .Thickness(1)
-            )
+            ))
             .Padding(32)
             .Background("#0b1120");
     }

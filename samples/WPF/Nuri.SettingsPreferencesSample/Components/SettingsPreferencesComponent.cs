@@ -39,6 +39,7 @@ public sealed class SettingsPreferencesComponent : Component
         return Grid(Rows(Auto, Star),
                 Header(canSave).Row(0),
                 Div(DivTypes.Scroll,
+                    Div(
                         new PreferenceSection("프로필", "controlled input과 기본 validation을 확인합니다.",
                             Text("표시 이름")
                                 .FontSize(12)
@@ -123,7 +124,7 @@ public sealed class SettingsPreferencesComponent : Component
                                 )
                                 .Columns(Star, Pixels(88))
                                 .Margin(top: 14))
-                    )
+                    ))
                     .Row(1)
             )
             .Padding(24)

@@ -134,7 +134,7 @@ public sealed class ExplorerTreeComponent : Component
                     .FontSize(16)
                     .FontWeight(FontWeightValue.Bold)
                     .Margin(bottom: 12),
-                Div(DivTypes.Scroll, tree))
+                Div(DivTypes.Scroll, Div(tree)))
             .Padding(16)
             .Margin(right: 16)
             .Background("#ffffff")
@@ -155,8 +155,10 @@ public sealed class ExplorerTreeComponent : Component
         if (selected == null)
         {
             return Div(
-                    Text("No selection").FontSize(20).FontWeight(FontWeightValue.Bold),
-                    Text("Select a node from the tree.").FontColor("#6b7280").Margin(top: 8))
+                    DivTypes.Scroll,
+                    Div(
+                        Text("No selection").FontSize(20).FontWeight(FontWeightValue.Bold),
+                        Text("Select a node from the tree.").FontColor("#6b7280").Margin(top: 8)))
                 .Padding(20)
                 .Background("#ffffff")
                 .Brush("#e5e7eb")
@@ -190,6 +192,8 @@ public sealed class ExplorerTreeComponent : Component
             .Thickness(1));
 
         return Div(
+                DivTypes.Scroll,
+                Div(
                 Text(selected.IsFolder ? "Folder details" : "File details")
                     .FontSize(13)
                     .FontColor("#6b7280"),
@@ -223,7 +227,7 @@ public sealed class ExplorerTreeComponent : Component
                     .Background("#f9fafb")
                     .Brush("#e5e7eb")
                     .Thickness(1)
-                    .CornerRadius(12))
+                    .CornerRadius(12)))
             .Padding(24)
             .Background("#ffffff")
             .Brush("#e5e7eb")

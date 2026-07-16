@@ -243,7 +243,11 @@ namespace Nuri.WPF
                 case DivTypes.Wrap:
                     return new WrapPanel();
                 case DivTypes.Scroll:
-                    return new StackPanel { Orientation = Orientation.Vertical };
+                    return new ScrollViewer
+                    {
+                        VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                        HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+                    };
                 case DivTypes.Block:
                     return new System.Windows.Controls.Grid();
                 case DivTypes.Column:
@@ -258,15 +262,13 @@ namespace Nuri.WPF
         {
             if (kind == DivTypes.Scroll)
             {
-                var childHost = new StackPanel { Orientation = Orientation.Vertical };
                 var scrollViewer = new ScrollViewer
                 {
-                    Content = childHost,
                     VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                     HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
                 };
 
-                return new DivElement(scrollViewer, childHost);
+                return new DivElement(scrollViewer, scrollViewer);
             }
 
             return new DivElement(CreateDivHost(kind));

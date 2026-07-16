@@ -156,7 +156,7 @@ internal sealed class LargeListComponent : Component
                 .CornerRadius(6))
             .ToArray();
 
-        return Div(DivTypes.Scroll, rows)
+        return Div(DivTypes.Scroll, Div(rows))
             .Padding(16)
             .Background("#ffffff")
             .Brush("#d8dee8")

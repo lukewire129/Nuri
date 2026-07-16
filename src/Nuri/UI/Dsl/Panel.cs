@@ -13,7 +13,7 @@ namespace Nuri.UI.Dsl
             AddChildren(children);
         }
 
-        public void AddChildren(IElement[] children)
+        public virtual void AddChildren(IElement[] children)
         {
             var childIndex = 1;
             foreach (var child in children)

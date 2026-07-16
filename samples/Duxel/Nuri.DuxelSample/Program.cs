@@ -1,11 +1,13 @@
+using Duxel.Core;
 using Nuri.Duxel;
 using Nuri.UI.Controls;
 using Nuri.UI.Dsl;
 
-NuriDuxelApplication.Run<CounterComponent>(
+NuriApplication.Run<CounterComponent>(
     title: "Nuri + Duxel",
     width: 720,
-    height: 480);
+    height: 580,
+    theme: UiTheme.Nord);
 
 internal sealed class CounterComponent : Component
 {
@@ -29,7 +31,8 @@ internal sealed class CounterComponent : Component
                     .Checked(enabled)
                     .Row(2)
                     .Column(1))
-                .Columns(Pixels(120), Star)
+                .Columns(120, Star)
+                .Rows(Auto,Auto, Auto)
                 .Spacing(10)
                 .Padding(8),
             Div(
@@ -37,21 +40,24 @@ internal sealed class CounterComponent : Component
                 Button("Increment", () => setCount(current => enabled ? current + 1 : current))
                     .Size(120, 34)
                     .Background("#0369A1"),
-                Button("Reset", () => setCount(_ => 0)).Size(90, 34))
-                .Spacing(12),
-            Div(
-                DivTypes.Scroll,
-                Text($"Hello, {name}. The content below is rendered inside a Duxel child region."),
-                Text("Scroll validates clipping and vertical wheel input."),
-                Text("Nuri state changes still use dirty component subtree rendering."),
-                Text("Grid columns use Nuri pixel, star, and auto length descriptions."),
-                Text("Padding, spacing, font size, and solid foreground colors are scoped."),
-                Text($"Current counter value: {count}"),
-                Text("End of scroll content."))
-                .Height(140)
+                Button("Reset", () => setCount(_ => 0))
+                        .Size(90, 34))
+                        .Spacing(12),
+                Div(
+                    DivTypes.Scroll,
+                    Div(
+                    Text($"Hello, {name}. The content below is rendered inside a Duxel child region."),
+                    Text("Scroll validates clipping and vertical wheel input."),
+                    Text("Nuri state changes still use dirty component subtree rendering."),
+                    Text("Grid columns use Nuri pixel, star, and auto length descriptions."),
+                    Text("Padding, spacing, font size, and solid foreground colors are scoped."),
+                    Text($"Current counter value: {count}"),
+                    Text("End of scroll content."))
+                )
                 .Padding(10)
                 .Brush("#475569")
-                .Thickness(1))
+                .Thickness(1)
+            )
             .Padding(16)
             .Spacing(14);
     }

@@ -20,10 +20,10 @@ internal static class Program
 
         var scenarios = new[]
         {
-            new Scenario("Initial build", () => CreateReorderedTree(size), false),
-            new Scenario("Keyed reorder", () => CreateReorderedTree(size), true),
-            new Scenario("Todo screen initial build", () => CreateTodoTree(size, false), false),
-            new Scenario("Todo screen keyed reorder", () => CreateTodoTree(size, true), true),
+            new Scenario("Initial build", () => PerfTreeFactory.CreateReorderedTree(size), false),
+            new Scenario("Keyed reorder", () => PerfTreeFactory.CreateReorderedTree(size), true),
+            new Scenario("Todo screen initial build", () => PerfTreeFactory.CreateTodoTree(size, false), false),
+            new Scenario("Todo screen keyed reorder", () => PerfTreeFactory.CreateTodoTree(size, true), true),
             new Scenario("Virtualized 10k initial source", () => CreateVirtualizedTree(10_000), false, 10_000),
             new Scenario("Virtualized 10k selection update", () => CreateVirtualizedTree(10_000), true, 10_000),
         };
@@ -234,31 +234,6 @@ internal static class Program
         return int.TryParse(value, out var parsed) ? parsed : fallback;
     }
 
-    private static (VirtualEntry Old, VirtualEntry New) CreateReorderedTree(int size)
-    {
-        var oldChildren = new List<VirtualEntry>(size);
-        var newChildren = new List<VirtualEntry>(size);
-
-        for (var i = 0; i < size; i++)
-            oldChildren.Add(CreateItem(i, keyed: true, "value"));
-
-        for (var i = 1; i < size; i++)
-            newChildren.Add(CreateItem(i, keyed: true, "value"));
-        newChildren.Add(CreateItem(0, keyed: true, "value"));
-
-        return (CreateRoot(oldChildren), CreateRoot(newChildren));
-    }
-
-    private static (VirtualEntry Old, VirtualEntry New) CreateTodoTree(int size, bool reorder)
-    {
-        var oldItems = Enumerable.Range(0, size).Select(CreateTodoItem).ToArray();
-        var newItems = reorder
-            ? Enumerable.Range(1, Math.Max(0, size - 1)).Append(0).Select(CreateTodoItem).ToArray()
-            : oldItems;
-
-        return (CreateTodoRoot(oldItems), CreateTodoRoot(newItems));
-    }
-
     private static (VirtualEntry Old, VirtualEntry New) CreateVirtualizedTree(int size)
     {
         var oldItems = Enumerable.Range(0, size).Select(index => new VirtualizedPerfRow(index, false)).ToArray();
@@ -276,59 +251,6 @@ internal static class Program
             32,
             item => Component.Text(item.Selected ? $"selected:{item.Index}" : item.Index.ToString()));
         return element.ToVirtualEntry().WithIdentity("virtualized-perf", null);
-    }
-
-    private static VirtualEntry CreateTodoRoot(IEnumerable<VirtualEntry> items)
-    {
-        var list = new VirtualEntry(
-            VirtualControlTypes.Div,
-            kind: DivTypes.Column,
-            children: items).WithIdentity("0_2", null);
-
-        return new VirtualEntry(
-            VirtualControlTypes.Div,
-            kind: DivTypes.Column,
-            children: new[]
-            {
-                new VirtualEntry(VirtualControlTypes.Text, properties: new[]
-                {
-                    KeyValuePair.Create<string, object?>("Text", "할 일 검증 샘플")
-                }),
-                new VirtualEntry(VirtualControlTypes.Text, properties: new[]
-                {
-                    KeyValuePair.Create<string, object?>("Text", "controlled input, list diff, filter")
-                }),
-                list
-            }).WithIdentity("0", null);
-    }
-
-    private static VirtualEntry CreateTodoItem(int index)
-    {
-        return new VirtualEntry(
-            VirtualControlTypes.Text,
-            key: $"todo-{index}",
-            properties: new[]
-            {
-                KeyValuePair.Create<string, object?>("Text", $"Todo item {index}"),
-                KeyValuePair.Create<string, object?>("Tag", index)
-            });
-    }
-
-    private static VirtualEntry CreateRoot(IEnumerable<VirtualEntry> children)
-    {
-            return new VirtualEntry(VirtualControlTypes.Div, kind: Nuri.UI.Controls.DivTypes.Column, children: children).WithIdentity("0", null);
-    }
-
-    private static VirtualEntry CreateItem(int index, bool keyed, string value)
-    {
-        return new VirtualEntry(
-                VirtualControlTypes.Text,
-                key: keyed ? $"item-{index}" : null,
-                properties: new[]
-            {
-                KeyValuePair.Create<string, object?>("Text", value),
-                KeyValuePair.Create<string, object?>("Tag", index),
-            });
     }
 
     private sealed record Scenario(
