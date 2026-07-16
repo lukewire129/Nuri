@@ -38,6 +38,9 @@ internal static class Program
             ("opacity animation requests frames and supports interruption", OpacityAnimationRequestsFramesAndSupportsInterruption),
             ("diagnostics track Duxel roots and patches", DiagnosticsTrackDuxelRootsAndPatches),
             ("input queue preserves semantic event order", InputQueuePreservesSemanticEventOrder),
+            ("virtualized items project bounded viewport rows", VirtualizedItemsProjectBoundedViewportRows),
+            ("virtualized items clip rows before the scrollbar", VirtualizedItemsClipRowsBeforeScrollbar),
+            ("measured virtualized items learn variable row heights", MeasuredVirtualizedItemsLearnVariableRowHeights),
             ("wheel routes independently to Nuri scroll regions", WheelRoutesIndependentlyToNuriScrollRegions),
             ("shared Animated Dashboard projects headlessly", SharedAnimatedDashboardProjectsHeadlessly),
             ("shared Explorer tree projects headlessly", SharedExplorerTreeProjectsHeadlessly)
@@ -712,6 +715,88 @@ internal static class Program
             "Host capture must not use the previous frame's boundary state; ordered renderer routing decides whether each direction can move.");
     }
 
+    private static void VirtualizedItemsProjectBoundedViewportRows()
+    {
+        NuriDiagnostics.Enable();
+        VirtualizedItemsProbeComponent.RenderedIndices.Clear();
+        using var context = CreateContext();
+        var input = new DuxelInputEventQueue();
+        var screen = new NuriDuxelScreen(
+            new VirtualizedItemsProbeComponent(),
+            () => { },
+            "virtualized-items-test",
+            input);
+
+        try
+        {
+            RenderFrame(context, screen);
+
+            AssertTrue(
+                VirtualizedItemsProbeComponent.RenderedIndices.Count is > 0 and <= 8,
+                $"A 160px viewport must project a bounded number of 32px rows, not all 10,000 (actual {VirtualizedItemsProbeComponent.RenderedIndices.Count}).");
+            AssertEqual(
+                0,
+                VirtualizedItemsProbeComponent.RenderedIndices.Min(),
+                "The initial virtualized projection must start with the first item.");
+
+            var metrics = NuriDiagnostics.GetSnapshot().VirtualizedItems.Single();
+            AssertEqual(10_000, metrics.ItemCount, "Virtualized diagnostics must retain the full item count.");
+            AssertEqual(
+                VirtualizedItemsProbeComponent.RenderedIndices.Count,
+                metrics.RealizedCount,
+                "Virtualized diagnostics must report only the rows projected for the current frame.");
+
+            var region = input.GetScrollRegions().Single();
+            var handleCenter = Center(region.ScrollbarHandle);
+            var trackBottom = new UiVector2(
+                region.ScrollbarTrack.X + (region.ScrollbarTrack.Width * 0.5f),
+                region.ScrollbarTrack.Y + region.ScrollbarTrack.Height - 1f);
+            VirtualizedItemsProbeComponent.RenderedIndices.Clear();
+            input.Enqueue(1, DuxelInputEventKind.PointerDown, handleCenter, code: 0, capturedByNuri: true);
+            input.Enqueue(2, DuxelInputEventKind.PointerMove, trackBottom, capturedByNuri: true);
+            input.Enqueue(3, DuxelInputEventKind.PointerUp, trackBottom, code: 0, capturedByNuri: true);
+
+            RenderFrame(context, screen);
+
+            AssertTrue(
+                VirtualizedItemsProbeComponent.RenderedIndices.Count is > 0 and <= 8,
+                "Scrolling to the end must retain bounded per-frame row projection.");
+            AssertEqual(
+                9_999,
+                VirtualizedItemsProbeComponent.RenderedIndices.Max(),
+                "Dragging to the end must project the final item without traversing preceding rows.");
+
+            screen.Dispose();
+            AssertEqual(
+                0,
+                NuriDiagnostics.GetSnapshot().VirtualizedItems.Count,
+                "Disposing a Duxel screen must remove its virtualized diagnostics.");
+
+            VirtualizedItemsProbeComponent.RenderedIndices.Clear();
+            using (var directContext = CreateContext())
+            using (var directScreen = new NuriDuxelScreen(
+                new VirtualizedItemsProbeComponent(),
+                () => { },
+                "direct-virtualized-items-test"))
+            {
+                RenderFrame(directContext, directScreen);
+                AssertTrue(
+                    VirtualizedItemsProbeComponent.RenderedIndices.Count is > 0 and <= 8,
+                    "A direct Duxel host must use CalcListClipping instead of projecting all 10,000 rows.");
+            }
+
+            AssertEqual(
+                0,
+                NuriDiagnostics.GetSnapshot().VirtualizedItems.Count,
+                "Disposing a direct Duxel screen must remove its virtualized diagnostics.");
+        }
+        finally
+        {
+            screen.Dispose();
+            NuriDiagnostics.Disable();
+        }
+    }
+
     private static UiVector2 Center(UiRect bounds)
     {
         return new UiVector2(bounds.X + (bounds.Width * 0.5f), bounds.Y + (bounds.Height * 0.5f));
@@ -1017,6 +1102,147 @@ internal static class Program
         }
     }
 
+    private sealed class TwoScrollRegionsComponent : Component
+    {
+        public override IElement Render()
+        {
+            return Grid(
+                    ScrollColumn("left").Column(0),
+                    ScrollColumn("right").Column(1))
+                .Columns(Pixels(220), Pixels(220));
+        }
+
+        private static IElement ScrollColumn(string prefix)
+        {
+            var children = Enumerable.Range(0, 30)
+                .Select(index => (IElement)Text($"{prefix}-{index}").Height(24))
+                .ToArray();
+            return Div(DivTypes.Scroll, Div(children)).Size(200, 120);
+        }
+    }
+
+    private static void VirtualizedItemsClipRowsBeforeScrollbar()
+    {
+        using var context = CreateContext();
+        var input = new DuxelInputEventQueue();
+        using var screen = new NuriDuxelScreen(
+            new VirtualizedItemsClipProbeComponent(),
+            () => { },
+            "virtualized-items-scrollbar-clip-test",
+            input);
+
+        var drawData = RenderFrameWithDrawData(context, screen, FrameInfo);
+        try
+        {
+            var region = input.GetScrollRegions().Single();
+            AssertTrue(region.ScrollbarTrack.Width > 0f, "The clip probe must produce a scrollbar.");
+
+            var rowBackgrounds = drawData.DrawLists
+                .SelectMany(drawList => drawList.Commands)
+                .Where(command => command.Kind == UiDrawCommandKind.RectFilledPrimitives
+                    && command.HasBounds
+                    && command.Bounds.Width >= 200f
+                    && command.Bounds.Height is >= 20f and <= 40f)
+                .ToArray();
+
+            AssertTrue(rowBackgrounds.Length > 0, "The clip probe must draw virtualized row backgrounds.");
+            AssertTrue(
+                rowBackgrounds.All(command =>
+                    command.ClipRect.X + command.ClipRect.Width
+                        <= region.ScrollbarTrack.X + 0.01f),
+                "Virtualized row drawing must be clipped at the scrollbar track instead of extending underneath it.");
+        }
+        finally
+        {
+            drawData.ReleasePooled();
+        }
+    }
+
+    private static void MeasuredVirtualizedItemsLearnVariableRowHeights()
+    {
+        MeasuredVirtualizedItemsProbeComponent.RenderedIndices.Clear();
+        using var context = CreateContext();
+        var input = new DuxelInputEventQueue();
+        var requestedFrames = 0;
+        using var screen = new NuriDuxelScreen(
+            new MeasuredVirtualizedItemsProbeComponent(),
+            () => requestedFrames++,
+            "measured-virtualized-items-test",
+            input);
+
+        for (var frame = 0; frame < 4; frame++)
+        {
+            MeasuredVirtualizedItemsProbeComponent.RenderedIndices.Clear();
+            RenderFrame(context, screen);
+        }
+
+        AssertTrue(requestedFrames > 0, "Learning variable row heights must request a stabilization frame.");
+        AssertTrue(!screen.HasPendingLayout, "Measured row extents must settle once the visible range has been learned.");
+        AssertTrue(
+            MeasuredVirtualizedItemsProbeComponent.RenderedIndices.Count is > 0 and <= 12,
+            $"Measured virtualization must project a bounded pixel range instead of all 1,000 rows (actual {MeasuredVirtualizedItemsProbeComponent.RenderedIndices.Count}).");
+        AssertEqual(
+            0,
+            MeasuredVirtualizedItemsProbeComponent.RenderedIndices.Min(),
+            "The initial measured range must start with the first row.");
+
+        var drawData = RenderFrameWithDrawData(context, screen, FrameInfo);
+        try
+        {
+            var rowHeights = drawData.DrawLists
+                .SelectMany(drawList => drawList.Commands)
+                .Where(command => command.Kind == UiDrawCommandKind.RectFilledPrimitives
+                    && command.HasBounds
+                    && command.Bounds.Width >= 200f
+                    && command.Bounds.Height is >= 20f and <= 90f)
+                .Select(command => MathF.Round(command.Bounds.Height))
+                .Distinct()
+                .ToArray();
+            AssertTrue(
+                rowHeights.Contains(24f) && rowHeights.Contains(80f),
+                "Measured virtualization must preserve both short and tall realized row heights.");
+        }
+        finally
+        {
+            drawData.ReleasePooled();
+        }
+
+        var region = input.GetScrollRegions().Single();
+        var handleCenter = Center(region.ScrollbarHandle);
+        var trackBottom = new UiVector2(
+            region.ScrollbarTrack.X + (region.ScrollbarTrack.Width * 0.5f),
+            region.ScrollbarTrack.Y + region.ScrollbarTrack.Height - 1f);
+        MeasuredVirtualizedItemsProbeComponent.RenderedIndices.Clear();
+        input.Enqueue(1, DuxelInputEventKind.PointerDown, handleCenter, code: 0, capturedByNuri: true);
+        input.Enqueue(2, DuxelInputEventKind.PointerMove, trackBottom, capturedByNuri: true);
+        input.Enqueue(3, DuxelInputEventKind.PointerUp, trackBottom, code: 0, capturedByNuri: true);
+        RenderFrame(context, screen);
+
+        AssertTrue(
+            MeasuredVirtualizedItemsProbeComponent.RenderedIndices.Count is > 0 and <= 12,
+            $"Scrolling measured rows to the end must retain bounded pixel-range projection (actual {MeasuredVirtualizedItemsProbeComponent.RenderedIndices.Count}).");
+        AssertEqual(
+            999,
+            MeasuredVirtualizedItemsProbeComponent.RenderedIndices.Max(),
+            "Measured virtualization must reach the final row without traversing all preceding templates.");
+
+        MeasuredVirtualizedItemsProbeComponent.RenderedIndices.Clear();
+        using var directContext = CreateContext();
+        using var directScreen = new NuriDuxelScreen(
+            new MeasuredVirtualizedItemsProbeComponent(),
+            () => { },
+            "direct-measured-virtualized-items-test");
+        for (var frame = 0; frame < 4; frame++)
+        {
+            MeasuredVirtualizedItemsProbeComponent.RenderedIndices.Clear();
+            RenderFrame(directContext, directScreen);
+        }
+
+        AssertTrue(
+            MeasuredVirtualizedItemsProbeComponent.RenderedIndices.Count is > 0 and <= 12,
+            "A direct Duxel host must also keep measured row projection bounded.");
+    }
+
     private sealed class DecoratedScrollComponent : Component
     {
         public override IElement Render()
@@ -1042,22 +1268,68 @@ internal static class Program
         }
     }
 
-    private sealed class TwoScrollRegionsComponent : Component
+    private sealed class VirtualizedItemsProbeComponent : Component
     {
+        private static readonly int[] SourceItems = Enumerable.Range(0, 10_000).ToArray();
+
+        public static List<int> RenderedIndices { get; } = new();
+
         public override IElement Render()
         {
-            return Grid(
-                    ScrollColumn("left").Column(0),
-                    ScrollColumn("right").Column(1))
-                .Columns(Pixels(220), Pixels(220));
+            return VirtualizedItems(
+                    SourceItems,
+                    item =>
+                    {
+                        RenderedIndices.Add(item);
+                        return Text(item.ToString()).Height(32);
+                    },
+                    buffer: 1,
+                    itemExtent: 32,
+                    itemKey: item => item.ToString())
+                .Size(300, 160);
         }
+    }
 
-        private static IElement ScrollColumn(string prefix)
+    private sealed class VirtualizedItemsClipProbeComponent : Component
+    {
+        private static readonly int[] SourceItems = Enumerable.Range(0, 100).ToArray();
+
+        public override IElement Render()
         {
-            var children = Enumerable.Range(0, 30)
-                .Select(index => (IElement)Text($"{prefix}-{index}").Height(24))
-                .ToArray();
-            return Div(DivTypes.Scroll, Div(children)).Size(200, 120);
+            return VirtualizedItems(
+                    SourceItems,
+                    item => Div(Text(item == 0 ? "selected" : item.ToString()))
+                        .Height(32)
+                        .Background(item == 0 ? "#dbeafe" : "#ffffff"),
+                    buffer: 0,
+                    itemExtent: 32,
+                    itemKey: item => item.ToString())
+                .Size(300, 160);
+        }
+    }
+
+    private sealed class MeasuredVirtualizedItemsProbeComponent : Component
+    {
+        private static readonly int[] SourceItems = Enumerable.Range(0, 1_000).ToArray();
+
+        public static List<int> RenderedIndices { get; } = new();
+
+        public override IElement Render()
+        {
+            return VirtualizedItems(
+                    SourceItems,
+                    item =>
+                    {
+                        RenderedIndices.Add(item);
+                        var height = item % 2 == 0 ? 24d : 80d;
+                        return Div(Text(item.ToString()))
+                            .Height(height)
+                            .Background(item == 0 ? "#dbeafe" : "#ffffff");
+                    },
+                    estimatedItemExtent: 36,
+                    bufferPixels: 64,
+                    itemKey: item => item.ToString())
+                .Size(300, 160);
         }
     }
 }

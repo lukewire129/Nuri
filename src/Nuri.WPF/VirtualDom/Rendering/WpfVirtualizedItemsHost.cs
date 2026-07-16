@@ -32,12 +32,14 @@ namespace Nuri.WPF
             VirtualizingPanel.SetIsVirtualizing(this, true);
             VirtualizingPanel.SetVirtualizationMode(this, VirtualizationMode.Recycling);
             VirtualizingPanel.SetScrollUnit(this, ScrollUnit.Pixel);
-            VirtualizingPanel.SetCacheLength(this, new VirtualizationCacheLength(1));
-            VirtualizingPanel.SetCacheLengthUnit(this, VirtualizationCacheLengthUnit.Page);
-
             var panelFactory = new FrameworkElementFactory(typeof(VirtualizingStackPanel));
             ItemsPanel = new ItemsPanelTemplate(panelFactory);
-            Loaded += (_, __) => RestoreRealizedRows();
+            Loaded += (_, __) =>
+            {
+                if (_source != null)
+                    ApplyVirtualizationSettings(_source);
+                RestoreRealizedRows();
+            };
             Unloaded += (_, __) =>
             {
                 ClearRealizedRows();
@@ -58,6 +60,7 @@ namespace Nuri.WPF
                 throw new ArgumentNullException(nameof(source));
 
             _source = source;
+            ApplyVirtualizationSettings(source);
             Reconcile(source);
             RefreshRealized(new HashSet<string>(source.GetIdentities(), StringComparer.Ordinal));
             RecordDiagnostics();
@@ -66,6 +69,7 @@ namespace Nuri.WPF
         internal void ApplyPatch(UpdateVirtualizedItemsPatch patch)
         {
             _source = patch.Source;
+            ApplyVirtualizationSettings(patch.Source);
             Reconcile(patch.Source);
 
             var changed = patch.RefreshRealizedItems
@@ -77,6 +81,24 @@ namespace Nuri.WPF
                     StringComparer.Ordinal);
             RefreshRealized(changed);
             RecordDiagnostics();
+        }
+
+        private void ApplyVirtualizationSettings(IVirtualizedItemsSource source)
+        {
+            var before = source.MeasuresItemExtent
+                ? source.BufferBeforePixels
+                : source.BufferBefore;
+            var after = source.MeasuresItemExtent
+                ? source.BufferAfterPixels
+                : source.BufferAfter;
+            VirtualizingPanel.SetCacheLength(
+                this,
+                new VirtualizationCacheLength(before, after));
+            VirtualizingPanel.SetCacheLengthUnit(
+                this,
+                source.MeasuresItemExtent
+                    ? VirtualizationCacheLengthUnit.Pixel
+                    : VirtualizationCacheLengthUnit.Item);
         }
 
         protected override DependencyObject GetContainerForItemOverride()
@@ -97,7 +119,7 @@ namespace Nuri.WPF
             if (element is not ListBoxItem container || item is not ItemHandle handle)
                 return;
 
-            container.Height = handle.Source.ItemExtent;
+            ApplyContainerExtent(container, handle.Source);
             RenderRow(container, handle);
         }
 
@@ -250,9 +272,23 @@ namespace Nuri.WPF
 
                 if (ItemContainerGenerator.ContainerFromItem(handle) is ListBoxItem container)
                 {
-                    container.Height = handle.Source.ItemExtent;
+                    ApplyContainerExtent(container, handle.Source);
                     RenderRow(container, handle);
                 }
+            }
+        }
+
+        private static void ApplyContainerExtent(
+            ListBoxItem container,
+            IVirtualizedItemsSource source)
+        {
+            if (source.MeasuresItemExtent)
+            {
+                container.ClearValue(FrameworkElement.HeightProperty);
+            }
+            else
+            {
+                container.Height = source.ItemExtent;
             }
         }
 

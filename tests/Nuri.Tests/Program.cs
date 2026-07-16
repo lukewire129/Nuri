@@ -54,6 +54,7 @@ internal static class Program
         GridLengthDslParsesStringDefinitions();
         GridLengthDslRejectsInvalidStringDefinitions();
         TransitionAppliesToAllConfiguredProperties();
+        VirtualizedItemsProvideErgonomicDefaultsAndBuffers();
         VirtualizedItemsStayLazyAndProduceKeyedChanges();
         VirtualizedItemsCaptureAnImmutableSnapshot();
         VirtualizedItemsUseSafeDuplicateIdentities();
@@ -85,6 +86,62 @@ internal static class Program
         AssertEqual(1, patch.Changes.Count(change => change.Type == VirtualizedItemChangeType.Add), "A new key should produce one virtualized add change.");
         AssertEqual(2, patch.Changes.Count(change => change.Type == VirtualizedItemChangeType.Move), "Retained keys should report their new positions.");
         AssertEqual(1, patch.Changes.Count(change => change.Type == VirtualizedItemChangeType.Update), "A changed snapshot with the same key should produce one update.");
+    }
+
+    private static void VirtualizedItemsProvideErgonomicDefaultsAndBuffers()
+    {
+        var templateCalls = 0;
+        var defaultView = Component.VirtualizedItems(
+            new[] { "a", "b", "c" },
+            item =>
+            {
+                templateCalls++;
+                return Component.Text(item);
+            });
+        var defaultSource = GetVirtualizedSource(defaultView);
+
+        AssertEqual(
+            ItemsTypes.Virtualized,
+            defaultView.Kind,
+            "The ergonomic factory must use the shared virtualized items kind.");
+        AssertEqual(3, defaultSource.Count, "The ergonomic factory must retain the shared source item count.");
+        AssertEqual(36d, defaultSource.ItemExtent, "VirtualizedItems must default item extent to 36.");
+        AssertEqual(5, defaultSource.BufferBefore, "VirtualizedItems must default the leading buffer to five items.");
+        AssertEqual(5, defaultSource.BufferAfter, "VirtualizedItems must default the trailing buffer to five items.");
+        AssertEqual("index:1", defaultSource.GetKey(1), "Omitting itemKey must use positional item identity.");
+        AssertEqual(0, templateCalls, "VirtualizedItems construction must keep item templates lazy.");
+        AssertEqual("b", defaultSource.RenderItem(1).Properties["Text"], "The ergonomic factory must render through the shared item template.");
+        AssertEqual(1, templateCalls, "Only an explicitly realized row should invoke its template.");
+
+        var symmetricSource = GetVirtualizedSource(Component.VirtualizedItems(
+            new[] { "a" },
+            Component.Text,
+            buffer: 6,
+            itemExtent: 28,
+            itemKey: item => item));
+        AssertEqual(6, symmetricSource.BufferBefore, "A single buffer value must apply before the viewport.");
+        AssertEqual(6, symmetricSource.BufferAfter, "A single buffer value must apply after the viewport.");
+        AssertEqual(28d, symmetricSource.ItemExtent, "The ergonomic factory must accept a custom fixed item extent.");
+        AssertEqual("a", symmetricSource.GetKey(0), "itemKey must provide stable item identity when configured.");
+
+        var asymmetricSource = GetVirtualizedSource(Component.VirtualizedItems(
+            new[] { "a" },
+            Component.Text,
+            3,
+            5));
+        AssertEqual(3, asymmetricSource.BufferBefore, "The first asymmetric buffer must apply before the viewport.");
+        AssertEqual(5, asymmetricSource.BufferAfter, "The second asymmetric buffer must apply after the viewport.");
+
+        var measuredSource = GetVirtualizedSource(Component.VirtualizedItems(
+            new[] { "short", "tall" },
+            Component.Text,
+            estimatedItemExtent: 40,
+            bufferPixels: 320,
+            itemKey: item => item));
+        AssertEqual(true, measuredSource.MeasuresItemExtent, "estimatedItemExtent must select measured item sizing.");
+        AssertEqual(40d, measuredSource.ItemExtent, "Measured sizing must retain its initial extent estimate.");
+        AssertEqual(320d, measuredSource.BufferBeforePixels, "Measured sizing must retain its leading pixel buffer.");
+        AssertEqual(320d, measuredSource.BufferAfterPixels, "Measured sizing must retain its trailing pixel buffer.");
     }
 
     private static void SubtreeRebuildPreservesRenderedDescendantIdentities()

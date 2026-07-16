@@ -56,6 +56,8 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
 
     public bool HasActiveScrollMotion => _renderer.HasActiveScrollMotion;
 
+    public bool HasPendingLayout => _renderer.HasPendingLayout;
+
     public UiTheme? CurrentTheme
     {
         get
@@ -150,6 +152,7 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
             || Volatile.Read(ref _fullRebuildRequested) != 0
             || _renderer.HasActiveAnimations
             || _renderer.HasActiveScrollMotion
+            || _renderer.HasPendingLayout
             || _renderer.HasPendingInput)
         {
             _requestFrame();
@@ -287,6 +290,7 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
         Interlocked.Exchange(ref _fullRebuildRequested, 0);
         Interlocked.Exchange(ref _pendingTheme, null);
         _invalidations.Clear();
+        _renderer.Dispose();
         ComponentLifecycle.DisposeSubtree(_rootId);
         if (_diagnosticsRegistered)
         {

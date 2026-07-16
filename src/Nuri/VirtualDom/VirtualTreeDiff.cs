@@ -113,7 +113,9 @@ namespace Nuri.VirtualDom
                 target,
                 newSource,
                 changes,
-                !newSource.HasSameTemplate(oldSource) || newSource.ItemExtent != oldSource.ItemExtent);
+                !newSource.HasSameTemplate(oldSource)
+                    || newSource.ItemExtent != oldSource.ItemExtent
+                    || newSource.MeasuresItemExtent != oldSource.MeasuresItemExtent);
         }
 
         private static void DiffEvents(VirtualEntry oldEntry, VirtualEntry newEntry, List<PatchOperation> operations)

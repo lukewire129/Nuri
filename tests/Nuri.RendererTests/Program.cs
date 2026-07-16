@@ -56,6 +56,7 @@ internal static class Program
         WpfRootDisposalRemovesVirtualizedDiagnostics();
         WpfTransitionsReplaceAndClearNativeAnimations(new WpfDriver());
         WpfVirtualizedItemsStayLazyAndRecycleContainers();
+        WpfMeasuredVirtualizedItemsUseNaturalRowHeights();
         RunSuite(() => new AvaloniaDriver());
         WpfRunBootstrapsStaAndClosesEveryWindowWithTheMainWindow();
         Console.WriteLine("Nuri.RendererTests passed.");
@@ -672,6 +673,50 @@ internal static class Program
         window.UpdateLayout();
         window.Close();
         NuriDiagnostics.Disable();
+    }
+
+    private static void WpfMeasuredVirtualizedItemsUseNaturalRowHeights()
+    {
+        var items = Enumerable.Range(0, 100)
+            .Select(index => (Index: index, Height: index % 2 == 0 ? 24d : 80d))
+            .ToArray();
+        var element = Component.VirtualizedItems(
+            items,
+            item => Component.Div(Component.Text(item.Index.ToString())).Height(item.Height),
+            estimatedItemExtent: 36,
+            bufferPixels: 160,
+            itemKey: item => item.Index.ToString());
+        var native = (WpfListBox)WpfVirtualEntryRenderer.Build(
+            element.ToVirtualEntry().WithIdentity("measured-virtualized-test", null));
+        var window = new System.Windows.Window
+        {
+            Width = 320,
+            Height = 240,
+            Content = native,
+            ShowInTaskbar = false,
+            WindowStyle = System.Windows.WindowStyle.None,
+            Opacity = 0
+        };
+
+        window.Show();
+        native.ApplyTemplate();
+        native.UpdateLayout();
+
+        var first = (WpfListBoxItem?)native.ItemContainerGenerator.ContainerFromIndex(0);
+        var second = (WpfListBoxItem?)native.ItemContainerGenerator.ContainerFromIndex(1);
+        AssertEqual(true, first != null && second != null, "WPF: measured virtualization must realize the initial variable-height rows.");
+        AssertEqual(true, double.IsNaN(first!.Height), "WPF: measured virtualization must not force the estimated height onto containers.");
+        AssertEqual(24d, first.ActualHeight, "WPF: a measured row must use its natural 24px height.");
+        AssertEqual(80d, second!.ActualHeight, "WPF: a measured row must use its natural 80px height.");
+        AssertEqual(
+            System.Windows.Controls.VirtualizationCacheLengthUnit.Pixel,
+            System.Windows.Controls.VirtualizingPanel.GetCacheLengthUnit(native),
+            "WPF: measured virtualization must interpret its cache length as pixels.");
+        AssertEqual(true, CountRealized(native) < items.Length, "WPF: measured rows must remain virtualized.");
+
+        window.Content = null;
+        window.UpdateLayout();
+        window.Close();
     }
 
     private static void WpfDiagnosticsTrackAppliedPatchBatches()

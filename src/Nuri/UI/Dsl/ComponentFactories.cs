@@ -213,6 +213,81 @@ namespace Nuri.UI.Dsl
                 items,
                 keySelector,
                 itemExtent,
+                false,
+                5,
+                5,
+                0,
+                0,
+                itemTemplate,
+                comparer);
+            return view;
+        }
+
+        public static ItemsView VirtualizedItems<T>(
+            IReadOnlyList<T> items,
+            Func<T, IElement> itemTemplate,
+            int buffer = 5,
+            double itemExtent = 36,
+            Func<T, string>? itemKey = null,
+            IEqualityComparer<T>? comparer = null)
+        {
+            var view = new ItemsView(ItemsTypes.Virtualized);
+            view.Properties[PropertyKeys.VirtualizedItemsSource] = new VirtualizedItemsSource<T>(
+                items,
+                itemKey,
+                itemExtent,
+                false,
+                buffer,
+                buffer,
+                0,
+                0,
+                itemTemplate,
+                comparer);
+            return view;
+        }
+
+        public static ItemsView VirtualizedItems<T>(
+            IReadOnlyList<T> items,
+            Func<T, IElement> itemTemplate,
+            int bufferBefore,
+            int bufferAfter,
+            double itemExtent = 36,
+            Func<T, string>? itemKey = null,
+            IEqualityComparer<T>? comparer = null)
+        {
+            var view = new ItemsView(ItemsTypes.Virtualized);
+            view.Properties[PropertyKeys.VirtualizedItemsSource] = new VirtualizedItemsSource<T>(
+                items,
+                itemKey,
+                itemExtent,
+                false,
+                bufferBefore,
+                bufferAfter,
+                0,
+                0,
+                itemTemplate,
+                comparer);
+            return view;
+        }
+
+        public static ItemsView VirtualizedItems<T>(
+            IReadOnlyList<T> items,
+            Func<T, IElement> itemTemplate,
+            double estimatedItemExtent,
+            double bufferPixels = 400,
+            Func<T, string>? itemKey = null,
+            IEqualityComparer<T>? comparer = null)
+        {
+            var view = new ItemsView(ItemsTypes.Virtualized);
+            view.Properties[PropertyKeys.VirtualizedItemsSource] = new VirtualizedItemsSource<T>(
+                items,
+                itemKey,
+                estimatedItemExtent,
+                true,
+                0,
+                0,
+                bufferPixels,
+                bufferPixels,
                 itemTemplate,
                 comparer);
             return view;

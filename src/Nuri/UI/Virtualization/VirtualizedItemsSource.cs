@@ -13,6 +13,16 @@ namespace Nuri.UI.Virtualization
 
         double ItemExtent { get; }
 
+        bool MeasuresItemExtent { get; }
+
+        int BufferBefore { get; }
+
+        int BufferAfter { get; }
+
+        double BufferBeforePixels { get; }
+
+        double BufferAfterPixels { get; }
+
         string GetKey(int index);
 
         IReadOnlyList<string> GetIdentities();
@@ -27,15 +37,20 @@ namespace Nuri.UI.Virtualization
     internal sealed class VirtualizedItemsSource<T> : IVirtualizedItemsSource
     {
         private readonly IReadOnlyList<T> _items;
-        private readonly Func<T, string> _keySelector;
+        private readonly Func<T, string>? _itemKey;
         private readonly Func<T, IElement> _itemTemplate;
         private readonly IEqualityComparer<T> _comparer;
         private string[]? _identities;
 
         public VirtualizedItemsSource(
             IReadOnlyList<T> items,
-            Func<T, string> keySelector,
+            Func<T, string>? itemKey,
             double itemExtent,
+            bool measuresItemExtent,
+            int bufferBefore,
+            int bufferAfter,
+            double bufferBeforePixels,
+            double bufferAfterPixels,
             Func<T, IElement> itemTemplate,
             IEqualityComparer<T>? comparer)
         {
@@ -43,23 +58,49 @@ namespace Nuri.UI.Virtualization
                 throw new ArgumentNullException(nameof(items));
 
             _items = items.ToArray();
-            _keySelector = keySelector ?? throw new ArgumentNullException(nameof(keySelector));
+            _itemKey = itemKey;
             _itemTemplate = itemTemplate ?? throw new ArgumentNullException(nameof(itemTemplate));
             _comparer = comparer ?? EqualityComparer<T>.Default;
 
             if (double.IsNaN(itemExtent) || double.IsInfinity(itemExtent) || itemExtent <= 0)
                 throw new ArgumentOutOfRangeException(nameof(itemExtent), "Item extent must be a finite value greater than zero.");
+            if (bufferBefore < 0)
+                throw new ArgumentOutOfRangeException(nameof(bufferBefore), "Virtualization buffer must be zero or greater.");
+            if (bufferAfter < 0)
+                throw new ArgumentOutOfRangeException(nameof(bufferAfter), "Virtualization buffer must be zero or greater.");
+            if (double.IsNaN(bufferBeforePixels) || double.IsInfinity(bufferBeforePixels) || bufferBeforePixels < 0)
+                throw new ArgumentOutOfRangeException(nameof(bufferBeforePixels), "Virtualization pixel buffer must be a finite value zero or greater.");
+            if (double.IsNaN(bufferAfterPixels) || double.IsInfinity(bufferAfterPixels) || bufferAfterPixels < 0)
+                throw new ArgumentOutOfRangeException(nameof(bufferAfterPixels), "Virtualization pixel buffer must be a finite value zero or greater.");
 
             ItemExtent = itemExtent;
+            MeasuresItemExtent = measuresItemExtent;
+            BufferBefore = bufferBefore;
+            BufferAfter = bufferAfter;
+            BufferBeforePixels = bufferBeforePixels;
+            BufferAfterPixels = bufferAfterPixels;
         }
 
         public int Count => _items.Count;
 
         public double ItemExtent { get; }
 
+        public bool MeasuresItemExtent { get; }
+
+        public int BufferBefore { get; }
+
+        public int BufferAfter { get; }
+
+        public double BufferBeforePixels { get; }
+
+        public double BufferAfterPixels { get; }
+
         public string GetKey(int index)
         {
-            var key = _keySelector(_items[index]);
+            if (_itemKey == null)
+                return $"index:{index}";
+
+            var key = _itemKey(_items[index]);
             if (string.IsNullOrWhiteSpace(key))
                 throw new InvalidOperationException($"Virtualized item at index {index} produced an empty key.");
 

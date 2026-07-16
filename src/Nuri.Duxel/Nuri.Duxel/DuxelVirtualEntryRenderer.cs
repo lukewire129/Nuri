@@ -4,11 +4,12 @@ using Nuri.Runtime.Diagnostics;
 using Nuri.UI.Controls;
 using Nuri.UI.Events;
 using Nuri.UI.Values;
+using Nuri.UI.Virtualization;
 using Nuri.VirtualDom;
 
 namespace Nuri.Duxel;
 
-public sealed class DuxelVirtualEntryRenderer
+public sealed class DuxelVirtualEntryRenderer : IDisposable
 {
     private const float ScrollFrictionPerSecond = 11f;
     private const float ScrollImpulsePerStep = 12f;
@@ -18,6 +19,8 @@ public sealed class DuxelVirtualEntryRenderer
     private const float ScrollbarInset = 2f;
     private readonly DuxelInputEventQueue? _inputEvents;
     private readonly Dictionary<string, ScrollRegionState> _scrollRegions = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, long> _virtualizedItemsHosts = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, VirtualizedExtentIndex> _virtualizedExtentIndexes = new(StringComparer.Ordinal);
     private readonly List<DuxelInputEvent> _deferredInputEvents = new();
     private readonly Stack<UiRect> _panelClipRects = new();
     private long _frameNumber;
@@ -34,6 +37,8 @@ public sealed class DuxelVirtualEntryRenderer
     public bool HasActiveScrollMotion { get; private set; }
 
     public bool HasPendingInput => _deferredInputEvents.Count > 0 || (_inputEvents?.HasPending ?? false);
+
+    public bool HasPendingLayout { get; private set; }
 
     public IReadOnlyList<DuxelInputEvent> LastInputEvents { get; private set; } = [];
 
@@ -54,6 +59,7 @@ public sealed class DuxelVirtualEntryRenderer
         AdvanceScrollPhysics(GetFrameDelta(ui));
         _frameNumber++;
         _scrollOrder = 0;
+        HasPendingLayout = false;
 
         if (NuriDiagnostics.IsEnabled)
         {
@@ -61,7 +67,8 @@ public sealed class DuxelVirtualEntryRenderer
         }
 
         var drawList = ui.GetWindowDrawList();
-        var ownsChannels = !drawList.HasChannels && ContainsPanelDecoration(entry);
+        var ownsChannels = !drawList.HasChannels
+            && (ContainsPanelDecoration(entry) || ContainsVirtualizedItems(entry));
         List<PanelDecoration>? decorations = ownsChannels ? new List<PanelDecoration>() : null;
         var hasActiveAnimations = false;
         HasActiveAnimations = false;
@@ -100,6 +107,7 @@ public sealed class DuxelVirtualEntryRenderer
             }
 
             PublishScrollRegions();
+            CleanupVirtualizedItemsDiagnostics();
         }
     }
 
@@ -179,6 +187,16 @@ public sealed class DuxelVirtualEntryRenderer
                 return;
             case VirtualControlTypes.Input:
                 RenderInput(ui, entry, effectiveOpacity, constraint);
+                return;
+            case VirtualControlTypes.Items
+                when string.Equals(entry.Kind, ItemsTypes.Virtualized, StringComparison.Ordinal):
+                RenderVirtualizedItems(
+                    ui,
+                    entry,
+                    decorations,
+                    effectiveOpacity,
+                    constraint,
+                    ref hasActiveAnimations);
                 return;
             default:
                 RenderVerticalChildren(ui, entry, decorations, effectiveOpacity, constraint, ref hasActiveAnimations);
@@ -377,6 +395,481 @@ public sealed class DuxelVirtualEntryRenderer
         state.Order = ++_scrollOrder;
         state.LastSeenFrame = _frameNumber;
         DrawScrollBar(ui, bounds, state, contentHeight);
+    }
+
+    private void RenderVirtualizedItems(
+        UiImmediateContext ui,
+        VirtualEntry entry,
+        List<PanelDecoration>? decorations,
+        float effectiveOpacity,
+        LayoutConstraint constraint,
+        ref bool hasActiveAnimations)
+    {
+        if (!TryGetVirtualizedItemsSource(entry, out var source))
+        {
+            return;
+        }
+
+        constraint = constraint.WithExplicitSize(GetSize(entry));
+        var requestedSize = GetSize(entry);
+        var available = ui.GetContentRegionAvail();
+        var width = requestedSize.X > 0f
+            ? requestedSize.X
+            : constraint.Width ?? available.X;
+        var height = requestedSize.Y > 0f
+            ? requestedSize.Y
+            : constraint.Height ?? (ui.GetFrameHeight() * 6f);
+        var size = new UiVector2(MathF.Max(1f, width), MathF.Max(1f, height));
+
+        if (_inputEvents is null)
+        {
+            RenderDirectVirtualizedItems(
+                ui,
+                entry,
+                source,
+                size,
+                decorations,
+                effectiveOpacity,
+                ref hasActiveAnimations);
+            return;
+        }
+
+        RenderNuriVirtualizedItems(
+            ui,
+            entry,
+            source,
+            size,
+            decorations,
+            effectiveOpacity,
+            ref hasActiveAnimations);
+    }
+
+    private void RenderNuriVirtualizedItems(
+        UiImmediateContext ui,
+        VirtualEntry entry,
+        IVirtualizedItemsSource source,
+        UiVector2 size,
+        List<PanelDecoration>? decorations,
+        float effectiveOpacity,
+        ref bool hasActiveAnimations)
+    {
+        if (source.MeasuresItemExtent)
+        {
+            RenderNuriMeasuredVirtualizedItems(
+                ui,
+                entry,
+                source,
+                size,
+                decorations,
+                effectiveOpacity,
+                ref hasActiveAnimations);
+            return;
+        }
+
+        var id = string.IsNullOrWhiteSpace(entry.Id) ? "NuriVirtualizedItems" : entry.Id;
+        if (!_scrollRegions.TryGetValue(id, out var state))
+        {
+            state = new ScrollRegionState();
+            _scrollRegions.Add(id, state);
+        }
+
+        var itemExtent = ToFloat(source.ItemExtent);
+        var contentHeight = itemExtent * source.Count;
+        var cursor = ui.GetCursorPos();
+        var screenStart = ui.GetCursorScreenPos();
+        var bounds = new UiRect(screenStart.X, screenStart.Y, size.X, size.Y);
+        var contentHeightAvailable = MathF.Max(0f, bounds.Height - 4f);
+        var contentRight = bounds.X + bounds.Width -
+            (contentHeight > contentHeightAvailable
+                ? ScrollbarWidth + ScrollbarInset
+                : ScrollbarInset);
+        var contentBounds = new UiRect(
+            bounds.X + 2f,
+            bounds.Y + 2f,
+            MathF.Max(0f, contentRight - (bounds.X + 2f)),
+            contentHeightAvailable);
+        state.MaxOffset = MathF.Max(0f, contentHeight - contentBounds.Height);
+        var clampedOffset = Math.Clamp(state.Offset, 0f, state.MaxOffset);
+        if (MathF.Abs(clampedOffset - state.Offset) > 0.001f)
+        {
+            state.Velocity = 0f;
+        }
+
+        state.Offset = clampedOffset;
+        CalculateVirtualizedRange(
+            source.Count,
+            itemExtent,
+            state.Offset,
+            contentBounds.Height,
+            source.BufferBefore,
+            source.BufferAfter,
+            out var firstIndex,
+            out var lastIndex);
+
+        ui.PushClipRect(contentBounds, true);
+        PushPanelClip(contentBounds);
+        try
+        {
+            RenderVirtualizedRange(
+                ui,
+                entry,
+                source,
+                firstIndex,
+                lastIndex,
+                contentBounds.X,
+                contentBounds.Y - state.Offset,
+                contentBounds.Width,
+                itemExtent,
+                decorations,
+                effectiveOpacity,
+                ref hasActiveAnimations);
+        }
+        finally
+        {
+            _panelClipRects.Pop();
+            ui.PopClipRect();
+            ui.SetCursorPos(cursor);
+        }
+
+        ui.Dummy(size);
+        state.Bounds = bounds;
+        state.Order = ++_scrollOrder;
+        state.LastSeenFrame = _frameNumber;
+        DrawScrollBar(ui, bounds, state, contentHeight);
+        RecordVirtualizedItems(entry.Id, source.Count, lastIndex - firstIndex);
+    }
+
+    private void RenderDirectVirtualizedItems(
+        UiImmediateContext ui,
+        VirtualEntry entry,
+        IVirtualizedItemsSource source,
+        UiVector2 size,
+        List<PanelDecoration>? decorations,
+        float effectiveOpacity,
+        ref bool hasActiveAnimations)
+    {
+        var id = string.IsNullOrWhiteSpace(entry.Id) ? "NuriVirtualizedItems" : entry.Id;
+        _ = ui.BeginChild(id, size, border: HasVisibleBorder(entry));
+        try
+        {
+            if (source.MeasuresItemExtent)
+            {
+                RenderDirectMeasuredVirtualizedItems(
+                    ui,
+                    entry,
+                    source,
+                    size,
+                    decorations,
+                    effectiveOpacity,
+                    ref hasActiveAnimations);
+                return;
+            }
+
+            var itemExtent = ToFloat(source.ItemExtent);
+            var contentStart = ui.GetCursorPos();
+            ui.CalcListClipping(source.Count, itemExtent, out var firstIndex, out var lastIndex);
+            firstIndex = Math.Max(0, firstIndex - source.BufferBefore);
+            lastIndex = Math.Min(source.Count, lastIndex + source.BufferAfter);
+
+            ui.SetCursorPos(contentStart);
+            ui.Dummy(new UiVector2(MathF.Max(1f, size.X), itemExtent * source.Count));
+            RenderVirtualizedRange(
+                ui,
+                entry,
+                source,
+                firstIndex,
+                lastIndex,
+                contentStart.X,
+                contentStart.Y,
+                MathF.Max(1f, size.X),
+                itemExtent,
+                decorations,
+                effectiveOpacity,
+                ref hasActiveAnimations);
+            RecordVirtualizedItems(entry.Id, source.Count, lastIndex - firstIndex);
+        }
+        finally
+        {
+            ui.EndChild();
+        }
+    }
+
+    private void RenderNuriMeasuredVirtualizedItems(
+        UiImmediateContext ui,
+        VirtualEntry entry,
+        IVirtualizedItemsSource source,
+        UiVector2 size,
+        List<PanelDecoration>? decorations,
+        float effectiveOpacity,
+        ref bool hasActiveAnimations)
+    {
+        var id = string.IsNullOrWhiteSpace(entry.Id) ? "NuriVirtualizedItems" : entry.Id;
+        if (!_scrollRegions.TryGetValue(id, out var state))
+        {
+            state = new ScrollRegionState();
+            _scrollRegions.Add(id, state);
+        }
+
+        var layout = GetVirtualizedExtentIndex(id);
+        var anchor = layout.CaptureAnchor(state.Offset);
+        if (layout.Reconcile(source)
+            && anchor is VirtualizedAnchor retainedAnchor
+            && layout.TryRestoreAnchor(retainedAnchor, out var restoredOffset))
+        {
+            state.Offset = restoredOffset;
+        }
+
+        layout.LastSeenFrame = _frameNumber;
+        var contentHeight = layout.TotalExtent;
+        var cursor = ui.GetCursorPos();
+        var screenStart = ui.GetCursorScreenPos();
+        var bounds = new UiRect(screenStart.X, screenStart.Y, size.X, size.Y);
+        var contentHeightAvailable = MathF.Max(0f, bounds.Height - 4f);
+        var contentRight = bounds.X + bounds.Width -
+            (contentHeight > contentHeightAvailable
+                ? ScrollbarWidth + ScrollbarInset
+                : ScrollbarInset);
+        var contentBounds = new UiRect(
+            bounds.X + 2f,
+            bounds.Y + 2f,
+            MathF.Max(0f, contentRight - (bounds.X + 2f)),
+            contentHeightAvailable);
+
+        state.MaxOffset = MathF.Max(0f, contentHeight - contentBounds.Height);
+        state.Offset = Math.Clamp(state.Offset, 0f, state.MaxOffset);
+        var anchorIndex = layout.FindIndexAtOffset(state.Offset);
+        var firstIndex = layout.FindIndexAtOffset(MathF.Max(
+            0f,
+            state.Offset - ToFloat(source.BufferBeforePixels)));
+        var targetEnd = state.Offset
+            + contentBounds.Height
+            + ToFloat(source.BufferAfterPixels);
+        var contentY = contentBounds.Y - state.Offset;
+        var realizedCount = 0;
+
+        ui.PushClipRect(contentBounds, true);
+        PushPanelClip(contentBounds);
+        try
+        {
+            realizedCount = RenderMeasuredVirtualizedRange(
+                ui,
+                entry,
+                source,
+                layout,
+                firstIndex,
+                targetEnd,
+                anchorIndex,
+                contentBounds.X,
+                ref contentY,
+                contentBounds.Width,
+                delta => state.Offset += delta,
+                decorations,
+                effectiveOpacity,
+                ref hasActiveAnimations);
+        }
+        finally
+        {
+            _panelClipRects.Pop();
+            ui.PopClipRect();
+            ui.SetCursorPos(cursor);
+        }
+
+        contentHeight = layout.TotalExtent;
+        state.MaxOffset = MathF.Max(0f, contentHeight - contentBounds.Height);
+        state.Offset = Math.Clamp(state.Offset, 0f, state.MaxOffset);
+        ui.Dummy(size);
+        state.Bounds = bounds;
+        state.Order = ++_scrollOrder;
+        state.LastSeenFrame = _frameNumber;
+        DrawScrollBar(ui, bounds, state, contentHeight);
+        RecordVirtualizedItems(entry.Id, source.Count, realizedCount);
+    }
+
+    private void RenderDirectMeasuredVirtualizedItems(
+        UiImmediateContext ui,
+        VirtualEntry entry,
+        IVirtualizedItemsSource source,
+        UiVector2 size,
+        List<PanelDecoration>? decorations,
+        float effectiveOpacity,
+        ref bool hasActiveAnimations)
+    {
+        var id = string.IsNullOrWhiteSpace(entry.Id) ? "NuriVirtualizedItems" : entry.Id;
+        var layout = GetVirtualizedExtentIndex(id);
+        var scrollOffset = MathF.Max(0f, ui.GetScrollY());
+        var anchor = layout.CaptureAnchor(scrollOffset);
+        if (layout.Reconcile(source)
+            && anchor is VirtualizedAnchor retainedAnchor
+            && layout.TryRestoreAnchor(retainedAnchor, out var restoredOffset))
+        {
+            scrollOffset = restoredOffset;
+            ui.SetScrollY(scrollOffset);
+        }
+
+        layout.LastSeenFrame = _frameNumber;
+        var contentStart = ui.GetCursorPos();
+        var contentWidth = MathF.Max(1f, ui.GetContentRegionAvail().X);
+        var visibleHeight = MathF.Max(1f, MathF.Min(size.Y, ui.GetWindowHeight()));
+        var firstIndex = layout.FindIndexAtOffset(MathF.Max(
+            0f,
+            scrollOffset - ToFloat(source.BufferBeforePixels)));
+        var targetEnd = scrollOffset
+            + visibleHeight
+            + ToFloat(source.BufferAfterPixels);
+        var contentY = contentStart.Y;
+
+        ui.Dummy(new UiVector2(contentWidth, layout.TotalExtent));
+        var realizedCount = RenderMeasuredVirtualizedRange(
+            ui,
+            entry,
+            source,
+            layout,
+            firstIndex,
+            targetEnd,
+            layout.FindIndexAtOffset(scrollOffset),
+            contentStart.X,
+            ref contentY,
+            contentWidth,
+            delta =>
+            {
+                scrollOffset += delta;
+                ui.SetScrollY(scrollOffset);
+            },
+            decorations,
+            effectiveOpacity,
+            ref hasActiveAnimations);
+        RecordVirtualizedItems(entry.Id, source.Count, realizedCount);
+    }
+
+    private int RenderMeasuredVirtualizedRange(
+        UiImmediateContext ui,
+        VirtualEntry hostEntry,
+        IVirtualizedItemsSource source,
+        VirtualizedExtentIndex layout,
+        int firstIndex,
+        float targetEnd,
+        int anchorIndex,
+        float contentX,
+        ref float contentY,
+        float contentWidth,
+        Action<float> adjustAnchor,
+        List<PanelDecoration>? decorations,
+        float effectiveOpacity,
+        ref bool hasActiveAnimations)
+    {
+        if (source.Count == 0 || firstIndex >= source.Count)
+        {
+            return 0;
+        }
+
+        var identities = source.GetIdentities();
+        var index = firstIndex;
+        while (index < source.Count && layout.GetOffset(index) < targetEnd)
+        {
+            var rowOffset = layout.GetOffset(index);
+            var itemEntry = source.RenderItem(index).ToVirtualEntry();
+            itemEntry.RewriteIdentity(
+                $"{hostEntry.Id}#item:{identities[index]}",
+                hostEntry.Id);
+            ui.SetCursorPos(new UiVector2(contentX, contentY + rowOffset));
+            ui.BeginGroup();
+            RenderEntry(
+                ui,
+                itemEntry,
+                decorations,
+                effectiveOpacity,
+                new LayoutConstraint(contentWidth, null),
+                ref hasActiveAnimations);
+            ui.EndGroup();
+
+            var margin = GetThickness(itemEntry, "Margin");
+            var declaredExtent = GetSize(itemEntry).Y
+                + ToFloat(margin.Top + margin.Bottom);
+            var measuredExtent = MathF.Max(
+                1f,
+                MathF.Max(ui.GetItemRectSize().Y, declaredExtent));
+            if (layout.Measure(index, measuredExtent, out var measuredDelta))
+            {
+                HasPendingLayout = true;
+                if (index < anchorIndex)
+                {
+                    contentY -= measuredDelta;
+                    adjustAnchor(measuredDelta);
+                }
+            }
+
+            index++;
+        }
+
+        return index - firstIndex;
+    }
+
+    private VirtualizedExtentIndex GetVirtualizedExtentIndex(string id)
+    {
+        if (!_virtualizedExtentIndexes.TryGetValue(id, out var layout))
+        {
+            layout = new VirtualizedExtentIndex();
+            _virtualizedExtentIndexes.Add(id, layout);
+        }
+
+        return layout;
+    }
+
+    private void RenderVirtualizedRange(
+        UiImmediateContext ui,
+        VirtualEntry hostEntry,
+        IVirtualizedItemsSource source,
+        int firstIndex,
+        int lastIndex,
+        float contentX,
+        float contentY,
+        float contentWidth,
+        float itemExtent,
+        List<PanelDecoration>? decorations,
+        float effectiveOpacity,
+        ref bool hasActiveAnimations)
+    {
+        if (firstIndex >= lastIndex)
+        {
+            return;
+        }
+
+        var identities = source.GetIdentities();
+        for (var index = firstIndex; index < lastIndex; index++)
+        {
+            var itemEntry = source.RenderItem(index).ToVirtualEntry();
+            itemEntry.RewriteIdentity(
+                $"{hostEntry.Id}#item:{identities[index]}",
+                hostEntry.Id);
+            ui.SetCursorPos(new UiVector2(contentX, contentY + (index * itemExtent)));
+            RenderEntry(
+                ui,
+                itemEntry,
+                decorations,
+                effectiveOpacity,
+                new LayoutConstraint(contentWidth, itemExtent),
+                ref hasActiveAnimations);
+        }
+    }
+
+    private static void CalculateVirtualizedRange(
+        int itemCount,
+        float itemExtent,
+        float offset,
+        float visibleHeight,
+        int bufferBefore,
+        int bufferAfter,
+        out int firstIndex,
+        out int lastIndex)
+    {
+        firstIndex = Math.Clamp(
+            (int)MathF.Floor(offset / itemExtent) - bufferBefore,
+            0,
+            itemCount);
+        lastIndex = Math.Clamp(
+            (int)MathF.Ceiling((offset + visibleHeight) / itemExtent) + bufferAfter,
+            firstIndex,
+            itemCount);
     }
 
     private static void DrawScrollBar(
@@ -1298,6 +1791,12 @@ public sealed class DuxelVirtualEntryRenderer
             return false;
         }
 
+        if (entry.Type == VirtualControlTypes.Items
+            && string.Equals(entry.Kind, ItemsTypes.Virtualized, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
         if (entry.Type != VirtualControlTypes.Div)
         {
             return false;
@@ -1548,6 +2047,51 @@ public sealed class DuxelVirtualEntryRenderer
         }
     }
 
+    private void RecordVirtualizedItems(string hostId, int itemCount, int realizedCount)
+    {
+        if (string.IsNullOrWhiteSpace(hostId))
+        {
+            return;
+        }
+
+        _virtualizedItemsHosts[hostId] = _frameNumber;
+        NuriDiagnostics.RecordVirtualizedItems(hostId, itemCount, realizedCount);
+    }
+
+    private void CleanupVirtualizedItemsDiagnostics()
+    {
+        foreach (var stale in _virtualizedItemsHosts
+            .Where(pair => pair.Value != _frameNumber)
+            .Select(pair => pair.Key)
+            .ToArray())
+        {
+            NuriDiagnostics.RemoveVirtualizedItems(stale);
+            _virtualizedItemsHosts.Remove(stale);
+        }
+
+        foreach (var stale in _virtualizedExtentIndexes
+            .Where(pair => pair.Value.LastSeenFrame != _frameNumber)
+            .Select(pair => pair.Key)
+            .ToArray())
+        {
+            _virtualizedExtentIndexes.Remove(stale);
+        }
+    }
+
+    public void Dispose()
+    {
+        foreach (var hostId in _virtualizedItemsHosts.Keys)
+        {
+            NuriDiagnostics.RemoveVirtualizedItems(hostId);
+        }
+
+        _virtualizedItemsHosts.Clear();
+        _virtualizedExtentIndexes.Clear();
+        _scrollRegions.Clear();
+        _deferredInputEvents.Clear();
+        _panelClipRects.Clear();
+    }
+
     private void PushPanelClip(UiRect clipRect)
     {
         if (_panelClipRects.TryPeek(out var parentClip))
@@ -1638,6 +2182,25 @@ public sealed class DuxelVirtualEntryRenderer
         foreach (var child in entry.Children)
         {
             if (ContainsPanelDecoration(child))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ContainsVirtualizedItems(VirtualEntry entry)
+    {
+        if (entry.Type == VirtualControlTypes.Items
+            && string.Equals(entry.Kind, ItemsTypes.Virtualized, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        foreach (var child in entry.Children)
+        {
+            if (ContainsVirtualizedItems(child))
             {
                 return true;
             }
@@ -1777,6 +2340,21 @@ public sealed class DuxelVirtualEntryRenderer
         _ = TryGetSingle(entry, PropertyKeys.Width, out var width);
         _ = TryGetSingle(entry, PropertyKeys.Height, out var height);
         return new UiVector2(MathF.Max(0f, width), MathF.Max(0f, height));
+    }
+
+    private static bool TryGetVirtualizedItemsSource(
+        VirtualEntry entry,
+        out IVirtualizedItemsSource source)
+    {
+        if (entry.Properties.TryGetValue(PropertyKeys.VirtualizedItemsSource, out var value)
+            && value is IVirtualizedItemsSource configured)
+        {
+            source = configured;
+            return true;
+        }
+
+        source = null!;
+        return false;
     }
 
     private static IReadOnlyList<LengthValue> GetColumnDefinitions(VirtualEntry entry)
@@ -2003,6 +2581,170 @@ public sealed class DuxelVirtualEntryRenderer
         float BorderThickness,
         float CornerRadius,
         UiRect? ClipRect);
+
+    private readonly record struct VirtualizedAnchor(string Identity, float OffsetWithinItem);
+
+    private sealed class VirtualizedExtentIndex
+    {
+        private readonly Dictionary<string, float> _measuredExtents = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, int> _indexes = new(StringComparer.Ordinal);
+        private string[] _identities = [];
+        private float[] _extents = [];
+        private float[] _tree = [0f];
+        private float _estimatedExtent;
+
+        public long LastSeenFrame { get; set; }
+
+        public float TotalExtent => PrefixSum(_extents.Length);
+
+        public bool Reconcile(IVirtualizedItemsSource source)
+        {
+            var identities = source.GetIdentities();
+            var estimate = MathF.Max(1f, ToFloat(source.ItemExtent));
+            var unchanged = _identities.Length == identities.Count
+                && MathF.Abs(_estimatedExtent - estimate) <= 0.01f;
+            if (unchanged)
+            {
+                for (var index = 0; index < identities.Count; index++)
+                {
+                    if (!string.Equals(_identities[index], identities[index], StringComparison.Ordinal))
+                    {
+                        unchanged = false;
+                        break;
+                    }
+                }
+            }
+
+            if (unchanged)
+            {
+                return false;
+            }
+
+            _estimatedExtent = estimate;
+            _identities = identities.ToArray();
+            var retained = new HashSet<string>(_identities, StringComparer.Ordinal);
+            foreach (var removed in _measuredExtents.Keys.Where(key => !retained.Contains(key)).ToArray())
+            {
+                _measuredExtents.Remove(removed);
+            }
+
+            _indexes.Clear();
+            _extents = new float[_identities.Length];
+            _tree = new float[_identities.Length + 1];
+            for (var index = 0; index < _identities.Length; index++)
+            {
+                _indexes[_identities[index]] = index;
+                _extents[index] = _measuredExtents.TryGetValue(_identities[index], out var measured)
+                    ? measured
+                    : _estimatedExtent;
+                Add(index, _extents[index]);
+            }
+
+            return true;
+        }
+
+        public VirtualizedAnchor? CaptureAnchor(float offset)
+        {
+            if (_identities.Length == 0)
+            {
+                return null;
+            }
+
+            var index = FindIndexAtOffset(offset);
+            return new VirtualizedAnchor(
+                _identities[index],
+                MathF.Max(0f, offset - GetOffset(index)));
+        }
+
+        public bool TryRestoreAnchor(VirtualizedAnchor anchor, out float offset)
+        {
+            if (_indexes.TryGetValue(anchor.Identity, out var index))
+            {
+                offset = GetOffset(index) + MathF.Min(anchor.OffsetWithinItem, _extents[index]);
+                return true;
+            }
+
+            offset = 0f;
+            return false;
+        }
+
+        public int FindIndexAtOffset(float offset)
+        {
+            if (_extents.Length == 0)
+            {
+                return 0;
+            }
+
+            offset = Math.Clamp(offset, 0f, TotalExtent);
+            var index = 0;
+            var sum = 0f;
+            var bit = HighestPowerOfTwoAtMost(_extents.Length);
+            while (bit != 0)
+            {
+                var next = index + bit;
+                if (next <= _extents.Length && sum + _tree[next] <= offset)
+                {
+                    index = next;
+                    sum += _tree[next];
+                }
+
+                bit >>= 1;
+            }
+
+            return Math.Min(index, _extents.Length - 1);
+        }
+
+        public float GetOffset(int index)
+        {
+            return PrefixSum(Math.Clamp(index, 0, _extents.Length));
+        }
+
+        public bool Measure(int index, float extent, out float delta)
+        {
+            extent = MathF.Max(1f, extent);
+            delta = extent - _extents[index];
+            if (MathF.Abs(delta) <= 0.1f)
+            {
+                delta = 0f;
+                return false;
+            }
+
+            _extents[index] = extent;
+            _measuredExtents[_identities[index]] = extent;
+            Add(index, delta);
+            return true;
+        }
+
+        private float PrefixSum(int count)
+        {
+            var sum = 0f;
+            for (var index = count; index > 0; index -= index & -index)
+            {
+                sum += _tree[index];
+            }
+
+            return sum;
+        }
+
+        private void Add(int index, float delta)
+        {
+            for (var treeIndex = index + 1; treeIndex < _tree.Length; treeIndex += treeIndex & -treeIndex)
+            {
+                _tree[treeIndex] += delta;
+            }
+        }
+
+        private static int HighestPowerOfTwoAtMost(int value)
+        {
+            var result = 1;
+            while ((result << 1) <= value)
+            {
+                result <<= 1;
+            }
+
+            return result;
+        }
+    }
 
     private sealed class ScrollRegionState
     {
