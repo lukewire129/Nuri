@@ -67,6 +67,10 @@ For a direct/non-Windows host, `GetMainViewport().WorkSize` remains the default 
 
 See [RUNTIME_IDENTITY.md](RUNTIME_IDENTITY.md) for key, lifecycle, duplicate-key, and cleanup invariants.
 
+### Duxel Theme Selection
+
+The fixed-theme `NuriApplication.Run(theme, rootFactory, ...)` overload passes one selected `UiTheme` to both the root factory and the Duxel host. Use this overload when a component needs palette colors but does not need to change the host theme at runtime. The existing `NuriApplication.Run(..., theme: ...)` parameter remains the concise path when the root does not need the palette value, while `Func<DuxelThemeController, IElement>` remains the opt-in path for runtime switching and applied-theme observation.
+
 ## Flat Virtualized Items
 
 Large renderer-owned lists use the platform-neutral `VirtualizedItems<T>(items, itemTemplate, ...)` contract. Fixed sizing remains the default fast path: `itemExtent` defaults to `36`, and the item buffer defaults to `5` before and after the viewport. One `buffer` value applies symmetrically; the `bufferBefore, bufferAfter` overload allows asymmetric values. Variable sizing is opt-in through `VirtualizedItems(items, itemTemplate, estimatedItemExtent: ..., bufferPixels: ...)`. The estimate positions unseen rows until a renderer measures them, and its buffer is a scroll length in pixels rather than an item count. The optional `itemKey` supplies stable identity across insertions, removals, and moves and also owns a measured extent. When it is omitted, identity is positional and row-local state or measured extents are not expected to follow a reordered item. The previous `VirtualizedItems<T>(items, keySelector, itemExtent, itemTemplate, comparer)` overload remains available for compatibility. Core copies the supplied items into an immutable render snapshot and emits `UpdateVirtualizedItemsPatch` with keyed add, remove, move, and update changes without invoking `itemTemplate`.

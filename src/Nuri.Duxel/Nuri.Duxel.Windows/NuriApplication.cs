@@ -33,6 +33,30 @@ public static class NuriApplication
     }
 
     public static void Run(
+        UiTheme theme,
+        Func<UiTheme, IElement> rootFactory,
+        string title = "Nuri Duxel",
+        int width = 1280,
+        int height = 720,
+        bool vsync = true,
+        bool useDuxelTitleBar = false,
+        bool integrateSystemChrome = false)
+    {
+        ArgumentNullException.ThrowIfNull(rootFactory);
+
+        Run(
+            rootFactory(theme),
+            title,
+            width,
+            height,
+            vsync,
+            theme,
+            themeController: null,
+            useDuxelTitleBar,
+            integrateSystemChrome);
+    }
+
+    public static void Run(
         Func<DuxelThemeController, IElement> rootFactory,
         string title = "Nuri Duxel",
         int width = 1280,

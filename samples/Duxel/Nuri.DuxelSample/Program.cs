@@ -3,13 +3,14 @@ using Nuri.Duxel;
 using Nuri.UI.Controls;
 using Nuri.UI.Dsl;
 
-NuriApplication.Run<CounterComponent>(
+NuriApplication.Run(
+    UiTheme.Nord,
+    theme => new CounterComponent(theme),
     title: "Nuri + Duxel",
     width: 720,
-    height: 580,
-    theme: UiTheme.Nord);
+    height: 580);
 
-internal sealed class CounterComponent : Component
+internal sealed class CounterComponent(UiTheme theme) : Component
 {
     public override IElement Render()
     {
@@ -58,6 +59,7 @@ internal sealed class CounterComponent : Component
                 .Brush("#475569")
                 .Thickness(1)
             )
+            .Background(theme.WindowBg)
             .Padding(16)
             .Spacing(14);
     }

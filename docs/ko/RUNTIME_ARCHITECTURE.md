@@ -67,6 +67,10 @@ Direct/non-Windows host에서는 `GetMainViewport().WorkSize`가 계속 기본 r
 
 key, lifecycle, 중복 key 및 cleanup 불변식은 [RUNTIME_IDENTITY.md](RUNTIME_IDENTITY.md)를 참고합니다.
 
+### Duxel Theme 선택
+
+고정 theme용 `NuriApplication.Run(theme, rootFactory, ...)` overload는 선택한 하나의 `UiTheme`을 root factory와 Duxel host 양쪽에 전달합니다. Component에서 palette color가 필요하지만 runtime에 host theme을 변경할 필요는 없을 때 이 overload를 사용합니다. Root에서 palette 값이 필요하지 않은 경우 기존 `NuriApplication.Run(..., theme: ...)` parameter가 간결한 경로로 유지되며, `Func<DuxelThemeController, IElement>`는 runtime switching과 적용된 theme 관찰을 위한 opt-in 경로로 유지됩니다.
+
 ## 평탄화 Virtualized Items
 
 큰 renderer-owned 목록은 플랫폼 중립적인 `VirtualizedItems<T>(items, itemTemplate, ...)` 계약을 사용합니다. 고정 sizing은 기본 fast path로 유지됩니다. `itemExtent` 기본값은 `36`이고 item buffer 기본값은 viewport 앞뒤로 각각 `5`입니다. 하나의 `buffer` 값은 양쪽에 동일하게 적용되며, `bufferBefore, bufferAfter` overload로 서로 다른 값을 지정할 수 있습니다. 가변 sizing은 `VirtualizedItems(items, itemTemplate, estimatedItemExtent: ..., bufferPixels: ...)`로 opt-in합니다. Renderer가 측정하기 전까지 estimate로 보이지 않는 row의 위치를 계산하며, buffer는 item 개수가 아니라 pixel 단위 scroll 길이입니다. 선택적인 `itemKey`는 삽입, 삭제, 이동에도 유지되는 안정적인 identity를 제공하고 측정된 extent도 소유합니다. 생략하면 identity는 위치 기준이며 row-local state 또는 측정된 extent가 재정렬된 item을 따라갈 것으로 기대하지 않습니다. 이전 `VirtualizedItems<T>(items, keySelector, itemExtent, itemTemplate, comparer)` overload는 호환성을 위해 유지합니다. Core는 전달된 items를 불변 render snapshot으로 복사하고 `itemTemplate`을 호출하지 않은 채 keyed add, remove, move, update 변경을 담은 `UpdateVirtualizedItemsPatch`를 생성합니다.
