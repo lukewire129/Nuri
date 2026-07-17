@@ -5,6 +5,7 @@ using Nuri.ExplorerTreeSample.Components;
 using Nuri.Runtime.Diagnostics;
 using Nuri.UI.Controls;
 using Nuri.UI.Dsl;
+using Nuri.UI.Navigation;
 using Nuri.UI.Values;
 
 internal static class Program
@@ -36,6 +37,8 @@ internal static class Program
             ("runtime theme changes request and apply on the next frame", RuntimeThemeChangesRequestAndApply),
             ("Duxel theme colors use the neutral Background DSL", DuxelThemeColorsUseNeutralBackgroundDsl),
             ("opacity animation requests frames and supports interruption", OpacityAnimationRequestsFramesAndSupportsInterruption),
+            ("animated router isolates keyed route hook state", AnimatedRouterIsolatesKeyedRouteHookState),
+            ("standard router projects route-local state updates", StandardRouterProjectsRouteLocalStateUpdates),
             ("diagnostics track Duxel roots and patches", DiagnosticsTrackDuxelRootsAndPatches),
             ("input queue preserves semantic event order", InputQueuePreservesSemanticEventOrder),
             ("virtualized items project bounded viewport rows", VirtualizedItemsProjectBoundedViewportRows),
@@ -600,6 +603,59 @@ internal static class Program
             "Supported opacity animations must not emit unsupported-property diagnostics.");
     }
 
+    private static void AnimatedRouterIsolatesKeyedRouteHookState()
+    {
+        DetailsRouteComponent.Reset();
+        using var context = CreateContext();
+        var root = new AnimatedNavigationProbe();
+        using var screen = new NuriDuxelScreen(
+            root,
+            () => { },
+            "animated-router-identity-test");
+
+        RenderFrame(context, screen);
+        root.NavigateDetails();
+        RenderFrame(context, screen);
+        RenderFrame(context, screen);
+
+        Thread.Sleep(40);
+        RenderFrame(context, screen);
+        RenderFrame(context, screen);
+
+        AssertTrue(
+            DetailsRouteComponent.RenderCount > 0,
+            "A keyed route replacement must mount the new screen with independent hook state.");
+    }
+
+    private static void StandardRouterProjectsRouteLocalStateUpdates()
+    {
+        RouterCounterPage.Reset();
+        RouterDetailsPage.Reset();
+        using var context = CreateContext();
+        var requestedFrames = 0;
+        var root = new StandardRouterProbe();
+        using var screen = new NuriDuxelScreen(
+            root,
+            () => requestedFrames++,
+            "standard-router-state-test");
+
+        RenderFrame(context, screen);
+        AssertEqual(0, RouterCounterPage.LastRenderedCount, "The standard Router should initially project route-local state.");
+
+        RouterCounterPage.Increment!();
+        AssertTrue(requestedFrames > 0, "A routed page state update should request a Duxel frame.");
+        RenderFrame(context, screen);
+        AssertEqual(1, RouterCounterPage.LastRenderedCount, "A routed page state update should rerender its Duxel subtree.");
+
+        root.NavigateDetails();
+        RenderFrame(context, screen);
+        AssertEqual("details", RouterDetailsPage.LastRenderedName, "Route replacement should mount the independently keyed page state.");
+
+        RouterDetailsPage.UpdateName!("updated");
+        RenderFrame(context, screen);
+        AssertEqual("updated", RouterDetailsPage.LastRenderedName, "The replacement page setter should remain active after navigation.");
+    }
+
     private static void InputQueuePreservesSemanticEventOrder()
     {
         var input = new DuxelInputEventQueue();
@@ -968,6 +1024,121 @@ internal static class Program
                 .Background("#1d4ed8")
                 .Opacity(opacity)
                 .Transition(TimeSpan.FromMilliseconds(200), EasingValue.CubicOut);
+        }
+    }
+
+    private sealed class AnimatedNavigationProbe : Component
+    {
+        private Navigator? _navigator;
+
+        public void NavigateDetails()
+        {
+            _navigator!.Navigate("details");
+        }
+
+        public override IElement Render()
+        {
+            var (navigation, navigator) = useNavigation("home");
+            _navigator = navigator;
+
+            return Div(
+                AnimatedRouter(
+                    navigation,
+                    TimeSpan.FromMilliseconds(20),
+                    EasingValue.CubicOut,
+                    Route("home", () => new HomeRouteComponent()),
+                    Route("details", () => new DetailsRouteComponent())));
+        }
+    }
+
+    private sealed class StandardRouterProbe : Component
+    {
+        private Navigator? _navigator;
+
+        public void NavigateDetails()
+        {
+            _navigator!.Navigate("details");
+        }
+
+        public override IElement Render()
+        {
+            var (navigation, navigator) = useNavigation("home");
+            _navigator = navigator;
+            return Div(
+                Router(
+                    navigation,
+                    Route("home", () => new RouterCounterPage()),
+                    Route("details", () => new RouterDetailsPage())));
+        }
+    }
+
+    private sealed class RouterCounterPage : Component
+    {
+        public static Action? Increment { get; private set; }
+
+        public static int LastRenderedCount { get; private set; }
+
+        public static void Reset()
+        {
+            Increment = null;
+            LastRenderedCount = -1;
+        }
+
+        public override IElement Render()
+        {
+            var (count, setCount) = useState(0);
+            Increment = () => setCount(current => current + 1);
+            LastRenderedCount = count;
+            return Div(
+                Text($"count:{count}"),
+                Button("Increment", Increment));
+        }
+    }
+
+    private sealed class RouterDetailsPage : Component
+    {
+        public static Action<string>? UpdateName { get; private set; }
+
+        public static string LastRenderedName { get; private set; } = string.Empty;
+
+        public static void Reset()
+        {
+            UpdateName = null;
+            LastRenderedName = string.Empty;
+        }
+
+        public override IElement Render()
+        {
+            var (name, setName) = useState("details");
+            UpdateName = value => setName(_ => value);
+            LastRenderedName = name;
+            return Div(Text(name));
+        }
+    }
+
+    private sealed class HomeRouteComponent : Component
+    {
+        public override IElement Render()
+        {
+            var (count, _) = useState(0);
+            return Div(Text($"home:{count}"));
+        }
+    }
+
+    private sealed class DetailsRouteComponent : Component
+    {
+        public static int RenderCount { get; private set; }
+
+        public static void Reset()
+        {
+            RenderCount = 0;
+        }
+
+        public override IElement Render()
+        {
+            var (name, _) = useState("details");
+            RenderCount++;
+            return Div(Text(name));
         }
     }
 

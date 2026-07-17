@@ -23,6 +23,7 @@ Do not merge these responsibilities. Renderer patch identity must not decide hoo
 - Keyed moves preserve hook state and should produce `MoveChildPatch` instead of remove/add patches where possible.
 - `Name` remains a virtual-entry key fallback for compatibility. New component and list code should use `.Key("...")`.
 - Keys are scoped to siblings. The same key may be reused under different parents.
+- Routers keep a stable unkeyed virtual root and place route content behind a component host keyed by the route key. Replacing a route must not reuse the previous page's hook identity when different page components occupy the same position.
 - Duplicate component keys never share hook identity. They emit `RuntimeLogKind.DuplicateKey` and fall back to position-based hook identity.
 - Duplicate keys have no state-preservation guarantee across reorder. They should be fixed by the caller.
 
@@ -68,6 +69,7 @@ When changing identity, hooks, lifecycle, or diffing, cover these cases:
 - changing a key produces old cleanup followed by new mount;
 - two navigation hooks in one component remain independent;
 - nested navigation state remains isolated;
+- keyed route replacement gives the new page independent hook state;
 - consecutive functional state updates use the latest state;
 - stale state setters and reducer dispatchers cannot invalidate a replacement that reuses the same string ID;
 - parent disposal cleans keyed descendants;

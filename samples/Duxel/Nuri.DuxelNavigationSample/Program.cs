@@ -44,8 +44,10 @@ internal sealed class NavigationSampleApp : Component
                                 .FontColor("#CBD5E1"))
                         .Spacing(12)
                         .Margin(top: 14, bottom: 18),
-                    Router(
+                    AnimatedRouter(
                         navigation,
+                        TimeSpan.FromMilliseconds(220),
+                        EasingValue.CubicOut,
                         Route("home", () => new HomeScreen(navigator)),
                         Route("details", () => new DetailsScreen(navigator)),
                         Route("settings", () => new SettingsScreen(navigator))))
@@ -191,10 +193,6 @@ internal sealed class ScreenSurface : Component
 
     public override IElement Render()
     {
-        var (entered, setEntered) = useState(false);
-
-        useEffect(() => setEntered(_ => true), []);
-
         return Div(
                 Text(_title)
                     .FontSize(24)
@@ -207,8 +205,6 @@ internal sealed class ScreenSurface : Component
             .Background("#111827")
             .Brush("#334155")
             .Thickness(1)
-            .CornerRadius(14)
-            .Opacity(entered ? 1.0 : 0.05)
-            .Transition(TimeSpan.FromMilliseconds(220), EasingValue.CubicOut);
+            .CornerRadius(14);
     }
 }

@@ -21,6 +21,7 @@ Renderer patch identity가 hook 소유권을 결정하거나 lifecycle 코드가
 - keyed move는 hook state를 유지하며 가능하면 remove/add 대신 `MoveChildPatch`를 생성해야 합니다.
 - `Name`은 호환성을 위한 virtual-entry key fallback으로 유지합니다. 새 코드는 `.Key("...")`를 사용합니다.
 - key는 sibling 범위에서만 유일하면 됩니다.
+- Router는 안정적인 unkeyed virtual root를 유지하고 route key로 keyed된 component host 뒤에 route content를 배치합니다. 서로 다른 page component가 같은 위치를 차지하더라도 route 교체 시 이전 page의 hook identity를 재사용하면 안 됩니다.
 - 중복 component key는 hook identity를 공유하지 않습니다. `RuntimeLogKind.DuplicateKey`를 기록하고 위치 기반 hook identity로 fallback합니다.
 - 중복 key reorder에서는 state 보존을 보장하지 않습니다.
 
@@ -62,6 +63,7 @@ Hook 저장소는 메모리에 유지되는 runtime node를 소유권 key로 사
 - key 변경 시 이전 cleanup 후 새 mount
 - 한 component 안의 navigation hook 격리
 - nested navigation state 격리
+- keyed route 교체 시 새 page가 독립적인 hook state 사용
 - 연속 함수형 state 변경이 최신 값 사용
 - stale state setter와 reducer dispatcher가 동일한 문자열 ID를 재사용한 replacement를 invalidate하지 않음
 - 부모 dispose 시 keyed 자손 cleanup

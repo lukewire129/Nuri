@@ -48,8 +48,9 @@ namespace Nuri.UI.Navigation
 
         private static IElement RenderRoute(RouteDefinition route)
         {
-            var element = route.Render();
-            return Component.Div(DivTypes.Block, element).Key(route.Key);
+            return Component.Div(
+                    DivTypes.Block,
+                    new RouteHost(route).Key(route.Key));
         }
     }
 }
