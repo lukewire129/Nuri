@@ -37,7 +37,6 @@ internal static class Program
             ("runtime theme changes request and apply on the next frame", RuntimeThemeChangesRequestAndApply),
             ("Duxel theme colors use the neutral Background DSL", DuxelThemeColorsUseNeutralBackgroundDsl),
             ("opacity animation requests frames and supports interruption", OpacityAnimationRequestsFramesAndSupportsInterruption),
-            ("animated router isolates keyed route hook state", AnimatedRouterIsolatesKeyedRouteHookState),
             ("standard router projects route-local state updates", StandardRouterProjectsRouteLocalStateUpdates),
             ("diagnostics track Duxel roots and patches", DiagnosticsTrackDuxelRootsAndPatches),
             ("input queue preserves semantic event order", InputQueuePreservesSemanticEventOrder),
@@ -603,30 +602,6 @@ internal static class Program
             "Supported opacity animations must not emit unsupported-property diagnostics.");
     }
 
-    private static void AnimatedRouterIsolatesKeyedRouteHookState()
-    {
-        DetailsRouteComponent.Reset();
-        using var context = CreateContext();
-        var root = new AnimatedNavigationProbe();
-        using var screen = new NuriDuxelScreen(
-            root,
-            () => { },
-            "animated-router-identity-test");
-
-        RenderFrame(context, screen);
-        root.NavigateDetails();
-        RenderFrame(context, screen);
-        RenderFrame(context, screen);
-
-        Thread.Sleep(40);
-        RenderFrame(context, screen);
-        RenderFrame(context, screen);
-
-        AssertTrue(
-            DetailsRouteComponent.RenderCount > 0,
-            "A keyed route replacement must mount the new screen with independent hook state.");
-    }
-
     private static void StandardRouterProjectsRouteLocalStateUpdates()
     {
         RouterCounterPage.Reset();
@@ -1027,30 +1002,6 @@ internal static class Program
         }
     }
 
-    private sealed class AnimatedNavigationProbe : Component
-    {
-        private Navigator? _navigator;
-
-        public void NavigateDetails()
-        {
-            _navigator!.Navigate("details");
-        }
-
-        public override IElement Render()
-        {
-            var (navigation, navigator) = useNavigation("home");
-            _navigator = navigator;
-
-            return Div(
-                AnimatedRouter(
-                    navigation,
-                    TimeSpan.FromMilliseconds(20),
-                    EasingValue.CubicOut,
-                    Route("home", () => new HomeRouteComponent()),
-                    Route("details", () => new DetailsRouteComponent())));
-        }
-    }
-
     private sealed class StandardRouterProbe : Component
     {
         private Navigator? _navigator;
@@ -1112,32 +1063,6 @@ internal static class Program
             var (name, setName) = useState("details");
             UpdateName = value => setName(_ => value);
             LastRenderedName = name;
-            return Div(Text(name));
-        }
-    }
-
-    private sealed class HomeRouteComponent : Component
-    {
-        public override IElement Render()
-        {
-            var (count, _) = useState(0);
-            return Div(Text($"home:{count}"));
-        }
-    }
-
-    private sealed class DetailsRouteComponent : Component
-    {
-        public static int RenderCount { get; private set; }
-
-        public static void Reset()
-        {
-            RenderCount = 0;
-        }
-
-        public override IElement Render()
-        {
-            var (name, _) = useState("details");
-            RenderCount++;
             return Div(Text(name));
         }
     }

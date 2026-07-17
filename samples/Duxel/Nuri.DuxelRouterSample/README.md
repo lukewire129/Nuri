@@ -6,4 +6,4 @@ Run the sample with:
 dotnet run --project "samples\Duxel\Nuri.DuxelRouterSample\Nuri.DuxelRouterSample.csproj" -c Debug
 ```
 
-This sample uses the standard `Router` for immediate route replacement. Compare it with `Nuri.DuxelNavigationSample`, which uses `AnimatedRouter` to fade the current screen out before replacing it and fading the next screen in.
+This sample focuses on the standard `Router` and immediate route replacement with a compact three-screen layout.

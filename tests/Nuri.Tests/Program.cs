@@ -49,7 +49,6 @@ internal static class Program
         MultipleNavigationHooksKeepIndependentState();
         NestedNavigationComponentsKeepIndependentState();
         RouterKeysSelectedRouteHost();
-        AnimatedRouterCompletesExitBeforeRouteReplacement();
         LayoutDistributionDslUsesNeutralProperties();
         GridLengthDslTreatsNumbersAsPixels();
         GridLengthDslParsesStringDefinitions();
@@ -554,73 +553,6 @@ internal static class Program
             "router#key:form",
             rendered.Children.Single().Id,
             "A route host should receive key-derived hook identity instead of reusing its sibling position.");
-    }
-
-    private static void AnimatedRouterCompletesExitBeforeRouteReplacement()
-    {
-        const string componentId = "animated-router";
-        var duration = TimeSpan.FromMilliseconds(80);
-        var invalidationCount = 0;
-
-        void OnAnyStateChanged(object? _, Component component)
-        {
-            if (string.Equals(component.Id, componentId, StringComparison.Ordinal))
-                invalidationCount++;
-        }
-
-        Component.AnyStateChanged += OnAnyStateChanged;
-        try
-        {
-            var initial = RenderAnimatedRouter(componentId, "home", duration);
-            AssertEqual("home", initial.Children.Single().Key, "AnimatedRouter should initially render the selected route.");
-            AssertEqual(1d, (double)initial.Properties["Opacity"], "AnimatedRouter should initially render at full opacity.");
-            Component.FlushPendingEffects();
-
-            var requested = RenderAnimatedRouter(componentId, "details", duration);
-            AssertEqual("home", requested.Children.Single().Key, "AnimatedRouter should retain the previous route before its exit effect runs.");
-            Component.FlushPendingEffects();
-
-            var exiting = RenderAnimatedRouter(componentId, "details", duration);
-            AssertEqual("home", exiting.Children.Single().Key, "AnimatedRouter should retain the previous route during fade-out.");
-            AssertEqual(0d, (double)exiting.Properties["Opacity"], "AnimatedRouter should target zero opacity during fade-out.");
-            Component.FlushPendingEffects();
-
-            AssertEqual(
-                true,
-                System.Threading.SpinWait.SpinUntil(() => invalidationCount >= 2, 2000),
-                "AnimatedRouter should request route replacement after the exit duration.");
-
-            var entering = RenderAnimatedRouter(componentId, "details", duration);
-            AssertEqual("details", entering.Children.Single().Key, "AnimatedRouter should replace the route only after fade-out.");
-            AssertEqual(0d, (double)entering.Properties["Opacity"], "The replacement route should start transparent.");
-            Component.FlushPendingEffects();
-
-            var entered = RenderAnimatedRouter(componentId, "details", duration);
-            AssertEqual("details", entered.Children.Single().Key, "AnimatedRouter should retain the replacement route during fade-in.");
-            AssertEqual(1d, (double)entered.Properties["Opacity"], "The replacement route should target full opacity.");
-            Component.FlushPendingEffects();
-        }
-        finally
-        {
-            Component.AnyStateChanged -= OnAnyStateChanged;
-            Component.DisposeHookState(componentId);
-        }
-    }
-
-    private static IElement RenderAnimatedRouter(string componentId, string route, TimeSpan duration)
-    {
-        var router = Component.AnimatedRouter(
-            new NavigationState(route),
-            duration,
-            EasingValue.CubicOut,
-            Component.Route("home", () => Component.Text("Home")),
-            Component.Route("details", () => Component.Text("Details")));
-        router.Id = componentId;
-        router.ResetStateIndexForRender();
-
-        var rendered = router.Render();
-        router.CompleteRenderHooks();
-        return rendered;
     }
 
     private static void UseStateReusesSetterForStableLogicalComponent()

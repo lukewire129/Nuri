@@ -25,14 +25,7 @@ Runtime identity, key, and required regression-test contracts are defined in [RU
 - `useEffect` with dependencies runs after mount and whenever any dependency changes by `Equals`.
 - Before a changed effect runs again, the previous cleanup runs.
 - `FlushPendingEffects` is called after initial mount, full rebuilds, and successful subtree rebuilds.
-
-## Animated Route Transitions
-
-- `AnimatedRouter(navigation, duration, easing, routes)` keeps the displayed route mounted while its root opacity transitions from `1` to `0`.
-- After `duration`, it replaces the keyed route subtree at opacity `0`, then transitions the replacement from `0` to `1`.
-- The exit and entry phases each use `duration`. Route cleanup therefore runs after the exit phase when the keyed subtree is replaced.
-- A newer navigation request cancels the pending replacement and targets the latest route. Returning to the currently displayed route reverses the exit by targeting opacity `1`.
-- The sequencing is platform-neutral. Each renderer remains responsible for materializing the neutral opacity transition and scheduling animation frames.
+- Route transition sequencing belongs to application components composed from `useState`, `useEffect`, and neutral transitions. `Router` selects keyed route content without prescribing an animation policy.
 
 ## Unmount
 

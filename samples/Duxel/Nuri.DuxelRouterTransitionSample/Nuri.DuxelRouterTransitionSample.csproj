@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\WPF\Nuri.RouterTransitionSample\Components\RouterTransitionComponent.cs" Link="Components\RouterTransitionComponent.cs" />
+    <ProjectReference Include="..\..\..\src\Nuri.Duxel\Nuri.Duxel.Windows\Nuri.Duxel.Windows.csproj" />
+  </ItemGroup>
+
+</Project>

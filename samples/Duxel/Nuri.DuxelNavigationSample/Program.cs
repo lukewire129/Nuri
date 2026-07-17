@@ -3,7 +3,6 @@ using Nuri.Duxel;
 using Nuri.UI.Controls;
 using Nuri.UI.Dsl;
 using Nuri.UI.Navigation;
-using Nuri.UI.Values;
 
 NuriApplication.Run<NavigationSampleApp>(
     title: "Nuri Duxel Navigation",
@@ -44,10 +43,8 @@ internal sealed class NavigationSampleApp : Component
                                 .FontColor("#CBD5E1"))
                         .Spacing(12)
                         .Margin(top: 14, bottom: 18),
-                    AnimatedRouter(
+                    Router(
                         navigation,
-                        TimeSpan.FromMilliseconds(220),
-                        EasingValue.CubicOut,
                         Route("home", () => new HomeScreen(navigator)),
                         Route("details", () => new DetailsScreen(navigator)),
                         Route("settings", () => new SettingsScreen(navigator))))
