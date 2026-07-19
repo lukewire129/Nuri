@@ -117,6 +117,20 @@ Core runtime, 100 measured iterations after 10 warmups:
 | Parent/child invalidation coalescing | 1,000 children | 0.3749 | 226.81 | 1 retained parent invalidation |
 | Effect mount/unmount | 1,000 | 2.1434 | 1895.83 | 1,000 cleanups |
 
+An editor-shaped focused run on 2026-07-19 exposed allocation in unchanged-order keyed reconciliation. An aligned-key fast path now retains existing virtual IDs and diffs children directly, while reordered, added, removed, and duplicate-key cases keep the general reconciliation path.
+
+The WPF phase comparison compiles the same benchmark source once against published Nuri.WPF 0.2.0 and once against the current source. Values below are medians from 5 independent Release processes, each with 30 warmups and 300 measured iterations over 1,000 eager keyed lines. Gen0 is the collection count for all 300 measured iterations.
+
+| Phase | Package 0.2.0 ms / KB / Gen0 | Current source ms / KB / Gen0 | Required result |
+|---|---:|---:|---:|
+| Virtual tree creation | 0.7947 / 695.74 / 25 | 0.7697 / 695.74 / 25 | 1,000 entries |
+| VirtualTreeDiff | 1.3372 / 523.76 / 19 | 0.8431 / 180.98 / 6 | 1 patch |
+| WPF initial build | 6.3666 / 1393.81 / 51 | 6.2872 / 1393.81 / 51 | 1 root |
+| WPF property patch | 0.0003 / 0.04 / 0 | 0.0003 / 0.04 / 0 | 1 patch |
+| Full sequential update | 0.8217 / 1219.54 / 44 | 0.5815 / 876.77 / 32 | 1 patch |
+
+The isolated diff was about 36.9% faster, allocated about 65.4% less, and triggered 68.4% fewer Gen0 collections. The full virtual-tree creation, diff, and WPF patch path was about 29.2% faster, allocated about 28.1% less, and triggered 27.3% fewer Gen0 collections. This supports retaining the fast path. A slower interactive sample result must be investigated above these phases in hook, Dispatcher, effect, layout, or measurement behavior rather than attributed to the aligned-key loop from that observation alone. Nuri.DuxelEditorStressSample keeps the related workload interactive with 100,000 virtual lines.
+
 WPF renderer, 100 measured iterations after 10 warmups:
 
 | Scenario | Size | Mean ms | Alloc KB | Required patch count |

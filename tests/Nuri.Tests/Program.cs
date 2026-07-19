@@ -19,6 +19,7 @@ internal static class Program
     private static void Main()
     {
         KeyedReorderPreservesPatchTargetIdentity();
+        AlignedKeyedChildrenPreserveIdentityAndPatchOnlyChanges();
         KeyedSlidingWindowPreservesRetainedChildIdentities();
         SubtreeRebuildPreservesRenderedDescendantIdentities();
         UseReducerDispatchesFromCurrentState();
@@ -276,6 +277,29 @@ internal static class Program
         AssertNotEqual(oldAId, selectedPatch.Target.Id, "Keyed reorder must not update the row currently at B's new position.");
         AssertEqual(oldBId, newTree.Children[0].Id, "New B entry should inherit old B id.");
         AssertEqual(oldAId, newTree.Children[1].Id, "New A entry should inherit old A id.");
+    }
+
+    private static void AlignedKeyedChildrenPreserveIdentityAndPatchOnlyChanges()
+    {
+        var oldTree = Parent(
+                Row("a", selected: false),
+                Row("b", selected: false),
+                Row("c", selected: false))
+            .WithIdentity("root", null);
+        var oldIds = oldTree.Children.Select(child => child.Id).ToArray();
+
+        var newTree = Parent(
+                Row("a", selected: false),
+                Row("b", selected: true),
+                Row("c", selected: false))
+            .WithIdentity("root", null);
+
+        var operations = VirtualTreeDiff.Diff(oldTree, newTree);
+
+        AssertEqual(1, operations.Count, "Aligned keyed children should patch only the changed row.");
+        AssertEqual(1, operations.OfType<UpdatePropertyPatch>().Count(), "The aligned keyed update should remain a property patch.");
+        for (var index = 0; index < oldIds.Length; index++)
+            AssertEqual(oldIds[index], newTree.Children[index].Id, "Aligned keyed children should retain their previous identities.");
     }
 
     private static void KeyedSlidingWindowPreservesRetainedChildIdentities()

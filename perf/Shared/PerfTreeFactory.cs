@@ -28,6 +28,35 @@ internal static class PerfTreeFactory
         return (CreateTodoRoot(oldItems), CreateTodoRoot(newItems));
     }
 
+    public static (VirtualEntry Old, VirtualEntry New) CreateEditorTree(int size, bool editLine)
+    {
+        var oldLines = Enumerable.Range(0, size).Select(index => CreateEditorLine(index, false)).ToArray();
+        var newLines = Enumerable.Range(0, size).Select(index => CreateEditorLine(index, editLine && index == size / 2)).ToArray();
+        return (CreateEditorRoot(oldLines, size), CreateEditorRoot(newLines, size));
+    }
+
+    private static VirtualEntry CreateEditorRoot(IEnumerable<VirtualEntry> lines, int documentSize)
+    {
+        var viewport = new VirtualEntry(VirtualControlTypes.Div, kind: DivTypes.Column, children: lines)
+            .WithIdentity("editor-viewport", null);
+        return new VirtualEntry(VirtualControlTypes.Div, kind: DivTypes.Column, children: new[]
+        {
+            new VirtualEntry(VirtualControlTypes.Text, properties: new[] { KeyValuePair.Create<string, object?>("Text", "Nuri Editor Stress") }),
+            new VirtualEntry(VirtualControlTypes.Text, properties: new[] { KeyValuePair.Create<string, object?>("Text", $"{documentSize:N0} visible lines") }),
+            viewport,
+            new VirtualEntry(VirtualControlTypes.Text, properties: new[] { KeyValuePair.Create<string, object?>("Text", "Ln 1, Col 1 | UTF-8 | Ready") })
+        }).WithIdentity("editor-root", null);
+    }
+
+    private static VirtualEntry CreateEditorLine(int index, bool edited)
+    {
+        return new VirtualEntry(VirtualControlTypes.Text, key: $"line-{index}", properties: new[]
+        {
+            KeyValuePair.Create<string, object?>("Text", edited ? $"{index + 1,5}  // edited line {index}" : $"{index + 1,5}  let value_{index} = compute({index});"),
+            KeyValuePair.Create<string, object?>("Tag", index)
+        });
+    }
+
     private static VirtualEntry CreateTodoRoot(IEnumerable<VirtualEntry> items)
     {
         var list = new VirtualEntry(

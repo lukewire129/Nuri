@@ -31,6 +31,7 @@ Duxel is the next UI backend development priority. Keep existing Avalonia sample
 - `Nuri.StoreSample`: shared store subscriptions and updates
 - `Nuri.AsyncLoadingSample`: effect-driven asynchronous loading
 - `Nuri.LargeListSample`: larger keyed-list rendering
+- `Nuri.WPFEditorStressComparison`: side-by-side WPF executables sharing one 1,000-line eager keyed editor component; one references NuGet Nuri.WPF 0.2.0 and the other references the current source project
 - `Nuri.DevToolsSample`: runtime diagnostics and developer tooling
 - `Nuri.ExplorerTreeSample`: recursive keyed folders/files with expand, selection, rename, add/delete, and lifecycle cleanup
 - `Nuri.AnimatedDashboardSample`: shared WPF/Avalonia/Duxel opacity transition and interruption baseline
@@ -39,6 +40,7 @@ Duxel is the next UI backend development priority. Keep existing Avalonia sample
 - `Nuri.DuxelSample`: Duxel immediate-mode hook state, Hot Reload, neutral events, nested Grid tracks, Scroll, sizing, spacing, and text-style smoke test
 - `Nuri.DuxelThemeGallerySample`: runtime Duxel theme switching across the currently materialized text, button, input, selection, Grid, and Scroll controls
 - `Nuri.DuxelExplorerTreeSample`: the WPF Explorer component sources projected through the Duxel host, including keyed subtree state, effect cleanup, work-area sizing, ordered wheel routing, and independent Nuri-owned tree/detail Scroll regions
+- `Nuri.DuxelEditorStressSample`: a 100,000-line editor-shaped Duxel workload with virtualized projection, single-line edits, adjacent keyed swaps, filtering, patch counts, and projected-row diagnostics
 - `Nuri.DuxelAnimatedDashboardSample`: the shared scrollable Animated Dashboard projected through Duxel `AnimateFloat` opacity tracks and constrained to the viewport work area
 - `Nuri.MultiWindowSample`: WPF root registration, local state isolation, shared Store updates, and per-window lifecycle cleanup
 

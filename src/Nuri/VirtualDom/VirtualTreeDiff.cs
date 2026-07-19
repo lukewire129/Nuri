@@ -168,6 +168,9 @@ namespace Nuri.VirtualDom
 
         private static void DiffChildren(VirtualEntry oldEntry, VirtualEntry newEntry, List<PatchOperation> operations)
         {
+            if (TryDiffAlignedKeyedChildren(oldEntry, newEntry, operations))
+                return;
+
             if (CanUseKeyedDiff(oldEntry.Children, oldEntry) && CanUseKeyedDiff(newEntry.Children, newEntry))
             {
                 DiffKeyedChildren(oldEntry, newEntry, operations);
@@ -192,6 +195,46 @@ namespace Nuri.VirtualDom
 
                 DiffInto(oldEntry.Children[index], newEntry.Children[index], operations);
             }
+        }
+
+        private static bool TryDiffAlignedKeyedChildren(
+            VirtualEntry oldEntry,
+            VirtualEntry newEntry,
+            List<PatchOperation> operations)
+        {
+            if (oldEntry.Children.Count == 0 || oldEntry.Children.Count != newEntry.Children.Count)
+                return false;
+
+            for (var index = 0; index < oldEntry.Children.Count; index++)
+            {
+                var oldKey = oldEntry.Children[index].Key;
+                var newKey = newEntry.Children[index].Key;
+                if (string.IsNullOrEmpty(oldKey)
+                    || !string.Equals(oldKey, newKey, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+
+            var keys = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var child in oldEntry.Children)
+            {
+                if (!keys.Add(child.Key!))
+                {
+                    Debug.WriteLine($"Duplicate virtual key '{child.Key}' under parent '{oldEntry.Id}'. Falling back to index-based diff.");
+                    return false;
+                }
+            }
+
+            for (var index = 0; index < oldEntry.Children.Count; index++)
+            {
+                var oldChild = oldEntry.Children[index];
+                var newChild = newEntry.Children[index];
+                newChild.RewriteIdentity(oldChild.Id, oldChild.ParentId);
+                DiffInto(oldChild, newChild, operations);
+            }
+
+            return true;
         }
 
         private static bool CanUseKeyedDiff(IReadOnlyList<VirtualEntry> children, VirtualEntry parent)

@@ -25,6 +25,8 @@ internal static class Program
             new Scenario("Keyed reorder next frame", () => PerfTreeFactory.CreateReorderedTree(size), true),
             new Scenario("Todo screen initial frame", () => PerfTreeFactory.CreateTodoTree(size, false), false),
             new Scenario("Todo screen keyed reorder next frame", () => PerfTreeFactory.CreateTodoTree(size, true), true),
+            new Scenario("Editor viewport initial frame", () => PerfTreeFactory.CreateEditorTree(size, false), false),
+            new Scenario("Editor viewport single-line edit", () => PerfTreeFactory.CreateEditorTree(size, true), true),
         };
 
         var results = new List<Result>();

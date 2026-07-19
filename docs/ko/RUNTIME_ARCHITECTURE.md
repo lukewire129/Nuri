@@ -117,6 +117,20 @@ Core runtime, warmup 10회 이후 100회 측정:
 | 부모/자식 invalidation 병합 | 자식 1,000개 | 0.3749 | 226.81 | 부모 invalidation 1개 |
 | Effect mount/unmount | 1,000 | 2.1434 | 1895.83 | cleanup 1,000개 |
 
+2026-07-19 editor-shaped 집중 측정에서 순서가 바뀌지 않은 keyed reconciliation의 할당이 드러났습니다. Aligned-key fast path는 이제 기존 virtual ID를 유지하고 child를 직접 diff하며, reorder, add, remove 및 duplicate-key case는 일반 reconciliation 경로를 유지합니다.
+
+WPF phase comparison은 동일한 benchmark source를 published Nuri.WPF 0.2.0과 현재 source에 각각 compile합니다. 아래 값은 독립 Release process 5개의 중앙값이며, 각 process는 1,000개 eager keyed line에 대해 warmup 30회와 측정 300회를 수행했습니다. Gen0는 측정 300회 전체의 collection count입니다.
+
+| Phase | Package 0.2.0 ms / KB / Gen0 | 현재 source ms / KB / Gen0 | 필수 결과 |
+|---|---:|---:|---:|
+| Virtual tree creation | 0.7947 / 695.74 / 25 | 0.7697 / 695.74 / 25 | entry 1,000개 |
+| VirtualTreeDiff | 1.3372 / 523.76 / 19 | 0.8431 / 180.98 / 6 | patch 1개 |
+| WPF initial build | 6.3666 / 1393.81 / 51 | 6.2872 / 1393.81 / 51 | root 1개 |
+| WPF property patch | 0.0003 / 0.04 / 0 | 0.0003 / 0.04 / 0 | patch 1개 |
+| Full sequential update | 0.8217 / 1219.54 / 44 | 0.5815 / 876.77 / 32 | patch 1개 |
+
+Isolated diff는 약 36.9% 빨라졌고 할당은 약 65.4%, Gen0 collection은 68.4% 감소했습니다. Virtual-tree creation, diff 및 WPF patch를 포함한 full path는 약 29.2% 빨라졌고 할당은 약 28.1%, Gen0 collection은 27.3% 감소했습니다. 이 결과는 fast path 유지를 뒷받침합니다. Interactive sample이 느리게 나온다면 그 관찰만으로 aligned-key loop를 원인으로 보지 않고 hook, Dispatcher, effect, layout 또는 measurement처럼 이 phase보다 위의 경로를 조사해야 합니다. Nuri.DuxelEditorStressSample은 관련 workload를 100,000개 virtual line으로 interactive하게 유지합니다.
+
 WPF renderer, warmup 10회 이후 100회 측정:
 
 | 시나리오 | 크기 | 평균 ms | 할당 KB | 필수 patch 수 |

@@ -16,6 +16,8 @@ var sustainedWarmup = GetIntOption(args, "--sustained-warmup", 10_000);
 var scenarios = new[]
 {
     CreateKeyedReorderScenario(size),
+    CreateEditorScenario(size, editLine: false),
+    CreateEditorScenario(size, editLine: true),
     CreateVirtualizedUpdateScenario(10_000),
     CreateVirtualizedUpdateScenario(100_000),
     CreateHookRenderScenario(1),
@@ -158,6 +160,16 @@ static Scenario CreateVirtualizedUpdateScenario(int size)
             var patch = VirtualTreeDiff.Diff(oldTree, newTree).OfType<UpdateVirtualizedItemsPatch>().Single();
             return patch.Changes.Count;
         },
+        () => { });
+}
+
+static Scenario CreateEditorScenario(int size, bool editLine)
+{
+    var trees = PerfTreeFactory.CreateEditorTree(size, editLine);
+    return new Scenario(
+        editLine ? "Editor viewport single-line edit" : "Editor viewport stable diff",
+        size,
+        () => VirtualTreeDiff.Diff(trees.Old, trees.New).Count,
         () => { });
 }
 
