@@ -7,7 +7,8 @@ const repositoryDirectory = path.resolve(extensionDirectory, "..", "..");
 const hosts = [
   {
     project: path.join(repositoryDirectory, "src", "Nuri.WPF.PreviewHost", "Nuri.WPF.PreviewHost.csproj"),
-    output: path.join(repositoryDirectory, "src", "Nuri.WPF.PreviewHost", "bin", "Release", "net8.0-windows"),
+    outputRoot: path.join(repositoryDirectory, "src", "Nuri.WPF.PreviewHost", "bin", "Release"),
+    targetFrameworks: ["net8.0-windows", "net9.0-windows"],
     destination: path.join(extensionDirectory, "preview-host"),
   },
   {
@@ -18,15 +19,15 @@ const hosts = [
       "Nuri.Duxel.PreviewHost",
       "Nuri.Duxel.PreviewHost.csproj"
     ),
-    output: path.join(
+    outputRoot: path.join(
       repositoryDirectory,
       "src",
       "Nuri.Duxel",
       "Nuri.Duxel.PreviewHost",
       "bin",
-      "Release",
-      "net9.0-windows"
+      "Release"
     ),
+    targetFrameworks: ["net8.0-windows", "net9.0-windows"],
     destination: path.join(extensionDirectory, "duxel-preview-host"),
   },
 ];
@@ -50,10 +51,16 @@ for (const host of hosts) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 
   fs.rmSync(host.destination, { recursive: true, force: true });
-  fs.cpSync(host.output, host.destination, {
-    recursive: true,
-    filter: (source) =>
-      !source.toLowerCase().endsWith(".pdb") &&
-      !source.toLowerCase().endsWith(".resources.dll"),
-  });
+  for (const targetFramework of host.targetFrameworks) {
+    fs.cpSync(
+      path.join(host.outputRoot, targetFramework),
+      path.join(host.destination, targetFramework),
+      {
+        recursive: true,
+        filter: (source) =>
+          !source.toLowerCase().endsWith(".pdb") &&
+          !source.toLowerCase().endsWith(".resources.dll"),
+      }
+    );
+  }
 }

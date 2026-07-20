@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Forms.Integration;
 using System.Windows.Media;
 using EnvDTE;
@@ -22,6 +23,7 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
 {
     private readonly TextBlock _statusText = new TextBlock();
     private readonly TextBlock _zoomText = new TextBlock { Text = "100%" };
+    private readonly RichTextBox _logText = new RichTextBox();
     private readonly WinForms.Panel _hostPanel = new WinForms.Panel
     {
         Dock = WinForms.DockStyle.Fill,
@@ -34,6 +36,7 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
     private string? _commandFilePath;
     private string? _statusFilePath;
     private string? _startupProjectDirectory;
+    private string? _lastHostStatusMessage;
     private bool _previewOwnsEmbeddedLayout;
     private int _zoomPercent = 100;
     private const int MinimumZoomPercent = 25;
@@ -113,7 +116,31 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
         _statusText.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
         toolbar.Children.Add(_statusText);
 
-        
+        _logText.IsReadOnly = true;
+        _logText.IsReadOnlyCaretVisible = true;
+        _logText.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
+        _logText.HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled;
+        _logText.Background = new SolidColorBrush(Color.FromRgb(30, 30, 30));
+        _logText.Foreground = Brushes.White;
+        _logText.BorderThickness = new Thickness(0);
+        _logText.Padding = new Thickness(6, 4, 6, 4);
+        _logText.FontFamily = new FontFamily("Consolas");
+        _logText.FontSize = 12;
+        _logText.Document = new FlowDocument
+        {
+            PagePadding = new Thickness(0)
+        };
+
+        var logBorder = new Border
+        {
+            Height = 140,
+            Background = _logText.Background,
+            BorderBrush = new SolidColorBrush(Color.FromRgb(70, 70, 74)),
+            BorderThickness = new Thickness(0, 1, 0, 0),
+            Child = _logText
+        };
+        DockPanel.SetDock(logBorder, Dock.Bottom);
+
         var formsHost = new WindowsFormsHost
         {
             Child = _hostPanel,
@@ -122,8 +149,11 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
         _hostPanel.Resize += (_, _) => UpdateEmbeddedWindowLayout();
 
         root.Children.Add(toolbar);
+        root.Children.Add(logBorder);
         root.Children.Add(formsHost);
         Content = root;
+
+        AppendLog(_statusText.Text, isError: false);
 
         Unloaded += (_, _) =>
         {
@@ -187,7 +217,7 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
         var dte = await package.GetServiceAsync(typeof(DTE)) as DTE2;
         if (dte == null)
         {
-            SetStatus("Visual Studio automation service is unavailable.");
+            SetStatus("Visual Studio automation service is unavailable.", isError: true);
             return;
         }
 
@@ -201,15 +231,19 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
         var hostSelection = PreviewHostCatalog.Select(projectPath!);
         if (hostSelection.Host == null)
         {
-            SetStatus(hostSelection.ErrorMessage ?? "No supported Nuri preview renderer was detected.");
+            SetStatus(
+                hostSelection.ErrorMessage ?? "No supported Nuri preview renderer was detected.",
+                isError: true);
             return;
         }
 
         var previewHost = hostSelection.Host;
-        var previewHostPath = ResolvePreviewHostPath(dte, previewHost);
+        var previewHostPath = ResolvePreviewHostPath(dte, previewHost, projectPath!);
         if (string.IsNullOrWhiteSpace(previewHostPath))
         {
-            SetStatus("Build " + previewHost.ExecutableName + " first, then open Nuri Preview again.");
+            SetStatus(
+                "Build " + previewHost.ExecutableName + " first, then open Nuri Preview again.",
+                isError: true);
             return;
         }
 
@@ -293,13 +327,13 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
         }
         catch (Exception ex)
         {
-            SetStatus("Failed to start PreviewHost: " + ex.Message);
+            SetStatus("Failed to start PreviewHost: " + ex.Message, isError: true);
             return;
         }
 
         if (_previewProcess == null)
         {
-            SetStatus("Failed to start PreviewHost.");
+            SetStatus("Failed to start PreviewHost.", isError: true);
             return;
         }
 
@@ -324,7 +358,7 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
             }
 
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-            SetStatus("PreviewHost started, but no window handle was found.");
+            SetStatus("PreviewHost started, but no window handle was found.", isError: true);
         }).FileAndForget("NuriPreview/AttachPreviewHost");
     }
 
@@ -379,6 +413,7 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
 
         _previewWindowHandle = IntPtr.Zero;
         _previewOwnsEmbeddedLayout = false;
+        _lastHostStatusMessage = null;
         _statusWatcher?.Dispose();
         _statusWatcher = null;
         UnsubscribeDocumentEvents();
@@ -534,17 +569,58 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
         if (string.IsNullOrWhiteSpace(message))
             return;
 
-        var statusMessage = message ?? string.Empty;
+        var statusMessage = (message ?? string.Empty).TrimEnd();
         await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-        SetStatus(statusMessage.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)[0]);
+        if (string.Equals(statusMessage, _lastHostStatusMessage, StringComparison.Ordinal))
+            return;
+
+        _lastHostStatusMessage = statusMessage;
+        var firstLine = statusMessage.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None)[0];
+        SetStatus(firstLine, IsErrorStatus(firstLine), statusMessage);
     }
 
-    private void SetStatus(string message)
+    private void SetStatus(string message, bool isError = false, string? logMessage = null)
     {
         ThreadHelper.ThrowIfNotOnUIThread();
         _statusText.Text = message;
         UpdateZoomTextFromStatus(message);
-        (PackageProvider.Package as NuriPreviewPackage)?.WriteLine(message);
+        var output = logMessage ?? message;
+        AppendLog(output, isError);
+        (PackageProvider.Package as NuriPreviewPackage)?.WriteLine(output);
+    }
+
+    private void AppendLog(string message, bool isError)
+    {
+        ThreadHelper.ThrowIfNotOnUIThread();
+        if (string.IsNullOrWhiteSpace(message))
+            return;
+
+        var paragraph = new Paragraph(new Run(message))
+        {
+            Foreground = isError
+                ? new SolidColorBrush(Color.FromRgb(255, 96, 96))
+                : Brushes.White,
+            Margin = new Thickness(0, 0, 0, 3)
+        };
+        _logText.Document.Blocks.Add(paragraph);
+        while (_logText.Document.Blocks.Count > 500)
+        {
+            var firstBlock = _logText.Document.Blocks.FirstBlock;
+            if (firstBlock == null)
+                break;
+
+            _logText.Document.Blocks.Remove(firstBlock);
+        }
+
+        _logText.ScrollToEnd();
+    }
+
+    private static bool IsErrorStatus(string message)
+    {
+        return message.IndexOf("error", StringComparison.OrdinalIgnoreCase) >= 0
+            || message.IndexOf("failed", StringComparison.OrdinalIgnoreCase) >= 0
+            || message.IndexOf("exception", StringComparison.OrdinalIgnoreCase) >= 0
+            || message.IndexOf("not found", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     private void UpdateZoomTextFromStatus(string message)
@@ -670,18 +746,34 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
         return null;
     }
 
-    private static string? ResolvePreviewHostPath(DTE2 dte, PreviewHostDefinition host)
+    private static string? ResolvePreviewHostPath(
+        DTE2 dte,
+        PreviewHostDefinition host,
+        string projectPath)
     {
         ThreadHelper.ThrowIfNotOnUIThread();
+        var targetFrameworkDirectories = PreviewTargetFrameworkDiscovery.OrderDirectories(
+            projectPath,
+            host.TargetFrameworkDirectories);
 
         var extensionDirectory = Path.GetDirectoryName(typeof(NuriPreviewControl).Assembly.Location);
         if (!string.IsNullOrWhiteSpace(extensionDirectory))
         {
-            var installedHost = Path.Combine(
-                extensionDirectory,
-                host.InstalledDirectoryName,
-                host.ExecutableName);
-            if (File.Exists(installedHost))
+            var installedHost = targetFrameworkDirectories
+                .Select(targetFramework => Path.Combine(
+                    extensionDirectory,
+                    host.InstalledDirectoryName,
+                    targetFramework,
+                    host.ExecutableName))
+                .Concat(new[]
+                {
+                    Path.Combine(
+                        extensionDirectory,
+                        host.InstalledDirectoryName,
+                        host.ExecutableName)
+                })
+                .FirstOrDefault(File.Exists);
+            if (!string.IsNullOrWhiteSpace(installedHost))
                 return installedHost;
         }
 
@@ -695,7 +787,7 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
 
         var configurations = new[] { "Debug", "Release" };
         var candidates = configurations
-            .SelectMany(configuration => host.TargetFrameworkDirectories.Select(targetFramework =>
+            .SelectMany(configuration => targetFrameworkDirectories.Select(targetFramework =>
                 Path.Combine(
                     solutionDirectory,
                     "src",

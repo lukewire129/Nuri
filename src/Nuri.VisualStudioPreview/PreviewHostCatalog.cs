@@ -129,6 +129,64 @@ internal sealed class PreviewHostSelection
     }
 }
 
+internal static class PreviewTargetFrameworkDiscovery
+{
+    public static IReadOnlyList<string> OrderDirectories(
+        string projectPath,
+        IReadOnlyList<string> candidates)
+    {
+        var preferred = DetectDirectory(projectPath);
+        if (preferred == null || !candidates.Contains(preferred, StringComparer.OrdinalIgnoreCase))
+            return candidates;
+
+        return candidates
+            .OrderBy(candidate => string.Equals(candidate, preferred, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ToArray();
+    }
+
+    private static string? DetectDirectory(string projectPath)
+    {
+        try
+        {
+            var document = XDocument.Load(projectPath);
+            var targetFramework = ReadProperty(document, "TargetFramework");
+            if (string.IsNullOrWhiteSpace(targetFramework))
+            {
+                targetFramework = ReadProperty(document, "TargetFrameworks")
+                    .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(value => value.Trim())
+                    .FirstOrDefault();
+            }
+
+            if (targetFramework == null)
+                return null;
+
+            if (targetFramework.StartsWith("net9.0", StringComparison.OrdinalIgnoreCase))
+                return "net9.0-windows";
+            if (targetFramework.StartsWith("net8.0", StringComparison.OrdinalIgnoreCase))
+                return "net8.0-windows";
+        }
+        catch (Exception)
+        {
+        }
+
+        return null;
+    }
+
+    private static string ReadProperty(XDocument document, string name)
+    {
+        return document
+            .Descendants()
+            .FirstOrDefault(element => string.Equals(
+                element.Name.LocalName,
+                name,
+                StringComparison.OrdinalIgnoreCase))
+            ?.Value
+            ?.Trim()
+            ?? string.Empty;
+    }
+}
+
 internal static class PreviewProjectReferenceGraph
 {
     public static bool DirectlyReferencesAny(string projectPath, IReadOnlyList<string> referenceNames)

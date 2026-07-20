@@ -43,6 +43,7 @@ internal static class Program
             ("implicit grid row fills its arranged height", ImplicitGridRowFillsArrangedHeight),
             ("measured auto row reduces remaining star height", MeasuredAutoRowReducesRemainingStarHeight),
             ("dirty state requests and projects a frame", DirtyStateRequestsAndProjectsFrame),
+            ("frame request projects without rebuilding components", FrameRequestProjectsWithoutRebuildingComponents),
             ("full rebuild requests and projects a frame", FullRebuildRequestsAndProjectsFrame),
             ("root replacement preserves or resets state", RootReplacementPreservesOrResetsState),
             ("runtime theme changes request and apply on the next frame", RuntimeThemeChangesRequestAndApply),
@@ -686,6 +687,30 @@ internal static class Program
             2,
             ProbeComponent.Log.Count(item => item == "render:1"),
             "A requested full rebuild must invoke the root component again while preserving state.");
+    }
+
+    private static void FrameRequestProjectsWithoutRebuildingComponents()
+    {
+        ProbeComponent.Reset();
+        using var context = CreateContext();
+        var requestedFrames = 0;
+        using var screen = new NuriDuxelScreen(
+            new ProbeComponent(),
+            () => requestedFrames++,
+            "frame-request-test");
+
+        RenderFrame(context, screen);
+        requestedFrames = 0;
+        var renderCount = ProbeComponent.Log.Count(item => item.StartsWith("render:", StringComparison.Ordinal));
+
+        screen.RequestFrame();
+        AssertEqual(1, requestedFrames, "A projection-only refresh must request a Duxel frame.");
+
+        RenderFrame(context, screen);
+        AssertEqual(
+            renderCount,
+            ProbeComponent.Log.Count(item => item.StartsWith("render:", StringComparison.Ordinal)),
+            "A projection-only refresh must not rebuild the committed component tree.");
     }
 
     private static void RootReplacementPreservesOrResetsState()

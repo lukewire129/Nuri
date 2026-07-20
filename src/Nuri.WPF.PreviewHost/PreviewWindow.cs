@@ -524,7 +524,7 @@ internal sealed class PreviewWindow : Window
                 ReportStatus(
                     "Preview build failed." + Environment.NewLine + result.Log,
                     hasError: true);
-                ShowMessage("Preview build failed." + Environment.NewLine + result.Log);
+                ShowErrorMessage("Preview build failed." + Environment.NewLine + result.Log);
                 return;
             }
 
@@ -535,7 +535,7 @@ internal sealed class PreviewWindow : Window
         catch (Exception ex)
         {
             ReportStatus(ex.ToString(), hasError: true);
-            ShowMessage(ex.ToString());
+            ShowErrorMessage(ex.ToString());
         }
         finally
         {
@@ -652,6 +652,13 @@ internal sealed class PreviewWindow : Window
             TextWrapping = TextWrapping.Wrap
         };
         _captureServer?.RequestCapture();
+    }
+
+    private void ShowErrorMessage(string message)
+    {
+        ShowMessage(_options.Embedded
+            ? "Preview unavailable. See the error log below."
+            : message);
     }
 
     private PreviewCaptureStatus GetCaptureStatus()

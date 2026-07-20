@@ -41,6 +41,10 @@ As of 2026-07-15, Duxel is the next UI backend development priority. Avalonia re
 
 Duxel development must preserve Core neutrality. The physical and solution folder `Nuri.Duxel` contains three projects: `src/Nuri.Duxel/Nuri.Duxel` owns immediate-mode frame projection and Duxel-specific property, event, and animation materialization, `src/Nuri.Duxel/Nuri.Duxel.Windows` owns Windows application and frame-loop integration, and `src/Nuri.Duxel/Nuri.Duxel.PreviewHost` owns the out-of-process Visual Studio/VS Code preview host. None of these projects may reshape Core around retained native-control assumptions. The preview extensions select WPF or Duxel from the selected project's transitive references; a project that references both renderers is rejected as ambiguous. The Visual Studio VSIX and VS Code prepublish output both package the WPF and Duxel hosts.
 
+The WPF and Duxel preview hosts both target `net8.0-windows` and `net9.0-windows`. Visual Studio and VS Code package all four host outputs and prefer the host matching the preview project's first declared target framework, while retaining the other version as a fallback.
+
+Duxel preview resize and zoom changes request a projection frame without rebuilding the committed Nuri virtual tree. Full rebuilds remain reserved for source or metadata updates that can change component output.
+
 ## Current Runtime Shape
 
 Runtime tree nodes are persistent in-memory identities. State, reducer, ref, memo, effect, and store hook data use runtime node references as ownership keys.

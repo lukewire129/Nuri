@@ -375,7 +375,7 @@ internal sealed class DuxelPreviewSession : IDisposable
             : GetContentScale();
         Volatile.Write(ref _previewScale, scale);
         _nativeWindow.ApplyPreviewScale(scale, PreviewWidth, PreviewHeight);
-        _screen?.RequestFullRebuild();
+        _screen?.RequestFrame();
         _captureServer?.RequestCapture();
         ReportStatus(_fitToWindow
             ? $"Preview zoom: Fit ({scale:P0})"

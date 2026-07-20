@@ -14,7 +14,7 @@ const previewRenderers = {
     executableName: "Nuri.Duxel.PreviewHost.exe",
     installedDirectoryName: "duxel-preview-host",
     sourceProjectParts: ["src", "Nuri.Duxel", "Nuri.Duxel.PreviewHost"],
-    targetFrameworks: ["net9.0-windows"],
+    targetFrameworks: ["net8.0-windows", "net9.0-windows"],
   },
   wpf: {
     id: "wpf",
@@ -94,7 +94,7 @@ async function startPreview() {
   }
 
   const renderer = rendererSelection.renderer;
-  const previewHostPath = resolvePreviewHostPath(contextOrThrow(), renderer);
+  const previewHostPath = resolvePreviewHostPath(contextOrThrow(), renderer, projectPath);
   if (!previewHostPath) {
     vscode.window.showErrorMessage(
       `${renderer.executableName} was not found. Build the preview host or set nuri.preview.previewHostPath.`
@@ -357,20 +357,32 @@ function collectProjectSourceFiles(projectDirectory) {
   return sourceFiles;
 }
 
-function resolvePreviewHostPath(context, renderer) {
+function resolvePreviewHostPath(context, renderer, projectPath) {
   const configuredPath = vscode.workspace
     .getConfiguration("nuri.preview")
     .get("previewHostPath", "")
     .trim();
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  const candidates = [
-    configuredPath,
-    path.join(context.extensionPath, renderer.installedDirectoryName, renderer.executableName),
-  ];
+  const targetFrameworks = orderTargetFrameworks(projectPath, renderer.targetFrameworks);
+  const candidates = [configuredPath];
+
+  for (const targetFramework of targetFrameworks) {
+    candidates.push(
+      path.join(
+        context.extensionPath,
+        renderer.installedDirectoryName,
+        targetFramework,
+        renderer.executableName
+      )
+    );
+  }
+  candidates.push(
+    path.join(context.extensionPath, renderer.installedDirectoryName, renderer.executableName)
+  );
 
   if (workspaceRoot) {
     for (const configuration of ["Release", "Debug"]) {
-      for (const targetFramework of renderer.targetFrameworks) {
+      for (const targetFramework of targetFrameworks) {
         candidates.push(
           path.join(
             workspaceRoot,
@@ -388,6 +400,27 @@ function resolvePreviewHostPath(context, renderer) {
   return candidates
     .filter((candidate) => candidate && path.isAbsolute(candidate))
     .find((candidate) => fs.existsSync(candidate));
+}
+
+function orderTargetFrameworks(projectPath, candidates) {
+  let projectText;
+  try {
+    projectText = fs.readFileSync(projectPath, "utf8");
+  } catch {
+    return candidates;
+  }
+
+  const singleTarget = /<TargetFramework\b[^>]*>([^<]+)<\/TargetFramework>/i.exec(projectText)?.[1];
+  const multipleTargets = /<TargetFrameworks\b[^>]*>([^<]+)<\/TargetFrameworks>/i.exec(projectText)?.[1];
+  const targetFramework = (singleTarget || multipleTargets?.split(";", 1)[0] || "").trim();
+  const preferred = /^net9\.0(?:-|$)/i.test(targetFramework)
+    ? "net9.0-windows"
+    : /^net8\.0(?:-|$)/i.test(targetFramework)
+      ? "net8.0-windows"
+      : undefined;
+  if (!preferred || !candidates.includes(preferred)) return candidates;
+
+  return [preferred, ...candidates.filter((candidate) => candidate !== preferred)];
 }
 
 async function waitForConnectionFile(connectionFilePath, timeoutMilliseconds) {

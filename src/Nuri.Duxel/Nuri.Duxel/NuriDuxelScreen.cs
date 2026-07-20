@@ -238,6 +238,16 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
         _requestFrame();
     }
 
+    public void RequestFrame()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _requestFrame();
+    }
+
     public void ReplaceRoot(IElement rootElement, bool resetState = false)
     {
         ArgumentNullException.ThrowIfNull(rootElement);

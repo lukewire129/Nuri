@@ -41,6 +41,10 @@ WPF Dispatcher, Duxel frame scheduling 및 향후 renderer scheduler는 renderer
 
 Duxel 개발에서도 Core 중립성을 유지해야 합니다. 물리 및 solution folder인 `Nuri.Duxel` 아래에는 세 project를 둡니다. `src/Nuri.Duxel/Nuri.Duxel`은 immediate-mode frame projection과 Duxel 전용 property, event, animation materialization을 소유하고, `src/Nuri.Duxel/Nuri.Duxel.Windows`는 Windows application 및 frame-loop integration을 소유하며, `src/Nuri.Duxel/Nuri.Duxel.PreviewHost`는 out-of-process Visual Studio/VS Code preview host를 소유합니다. 어느 project도 retained native-control 가정을 중심으로 Core 구조를 바꾸면 안 됩니다. Preview extension은 선택한 project의 transitive reference에서 WPF 또는 Duxel을 선택하며, 두 renderer를 모두 참조하는 project는 모호하므로 거부합니다. Visual Studio VSIX와 VS Code prepublish output은 모두 WPF 및 Duxel host를 package합니다.
 
+WPF 및 Duxel preview host는 모두 `net8.0-windows`와 `net9.0-windows`를 target으로 합니다. Visual Studio와 VS Code는 네 host output을 모두 package하고 preview project에 첫 번째로 선언된 target framework와 일치하는 host를 우선 선택하며, 다른 version은 fallback으로 유지합니다.
+
+Duxel preview의 resize 및 zoom 변경은 commit된 Nuri virtual tree를 rebuild하지 않고 projection frame만 요청합니다. Full rebuild는 component output을 바꿀 수 있는 source 또는 metadata update에만 사용합니다.
+
 ## 현재 Runtime 구조
 
 Runtime tree node는 메모리에 유지되는 identity입니다. state, reducer, ref, memo, effect, store hook 데이터는 runtime node reference를 소유권 key로 사용합니다.

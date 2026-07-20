@@ -29,9 +29,9 @@
     <CreateVsixContainerDependsOn>GeneratePkgDef;$(CreateVsixContainerDependsOn)</CreateVsixContainerDependsOn>
     <DeployVSTemplates>false</DeployVSTemplates>
     <WpfPreviewHostProject>$(MSBuildProjectDirectory)\..\Nuri.WPF.PreviewHost\Nuri.WPF.PreviewHost.csproj</WpfPreviewHostProject>
-    <WpfPreviewHostOutputDirectory>$(MSBuildProjectDirectory)\..\Nuri.WPF.PreviewHost\bin\$(Configuration)\net8.0-windows</WpfPreviewHostOutputDirectory>
+    <WpfPreviewHostOutputRoot>$(MSBuildProjectDirectory)\..\Nuri.WPF.PreviewHost\bin\$(Configuration)</WpfPreviewHostOutputRoot>
     <DuxelPreviewHostProject>$(MSBuildProjectDirectory)\..\Nuri.Duxel\Nuri.Duxel.PreviewHost\Nuri.Duxel.PreviewHost.csproj</DuxelPreviewHostProject>
-    <DuxelPreviewHostOutputDirectory>$(MSBuildProjectDirectory)\..\Nuri.Duxel\Nuri.Duxel.PreviewHost\bin\$(Configuration)\net9.0-windows</DuxelPreviewHostOutputDirectory>
+    <DuxelPreviewHostOutputRoot>$(MSBuildProjectDirectory)\..\Nuri.Duxel\Nuri.Duxel.PreviewHost\bin\$(Configuration)</DuxelPreviewHostOutputRoot>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
@@ -70,13 +70,21 @@
 
   <Target Name="IncludePreviewHostInVsix" BeforeTargets="GetVsixSourceItems">
     <ItemGroup>
-      <Content Include="$(WpfPreviewHostOutputDirectory)\**\*" Exclude="$(WpfPreviewHostOutputDirectory)\**\*.pdb;$(WpfPreviewHostOutputDirectory)\**\*.resources.dll">
+      <Content Include="$(WpfPreviewHostOutputRoot)\net8.0-windows\**\*" Exclude="$(WpfPreviewHostOutputRoot)\net8.0-windows\**\*.pdb;$(WpfPreviewHostOutputRoot)\net8.0-windows\**\*.resources.dll">
         <IncludeInVSIX>true</IncludeInVSIX>
-        <VSIXSubPath>PreviewHost\%(RecursiveDir)</VSIXSubPath>
+        <VSIXSubPath>PreviewHost\net8.0-windows\%(RecursiveDir)</VSIXSubPath>
       </Content>
-      <Content Include="$(DuxelPreviewHostOutputDirectory)\**\*" Exclude="$(DuxelPreviewHostOutputDirectory)\**\*.pdb;$(DuxelPreviewHostOutputDirectory)\**\*.resources.dll">
+      <Content Include="$(WpfPreviewHostOutputRoot)\net9.0-windows\**\*" Exclude="$(WpfPreviewHostOutputRoot)\net9.0-windows\**\*.pdb;$(WpfPreviewHostOutputRoot)\net9.0-windows\**\*.resources.dll">
         <IncludeInVSIX>true</IncludeInVSIX>
-        <VSIXSubPath>DuxelPreviewHost\%(RecursiveDir)</VSIXSubPath>
+        <VSIXSubPath>PreviewHost\net9.0-windows\%(RecursiveDir)</VSIXSubPath>
+      </Content>
+      <Content Include="$(DuxelPreviewHostOutputRoot)\net8.0-windows\**\*" Exclude="$(DuxelPreviewHostOutputRoot)\net8.0-windows\**\*.pdb;$(DuxelPreviewHostOutputRoot)\net8.0-windows\**\*.resources.dll">
+        <IncludeInVSIX>true</IncludeInVSIX>
+        <VSIXSubPath>DuxelPreviewHost\net8.0-windows\%(RecursiveDir)</VSIXSubPath>
+      </Content>
+      <Content Include="$(DuxelPreviewHostOutputRoot)\net9.0-windows\**\*" Exclude="$(DuxelPreviewHostOutputRoot)\net9.0-windows\**\*.pdb;$(DuxelPreviewHostOutputRoot)\net9.0-windows\**\*.resources.dll">
+        <IncludeInVSIX>true</IncludeInVSIX>
+        <VSIXSubPath>DuxelPreviewHost\net9.0-windows\%(RecursiveDir)</VSIXSubPath>
       </Content>
     </ItemGroup>
   </Target>
