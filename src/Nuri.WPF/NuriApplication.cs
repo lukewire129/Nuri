@@ -13,45 +13,31 @@ namespace Nuri.WPF
     {
         private static readonly object SyncRoot = new object();
         private static readonly List<ApplicationRoot> Roots = new List<ApplicationRoot>();
-        private static NuriApplicationOptions Options = new NuriApplicationOptions();
         private static bool _hotReloadAttached;
-        private static bool _configurationLocked;
+
+        public static NuriApplicationBuilder<TComponent> Create<TComponent>(
+            string title,
+            double width = 800,
+            double height = 600)
+            where TComponent : Component, new()
+        {
+            return new NuriApplicationBuilder<TComponent>(title, width, height);
+        }
 
         public static void Run<TComponent>(string title, double width = 800, double height = 600)
             where TComponent : Component, new()
         {
-            if (Thread.CurrentThread.GetApartmentState() != ApartmentState.STA)
+            Create<TComponent>(title, width, height).Run();
+        }
+
+        internal static void RunOnApplicationThread(Action run)
+        {
+            if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
             {
-                RunFromNonStaThread(() => RunCore<TComponent>(title, width, height));
+                run();
                 return;
             }
 
-            RunCore<TComponent>(title, width, height);
-        }
-
-        private static void RunCore<TComponent>(string title, double width, double height)
-            where TComponent : Component, new()
-        {
-            EnsureHotReloadAttached();
-
-            var application = Application.Current;
-            if (application == null)
-            {
-                application = new Application
-                {
-                    ShutdownMode = ShutdownMode.OnMainWindowClose
-                };
-                application.Run(CreateWindow<TComponent>(title, width, height));
-                return;
-            }
-
-            application.ShutdownMode = ShutdownMode.OnMainWindowClose;
-            var window = Show<TComponent>(title, width, height);
-            application.MainWindow ??= window;
-        }
-
-        private static void RunFromNonStaThread(Action run)
-        {
             var existingApplication = Application.Current;
             if (existingApplication != null)
             {
@@ -91,10 +77,7 @@ namespace Nuri.WPF
         public static Window Show<TComponent>(string title, double width = 800, double height = 600)
             where TComponent : Component, new()
         {
-            var window = new Window();
-            Attach<TComponent>(window, title, width, height);
-            window.Show();
-            return window;
+            return Create<TComponent>(title, width, height).Show();
         }
 
         public static ApplicationRoot Attach<TComponent>(Window window, string title, double width = 800, double height = 600)
@@ -130,33 +113,6 @@ namespace Nuri.WPF
         public static void Configure()
         {
             EnsureHotReloadAttached();
-        }
-
-        public static void Configure(Action<NuriApplicationOptions> configure)
-        {
-            if (configure == null)
-                throw new ArgumentNullException(nameof(configure));
-
-            lock (SyncRoot)
-            {
-                if (_configurationLocked)
-                    throw new InvalidOperationException("NuriApplication must be configured before the first application root is created.");
-
-                var configuredOptions = Options.Clone();
-                configure(configuredOptions);
-                Options = configuredOptions;
-            }
-
-            EnsureHotReloadAttached();
-        }
-
-        internal static DevToolsConfiguration LockDevToolsConfiguration()
-        {
-            lock (SyncRoot)
-            {
-                _configurationLocked = true;
-                return new DevToolsConfiguration(Options.DevTools.Enabled, Options.DevTools.ToggleKey);
-            }
         }
 
         internal static void Register(ApplicationRoot root)
@@ -216,14 +172,6 @@ namespace Nuri.WPF
 
             foreach (var root in roots)
                 root.ScheduleComponentRebuild(component);
-        }
-
-        private static Window CreateWindow<TComponent>(string title, double width, double height)
-            where TComponent : Component, new()
-        {
-            var window = new Window();
-            Attach<TComponent>(window, title, width, height);
-            return window;
         }
 
         private static WindowView CreateRoot<TComponent>(string title, double width, double height)

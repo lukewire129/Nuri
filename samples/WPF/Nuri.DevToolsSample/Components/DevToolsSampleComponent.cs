@@ -13,8 +13,8 @@ public sealed class DevToolsSampleComponent : Component
 
         return Grid(Rows(Auto, Star, Auto),
                 Div(
-                        Text("Runtime DevTools Sample").FontSize(24).FontWeight(FontWeightValue.Bold),
-                        Text("Use the buttons to trigger state and store invalidations. Inspect the DevTools window for component, hook, store, and log changes.")
+                        Text("WPF Runtime DevTools Sample").FontSize(24).FontWeight(FontWeightValue.Bold),
+                        Text("This WPF application is the inspected target. Press F12 to open Nuri DevTools.")
                             .FontColor("#475569")
                             .Margin(top: 6))
                     .Row(0),
@@ -44,7 +44,7 @@ public sealed class DevToolsSampleComponent : Component
                     .Columns(Pixels(220), Star)
                     .Margin(top: 16)
                     .Row(1),
-                Text("Open the DevTools window and select components to inspect hooks and render counts.")
+                Text("Select a component in DevTools to inspect hooks, stores, render counts, and highlight its WPF element.")
                     .FontColor("#64748b")
                     .Margin(top: 14)
                     .Row(2))

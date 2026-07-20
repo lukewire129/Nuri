@@ -38,6 +38,7 @@ internal static class Program
         RuntimeAncestryRegistryReleasesDisposedSubtrees();
         ComponentCachesAndRefreshesItsRuntimeNode();
         DiagnosticsPreserveHookSummaryWhenEnabled();
+        DiagnosticsDiscoverRootsRegisteredBeforeEnable();
         DiagnosticsTrackPatchBatchesAndVirtualizedRows();
         DiagnosticsLogOnceDeduplicatesUntilLogsAreCleared();
         DuplicateComponentKeysUseIndependentHookIdentity();
@@ -807,6 +808,35 @@ internal static class Program
         finally
         {
             Component.DisposeHookState(component.Id);
+            NuriDiagnostics.UnregisterRoot(rootId);
+            NuriDiagnostics.Disable();
+        }
+    }
+
+    private static void DiagnosticsDiscoverRootsRegisteredBeforeEnable()
+    {
+        const string rootId = "diagnostics-late-enable-root";
+        var entry = Parent().WithIdentity(rootId, null);
+
+        NuriDiagnostics.Disable();
+        NuriDiagnostics.RegisterRoot(rootId, "Test", () => entry);
+        try
+        {
+            NuriDiagnostics.Enable();
+            AssertEqual(
+                true,
+                NuriDiagnostics.GetSnapshot().Roots.Any(root => root.RootId == rootId),
+                "Enabling diagnostics after a root mounts must discover the existing root.");
+
+            NuriDiagnostics.Disable();
+            NuriDiagnostics.UnregisterRoot(rootId);
+            AssertEqual(
+                false,
+                NuriDiagnostics.GetSnapshot().Roots.Any(root => root.RootId == rootId),
+                "Unmounting while diagnostics are disabled must still unregister the root.");
+        }
+        finally
+        {
             NuriDiagnostics.UnregisterRoot(rootId);
             NuriDiagnostics.Disable();
         }

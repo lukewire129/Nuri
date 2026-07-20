@@ -1,4 +1,5 @@
 using System.Windows;
+using Nuri.DevTools;
 using Nuri.DevToolsSample.Components;
 using Nuri.WPF;
 
@@ -11,8 +12,16 @@ internal static class Program
     {
         var application = new Application();
 
-        var appWindow = NuriApplication.Show<DevToolsSampleComponent>("Nuri DevTools Sample", width: 940, height: 620);
+        var app = NuriApplication.Create<DevToolsSampleComponent>(
+            "Nuri WPF DevTools Sample",
+            width: 940,
+            height: 620);
 
+#if DEBUG
+        app.UseDebug();
+#endif
+
+        var appWindow = app.Show();
         application.MainWindow = appWindow;
         application.Run();
     }

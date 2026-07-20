@@ -39,6 +39,7 @@ internal static class Program
             ("opacity animation requests frames and supports interruption", OpacityAnimationRequestsFramesAndSupportsInterruption),
             ("standard router projects route-local state updates", StandardRouterProjectsRouteLocalStateUpdates),
             ("diagnostics track Duxel roots and patches", DiagnosticsTrackDuxelRootsAndPatches),
+            ("diagnostics can exclude an inspector screen", DiagnosticsCanExcludeInspectorScreen),
             ("input queue preserves semantic event order", InputQueuePreservesSemanticEventOrder),
             ("virtualized items project bounded viewport rows", VirtualizedItemsProjectBoundedViewportRows),
             ("virtualized items clip rows before the scrollbar", VirtualizedItemsClipRowsBeforeScrollbar),
@@ -563,6 +564,39 @@ internal static class Program
         AssertTrue(
             NuriDiagnostics.GetSnapshot().Roots.All(item => item.RootId != root.RootId),
             "Disposing a Duxel screen must unregister its diagnostics root.");
+    }
+
+    private static void DiagnosticsCanExcludeInspectorScreen()
+    {
+        ProbeComponent.Reset();
+        NuriDiagnostics.Enable();
+        NuriDiagnostics.ClearLogs();
+        using var context = CreateContext();
+        var component = new ProbeComponent();
+        var screen = new NuriDuxelScreen(
+            component,
+            () => { },
+            "excluded-diagnostics-test",
+            includeInDiagnostics: false);
+
+        RenderFrame(context, screen);
+        ProbeComponent.Update!(1);
+        RenderFrame(context, screen);
+
+        var snapshot = NuriDiagnostics.GetSnapshot();
+        AssertTrue(
+            snapshot.Roots.All(root => root.RootId != component.Id),
+            "A diagnostics-excluded Duxel screen must not register itself as an inspected root.");
+        AssertTrue(
+            snapshot.RecentLogs.All(log => log.ComponentId != component.Id && log.RootId != component.Id),
+            "A diagnostics-excluded Duxel screen must not emit component, invalidation, or patch logs for itself.");
+
+        screen.Dispose();
+        NuriDiagnostics.Log(RuntimeLogKind.AppLog, component.Id, component.Id, "exclusion released");
+        AssertTrue(
+            NuriDiagnostics.GetSnapshot().RecentLogs.Any(log => log.Message == "exclusion released"),
+            "Disposing an excluded Duxel screen must release its diagnostics exclusion.");
+        NuriDiagnostics.ClearLogs();
     }
 
     private static void OpacityAnimationRequestsFramesAndSupportsInterruption()

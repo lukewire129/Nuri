@@ -54,6 +54,7 @@ internal static class Program
         WpfUnsupportedEventDiagnosticsAreDeduplicated();
         WpfDiagnosticsTrackAppliedPatchBatches();
         WpfRootDisposalRemovesVirtualizedDiagnostics();
+        WpfDebugHostBuilderMapsShortcutsAndLifecycle();
         WpfTransitionsReplaceAndClearNativeAnimations(new WpfDriver());
         WpfVirtualizedItemsStayLazyAndRecycleContainers();
         WpfMeasuredVirtualizedItemsUseNaturalRowHeights();
@@ -213,6 +214,91 @@ internal static class Program
         disposeRoot.Dispose();
         RaiseWpfInputEvents(disposedButton, disposedTextBox, disposedCheckBox, disposedPointerSurface, keyboardSource, "disposed-input");
         AssertEqual(0, disposeLog.Count, "WPF: root disposal should detach native event handlers.");
+    }
+
+    private static void WpfDebugHostBuilderMapsShortcutsAndLifecycle()
+    {
+        NuriDiagnostics.Enable();
+        NuriDiagnostics.ClearLogs();
+        var initialRootCount = NuriDiagnostics.GetSnapshot().Roots.Count;
+        var builder = NuriApplication.Create<DebugHostProbeComponent>(
+            "Nuri.RendererTests.DebugHost",
+            width: 1,
+            height: 1);
+        var host = (INuriDebugHost)builder;
+        var openCount = 0;
+
+        AssertEqual(false, host.HasStarted, "WPF: Create should not start or mount the application.");
+        AssertEqual(initialRootCount, NuriDiagnostics.GetSnapshot().Roots.Count, "WPF: Create should not register a root.");
+        host.SetDebugShortcut(DebugKey.F8, () => openCount++);
+
+        var window = builder.Show();
+        window.ShowInTaskbar = false;
+        window.WindowStyle = System.Windows.WindowStyle.None;
+        window.Opacity = 0;
+        using var keyboardSource = new System.Windows.Interop.HwndSource(
+            new System.Windows.Interop.HwndSourceParameters("Nuri.RendererTests.DebugHostKeys")
+            {
+                Width = 1,
+                Height = 1,
+                WindowStyle = 0
+            });
+
+        try
+        {
+            AssertEqual(true, host.HasStarted, "WPF: Show should mark the debug host as started.");
+            AssertEqual(false, host.IsClosed, "WPF: a shown debug host should remain active.");
+            AssertEqual(initialRootCount + 1, host.CaptureSnapshot().Roots.Count, "WPF: Show should mount and register one root.");
+
+            RaiseDebugShortcut(window, keyboardSource, System.Windows.Input.Key.F7);
+            AssertEqual(0, openCount, "WPF: an unrelated function key should not open DevTools.");
+            var handled = RaiseDebugShortcut(window, keyboardSource, System.Windows.Input.Key.F8);
+            AssertEqual(true, handled, "WPF: the configured debug shortcut should be handled.");
+            AssertEqual(1, openCount, "WPF: the configured debug shortcut should invoke its callback once.");
+
+            host.SetDebugShortcut(DebugKey.F12, () => openCount += 10);
+            RaiseDebugShortcut(window, keyboardSource, System.Windows.Input.Key.F8);
+            AssertEqual(1, openCount, "WPF: replacing a debug shortcut should remove the old key behavior.");
+            RaiseDebugShortcut(window, keyboardSource, System.Windows.Input.Key.F12);
+            AssertEqual(11, openCount, "WPF: replacing a debug shortcut should use the latest callback.");
+        }
+        finally
+        {
+            window.Close();
+        }
+
+        AssertEqual(true, host.IsClosed, "WPF: closing the window should close the debug host.");
+        AssertEqual(initialRootCount, NuriDiagnostics.GetSnapshot().Roots.Count, "WPF: closing the debug host should unregister its root.");
+
+        var disposedRejected = false;
+        try
+        {
+            host.SetDebugShortcut(DebugKey.F1, () => { });
+        }
+        catch (ObjectDisposedException)
+        {
+            disposedRejected = true;
+        }
+
+        AssertEqual(true, disposedRejected, "WPF: a closed debug host should reject shortcut configuration.");
+        NuriDiagnostics.Disable();
+    }
+
+    private static bool RaiseDebugShortcut(
+        System.Windows.Window window,
+        System.Windows.PresentationSource keyboardSource,
+        System.Windows.Input.Key key)
+    {
+        var args = new System.Windows.Input.KeyEventArgs(
+            System.Windows.Input.Keyboard.PrimaryDevice,
+            keyboardSource,
+            Environment.TickCount,
+            key)
+        {
+            RoutedEvent = System.Windows.Input.Keyboard.PreviewKeyDownEvent
+        };
+        window.RaiseEvent(args);
+        return args.Handled;
     }
 
     private static void RaiseWpfInputEvents(
@@ -1873,6 +1959,15 @@ internal static class Program
             }, []);
 
             return Text("main");
+        }
+    }
+
+    private sealed class DebugHostProbeComponent : Component
+    {
+        public override IElement Render()
+        {
+            var (value, _) = useState(0);
+            return Text("debug-host:" + value);
         }
     }
 

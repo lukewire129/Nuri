@@ -15,11 +15,33 @@ namespace Nuri.Runtime.Diagnostics
         private static readonly Dictionary<string, VirtualizedItemsSnapshot> VirtualizedItems = new Dictionary<string, VirtualizedItemsSnapshot>();
         private static readonly RuntimeLogBuffer Logs = new RuntimeLogBuffer(5000);
         private static readonly HashSet<string> LoggedOnceKeys = new HashSet<string>(StringComparer.Ordinal);
+        private static readonly HashSet<string> ExcludedRootIds = new HashSet<string>(StringComparer.Ordinal);
         private static long _sequence;
 
         public static bool IsEnabled { get; private set; }
 
         public static event EventHandler? Changed;
+
+        internal static void ExcludeRoot(string rootId)
+        {
+            if (string.IsNullOrWhiteSpace(rootId))
+                return;
+
+            lock (SyncRoot)
+            {
+                ExcludedRootIds.Add(rootId);
+                Roots.Remove(rootId);
+            }
+        }
+
+        internal static void IncludeRoot(string rootId)
+        {
+            if (string.IsNullOrWhiteSpace(rootId))
+                return;
+
+            lock (SyncRoot)
+                ExcludedRootIds.Remove(rootId);
+        }
 
         public static void Enable()
         {
@@ -74,13 +96,13 @@ namespace Nuri.Runtime.Diagnostics
 
         public static void RegisterRoot(string rootId, string renderer, Func<VirtualEntry?> getCurrentVirtualEntry)
         {
-            if (!IsEnabled)
-                return;
-
             if (string.IsNullOrWhiteSpace(rootId))
                 return;
 
             if (getCurrentVirtualEntry == null)
+                return;
+
+            if (IsExcluded(rootId, null))
                 return;
 
             lock (SyncRoot)
@@ -88,12 +110,13 @@ namespace Nuri.Runtime.Diagnostics
                 Roots[rootId] = new RootRecord(rootId, renderer, getCurrentVirtualEntry);
             }
 
-            Log(RuntimeLogKind.RootRegistered, rootId, null, "Root registered.");
+            if (IsEnabled)
+                Log(RuntimeLogKind.RootRegistered, rootId, null, "Root registered.");
         }
 
         public static void UnregisterRoot(string rootId)
         {
-            if (!IsEnabled)
+            if (string.IsNullOrWhiteSpace(rootId))
                 return;
 
             lock (SyncRoot)
@@ -101,12 +124,13 @@ namespace Nuri.Runtime.Diagnostics
                 Roots.Remove(rootId);
             }
 
-            Log(RuntimeLogKind.RootUnregistered, rootId, null, "Root unregistered.");
+            if (IsEnabled && !IsExcluded(rootId, null))
+                Log(RuntimeLogKind.RootUnregistered, rootId, null, "Root unregistered.");
         }
 
         public static void RecordComponentRendered(string componentId, string typeName)
         {
-            if (!IsEnabled || string.IsNullOrWhiteSpace(componentId))
+            if (!IsEnabled || string.IsNullOrWhiteSpace(componentId) || IsExcluded(null, componentId))
                 return;
 
             lock (SyncRoot)
@@ -122,7 +146,7 @@ namespace Nuri.Runtime.Diagnostics
 
         public static void RecordPatchBatch(string rootId, IReadOnlyList<PatchOperation> operations)
         {
-            if (!IsEnabled || string.IsNullOrWhiteSpace(rootId) || operations == null)
+            if (!IsEnabled || string.IsNullOrWhiteSpace(rootId) || operations == null || IsExcluded(rootId, null))
                 return;
 
             lock (SyncRoot)
@@ -146,7 +170,7 @@ namespace Nuri.Runtime.Diagnostics
 
         public static void RecordVirtualizedItems(string hostId, int itemCount, int realizedCount)
         {
-            if (!IsEnabled || string.IsNullOrWhiteSpace(hostId))
+            if (!IsEnabled || string.IsNullOrWhiteSpace(hostId) || IsExcluded(null, hostId))
                 return;
 
             lock (SyncRoot)
@@ -174,7 +198,7 @@ namespace Nuri.Runtime.Diagnostics
 
         public static void RecordHook(string componentId, int index, HookKind kind, string displayType, string summary)
         {
-            if (!IsEnabled || string.IsNullOrWhiteSpace(componentId))
+            if (!IsEnabled || string.IsNullOrWhiteSpace(componentId) || IsExcluded(null, componentId))
                 return;
 
             lock (SyncRoot)
@@ -186,7 +210,7 @@ namespace Nuri.Runtime.Diagnostics
 
         public static void TrimHooks(string componentId, int usedHookCount)
         {
-            if (!IsEnabled || string.IsNullOrWhiteSpace(componentId))
+            if (!IsEnabled || string.IsNullOrWhiteSpace(componentId) || IsExcluded(null, componentId))
                 return;
 
             lock (SyncRoot)
@@ -204,7 +228,7 @@ namespace Nuri.Runtime.Diagnostics
 
         public static void DisposeComponentSubtree(string rootComponentId)
         {
-            if (!IsEnabled || string.IsNullOrWhiteSpace(rootComponentId))
+            if (!IsEnabled || string.IsNullOrWhiteSpace(rootComponentId) || IsExcluded(null, rootComponentId))
                 return;
 
             lock (SyncRoot)
@@ -230,7 +254,7 @@ namespace Nuri.Runtime.Diagnostics
 
         public static void RecordComponentInvalidated(string componentId, string reason)
         {
-            if (!IsEnabled || string.IsNullOrWhiteSpace(componentId))
+            if (!IsEnabled || string.IsNullOrWhiteSpace(componentId) || IsExcluded(null, componentId))
                 return;
 
             lock (SyncRoot)
@@ -291,7 +315,10 @@ namespace Nuri.Runtime.Diagnostics
             string selectedType,
             string selectedValueSummary)
         {
-            if (!IsEnabled || string.IsNullOrWhiteSpace(storeId) || string.IsNullOrWhiteSpace(componentId))
+            if (!IsEnabled
+                || string.IsNullOrWhiteSpace(storeId)
+                || string.IsNullOrWhiteSpace(componentId)
+                || IsExcluded(null, componentId))
                 return;
 
             lock (SyncRoot)
@@ -364,7 +391,7 @@ namespace Nuri.Runtime.Diagnostics
 
         public static void LogOnce(RuntimeLogKind kind, string dedupeKey, string? rootId, string? componentId, string message)
         {
-            if (!IsEnabled || string.IsNullOrWhiteSpace(dedupeKey))
+            if (!IsEnabled || string.IsNullOrWhiteSpace(dedupeKey) || IsExcluded(rootId, componentId))
                 return;
 
             RuntimeLogEntry entry;
@@ -396,7 +423,7 @@ namespace Nuri.Runtime.Diagnostics
             string? sourceMember,
             int? sourceLine)
         {
-            if (!IsEnabled)
+            if (!IsEnabled || IsExcluded(rootId, componentId))
                 return;
 
             RuntimeLogEntry entry;
@@ -417,6 +444,23 @@ namespace Nuri.Runtime.Diagnostics
             }
 
             Changed?.Invoke(null, EventArgs.Empty);
+        }
+
+        private static bool IsExcluded(string? rootId, string? componentId)
+        {
+            lock (SyncRoot)
+            {
+                foreach (var excludedRootId in ExcludedRootIds)
+                {
+                    if ((!string.IsNullOrWhiteSpace(rootId)
+                            && RuntimeTreeIdentity.IsDescendantOrSelf(rootId!, excludedRootId))
+                        || (!string.IsNullOrWhiteSpace(componentId)
+                            && RuntimeTreeIdentity.IsDescendantOrSelf(componentId!, excludedRootId)))
+                        return true;
+                }
+            }
+
+            return false;
         }
 
         private static ComponentSnapshot? CreateComponentTree(VirtualEntry? entry)

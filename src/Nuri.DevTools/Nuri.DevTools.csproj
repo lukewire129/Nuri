@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Version>0.1.0</Version>
+    <PackageId>Nuri.DevTools</PackageId>
+    <Title>Nuri DevTools</Title>
+    <Description>Duxel-backed runtime inspector for Nuri applications.</Description>
+    <PackageProjectUrl>https://github.com/lukewire129/Nuri</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/lukewire129/Nuri</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>nuri;devtools;duxel;diagnostics;inspector</PackageTags>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Nuri.Duxel\Nuri.Duxel.Windows\Nuri.Duxel.Windows.csproj" />
+  </ItemGroup>
+
+</Project>

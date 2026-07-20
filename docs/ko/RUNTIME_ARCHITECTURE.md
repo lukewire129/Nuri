@@ -89,11 +89,23 @@ Warmup 이후 `--explorer-comparison` WPF harness는 2026-07-14에 700px viewpor
 
 `NuriDiagnostics`가 활성화되면 등록된 각 application root는 적용된 diff-batch count, 누적 patch count, 마지막 batch size 및 `PatchOperationType`별 count를 기록합니다. 이 counter는 초기 native materialization 이후 `RenderCoordinator` rebuild batch를 대상으로 하며, renderer 내부의 realized-row diff는 root patch batch에 포함하지 않습니다.
 
+Application-root 존재 여부는 `NuriDiagnostics.IsEnabled`와 무관하게 등록하며 component, hook, log 및 patch 상세 수집만 이 값으로 제어합니다. 따라서 application root가 mount된 뒤 DevTools를 활성화해도 현재 live root를 즉시 찾을 수 있습니다. Root disposal은 diagnostics가 비활성화된 상태에서도 항상 존재 record를 unregister하므로 나중에 활성화했을 때 stale root가 나타나지 않습니다.
+
 Renderer-owned virtualized host는 host id, virtual item count 및 realized 또는 projected row count를 담은 중립 `VirtualizedItemsSnapshot` entry도 게시할 수 있습니다. WPF와 Duxel root disposal은 이 entry를 결정적으로 제거합니다. WPF Large List stress 화면은 직전 commit의 patch batch, 누적 patch, component render count 및 realized row count를 표시하여 interactive operation에서 full rebuild 또는 unbounded materialization을 드러냅니다.
 
 Diagnostics가 활성화된 경우 WPF property 경로는 mapper, 쓰기 가능한 CLR property 및 attached-property fallback이 모두 실패한 뒤에만 `RuntimeLogKind.UnsupportedProperty`를 기록합니다. Host-only window property는 의도적인 제외 상태를 유지합니다. Message에는 property와 native control type을 포함하며 `NuriDiagnostics.ClearLogs()`가 호출될 때까지 native control CLR type과 property 이름 조합으로 중복을 억제합니다.
 
 WPF event add 경로도 중립 event를 변환할 수 없거나 변환된 native event가 대상 control에 없으면 `RuntimeLogKind.UnsupportedEvent`를 기록합니다. Native delegate 호환성은 그대로 유지하고 event 제거는 warning을 만들지 않으며, `NuriDiagnostics.ClearLogs()`가 호출될 때까지 native control CLR type과 source event 이름 조합으로 message 중복을 억제합니다.
+
+`Nuri.DevTools`는 Duxel 기반의 표준 diagnostics UI입니다. 플랫폼 중립적인 `RuntimeSnapshot`을 읽고 Core DSL과 `Nuri.Duxel`을 통해 component tree, detail, hook, store, runtime-log 및 console view를 렌더하며, 검사 대상 WPF application과 별도 thread에서 Duxel window를 실행합니다. `NuriDiagnostics.Changed`는 검사 대상 renderer thread에서 hook을 변경하지 않고 DevTools full rebuild를 직접 요청합니다. Renderer별 integration은 Core의 `INuriDebugHost`를 통해 얇게 유지합니다. WPF는 function-key routing을 소유하고 snapshot capture와 선택한 component highlight를 모두 Dispatcher로 dispatch하므로 Duxel thread가 WPF 소유 state를 직접 순회하거나 highlight하지 않습니다.
+
+`NuriDevTools.OpenInspector(...)` 및 `RunInspector(...)` API는 선택적인 `snapshotProvider`를 받습니다. 이 이름은 renderer-neutral inspector를 여는 작업과 application window 생성을 구분합니다. Duxel host는 구현 세부 사항으로 유지합니다. 기존 `Show(...)` 및 `Run(...)` 이름은 obsolete 호환 alias로 유지합니다. 변경 가능한 virtual tree를 소유한 retained renderer는 UI thread에서 schedule되는 provider를 전달해야 하며, 기본 direct `NuriDiagnostics.GetSnapshot` provider는 caller가 안전한 snapshot access를 이미 보장할 때만 적합합니다.
+
+`NuriApplication.Create<TComponent>(...)`는 `Show()` 또는 `Run()` 전에는 root를 mount하지 않는 lazy WPF application builder를 반환합니다. `Nuri.DevTools` extension인 `UseDebug()` 및 `UseDebug(DebugKey)`는 공유 contract에 WPF `Key`를 노출하지 않고 기본 `F12` 또는 명시적인 `F1`부터 `F12` key를 설정합니다. Startup 전에 `UseDebug()`를 호출하면 첫 render 전에 diagnostics가 활성화됩니다. 늦은 호출도 동작하지만 이전 component, hook, store 및 patch detail을 복구할 수 없으므로 `RuntimeLogKind.Diagnostics` warning과 `Debug.WriteLine` message를 한 번 기록합니다. 재설정은 shortcut을 교체하며 닫힌 host는 설정을 거부합니다.
+
+DevTools의 `NuriDuxelScreen`은 `includeInDiagnostics: false`를 사용합니다. Core diagnostics는 해당 runtime root와 descendant를 root, component, hook, invalidation, patch, virtualization 및 지원 renderer warning 기록에서 제외하고 screen이 dispose되면 exclusion을 해제합니다. 따라서 검사 대상 application diagnostics는 계속 활성화하면서 inspector 자신의 render가 diagnostics-change/rebuild loop를 만드는 것을 방지합니다. 현재 host는 process 내부에서 diagnostics를 공유하며, 이후 out-of-process transport는 DevTools UI model을 변경하지 않고 같은 snapshot 및 highlight command를 전달할 수 있습니다.
+
+기존 native WPF DevTools window와 `Nuri.WPF.DevTools` package는 제거했습니다. Renderer adapter는 `Nuri.WPF.Diagnostics.WpfElementHighlighter` 같은 좁은 integration helper를 유지할 수 있지만 diagnostics UI 자체는 `Nuri.DevTools`에만 둡니다.
 
 ## 중립 Transform Animation
 

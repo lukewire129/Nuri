@@ -18,6 +18,7 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
     private readonly DuxelVirtualEntryRenderer _renderer;
     private readonly Func<UiVector2?>? _viewportSizeProvider;
     private readonly Action<UiTheme>? _themeObserver;
+    private readonly bool _includeInDiagnostics;
     private readonly object _themeGate = new();
     private readonly ComponentInvalidationQueue _invalidations = new();
     private readonly string _rootId;
@@ -35,18 +36,25 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
         string surfaceTitle = "Nuri",
         DuxelInputEventQueue? inputEvents = null,
         Func<UiVector2?>? viewportSizeProvider = null,
-        Action<UiTheme>? themeObserver = null)
+        Action<UiTheme>? themeObserver = null,
+        bool includeInDiagnostics = true)
     {
         ArgumentNullException.ThrowIfNull(rootElement);
         _requestFrame = requestFrame ?? throw new ArgumentNullException(nameof(requestFrame));
         _renderer = new DuxelVirtualEntryRenderer(inputEvents);
         _viewportSizeProvider = viewportSizeProvider;
         _themeObserver = themeObserver;
+        _includeInDiagnostics = includeInDiagnostics;
 
         var treePrefix = $"duxel{Interlocked.Increment(ref _nextTreeIndex)}";
         rootElement.LoadNodeNumber(treePrefix, 0);
         Nuri.UI.ElementTree<IElement, AnimationValue>.AssignDescendantIds(rootElement.Id, rootElement);
         _rootId = rootElement.Id;
+
+        if (!_includeInDiagnostics)
+        {
+            NuriDiagnostics.ExcludeRoot(_rootId);
+        }
 
         _runtime = new ApplicationRuntime<IElement>(() => rootElement, element => element.ToVirtualEntry());
         Component.AnyStateChanged += OnAnyStateChanged;
@@ -134,10 +142,13 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
         if (pendingCommit is not null)
         {
             _runtime.Commit(pendingCommit);
-            NuriDiagnostics.RecordPatchBatch(_rootId, pendingCommit.Operations);
+            if (_includeInDiagnostics)
+            {
+                NuriDiagnostics.RecordPatchBatch(_rootId, pendingCommit.Operations);
+            }
         }
 
-        if (!_diagnosticsRegistered)
+        if (_includeInDiagnostics && !_diagnosticsRegistered)
         {
             NuriDiagnostics.RegisterRoot(_rootId, "Duxel", () => _runtime.CurrentVirtualEntry);
             _diagnosticsRegistered = true;
@@ -254,7 +265,10 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
         }
 
         _runtime.CommitVirtualEntry(_runtime.CurrentVirtualEntry);
-        NuriDiagnostics.RecordPatchBatch(_rootId, operations);
+        if (_includeInDiagnostics)
+        {
+            NuriDiagnostics.RecordPatchBatch(_rootId, operations);
+        }
         return true;
     }
 
@@ -295,6 +309,11 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
         if (_diagnosticsRegistered)
         {
             NuriDiagnostics.UnregisterRoot(_rootId);
+        }
+
+        if (!_includeInDiagnostics)
+        {
+            NuriDiagnostics.IncludeRoot(_rootId);
         }
 
         _disposed = true;

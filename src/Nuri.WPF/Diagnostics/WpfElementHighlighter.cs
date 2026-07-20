@@ -2,11 +2,10 @@ using System;
 using System.Windows;
 using System.Windows.Documents;
 using System.Windows.Media;
-using Nuri.WPF.Diagnostics;
 
-namespace Nuri.WPF.DevTools
+namespace Nuri.WPF.Diagnostics
 {
-    internal static class WpfElementHighlighter
+    public static class WpfElementHighlighter
     {
         private static FrameworkElement? _target;
         private static AdornerLayer? _layer;

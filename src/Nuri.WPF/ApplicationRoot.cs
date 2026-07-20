@@ -12,7 +12,6 @@ using Nuri.UI.Dsl;
 using Nuri.UI.Values;
 using Nuri.VirtualDom;
 using Nuri.WPF.Diagnostics;
-using Nuri.WPF.DevTools;
 
 namespace Nuri.WPF
 {
@@ -51,8 +50,7 @@ namespace Nuri.WPF
             Action<IElement>? applyHostProperties = null)
         {
             var instance = new ApplicationRoot();
-            var devTools = NuriApplication.LockDevToolsConfiguration();
-            instance.InitializeInternal(rootElement, host, dispatcherProvider, applyHostProperties ?? (_ => { }), devTools);
+            instance.InitializeInternal(rootElement, host, dispatcherProvider, applyHostProperties ?? (_ => { }));
             return instance;
         }
 
@@ -87,8 +85,6 @@ namespace Nuri.WPF
 
         private void InitializeInternal(IElement rootElement, Window mainWindow)
         {
-            var devTools = NuriApplication.LockDevToolsConfiguration();
-
             InitializeInternal(
                 rootElement,
                 new WpfApplicationHost(mainWindow),
@@ -97,23 +93,15 @@ namespace Nuri.WPF
                 {
                     if (_host is not null)
                         _host.ApplyWindowProperties(element);
-                },
-                devTools);
-
-            if (devTools.Enabled)
-                NuriDevTools.AttachHotKey(mainWindow, devTools.ToggleKey);
+                });
         }
 
         private void InitializeInternal(
             IElement rootElement,
             IHostAdapter<FrameworkElement> host,
             Func<Dispatcher?> dispatcherProvider,
-            Action<IElement> applyHostProperties,
-            DevToolsConfiguration devTools)
+            Action<IElement> applyHostProperties)
         {
-            if (devTools.Enabled)
-                NuriDevTools.Enable();
-
             var treePrefix = $"window{Interlocked.Increment(ref _nextTreeIndex)}";
             _treePrefix = treePrefix;
             PrepareRoot(rootElement, treePrefix);

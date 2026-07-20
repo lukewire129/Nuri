@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Nuri.WPF\Nuri.WPF.csproj" SetTargetFramework="TargetFramework=net8.0-windows" />
+    <ProjectReference Include="..\..\..\src\Nuri.DevTools\Nuri.DevTools.csproj" />
   </ItemGroup>
 
 </Project>

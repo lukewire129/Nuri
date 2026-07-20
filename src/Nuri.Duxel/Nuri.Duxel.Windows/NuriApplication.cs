@@ -17,7 +17,9 @@ public static class NuriApplication
         UiTheme? theme = null,
         DuxelThemeController? themeController = null,
         bool useDuxelTitleBar = false,
-        bool integrateSystemChrome = false)
+        bool integrateSystemChrome = false,
+        bool includeInDiagnostics = true,
+        Action<NuriDuxelScreen>? screenCreated = null)
         where TComponent : Component, new()
     {
         Run(
@@ -29,7 +31,9 @@ public static class NuriApplication
             theme,
             themeController,
             useDuxelTitleBar,
-            integrateSystemChrome);
+            integrateSystemChrome,
+            includeInDiagnostics,
+            screenCreated);
     }
 
     public static void Run(
@@ -90,7 +94,9 @@ public static class NuriApplication
         UiTheme? theme = null,
         DuxelThemeController? themeController = null,
         bool useDuxelTitleBar = false,
-        bool integrateSystemChrome = false)
+        bool integrateSystemChrome = false,
+        bool includeInDiagnostics = true,
+        Action<NuriDuxelScreen>? screenCreated = null)
     {
         ArgumentNullException.ThrowIfNull(rootElement);
 
@@ -115,7 +121,9 @@ public static class NuriApplication
             title,
             inputEvents,
             GetContentAreaSize,
-            observeTheme);
+            observeTheme,
+            includeInDiagnostics);
+        screenCreated?.Invoke(screen);
         var options = DuxelApp.Options(screen, title, width, height, vsync);
         if (theme is { } selectedTheme)
         {
