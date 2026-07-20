@@ -8,19 +8,31 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <Version>0.1.0</Version>
+    <Version>0.3.0</Version>
+    <PackageVersion Condition="'$(NuriToolsReleaseVersion)' != ''">$(NuriToolsReleaseVersion)</PackageVersion>
+    <IsPackable>true</IsPackable>
     <PackageId>Nuri.DevTools</PackageId>
     <Title>Nuri DevTools</Title>
+    <Authors>lukewire129</Authors>
     <Description>Duxel-backed runtime inspector for Nuri applications.</Description>
     <PackageProjectUrl>https://github.com/lukewire129/Nuri</PackageProjectUrl>
     <RepositoryUrl>https://github.com/lukewire129/Nuri</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageTags>nuri;devtools;duxel;diagnostics;inspector</PackageTags>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>nuri;devtools;duxel;diagnostics;inspector;csharp;dotnet</PackageTags>
+    <PackageReleaseNotes>Introduces the standalone Duxel-backed runtime inspector for Nuri applications.</PackageReleaseNotes>
+    <Copyright>Copyright (c) 2026 lukewire129.</Copyright>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\assets\icon.png" Pack="true" PackagePath="\" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Nuri.Duxel\Nuri.Duxel.Windows\Nuri.Duxel.Windows.csproj" />

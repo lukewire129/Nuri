@@ -8,7 +8,8 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
+    <PackageVersion Condition="'$(NuriToolsReleaseVersion)' != ''">$(NuriToolsReleaseVersion)</PackageVersion>
     <PackageId>Nuri.Duxel.Windows</PackageId>
     <Title>Nuri Duxel Windows Host</Title>
     <Description>Windows application and frame-loop host for the Nuri Duxel renderer.</Description>

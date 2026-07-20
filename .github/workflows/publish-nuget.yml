@@ -6,7 +6,7 @@ on:
       version:
         description: Package version to publish
         required: true
-        default: 0.1.0
+        default: 0.3.0
 
 permissions:
   contents: read
@@ -28,11 +28,20 @@ jobs:
       - name: Restore package projects
         run: dotnet restore src/Nuri.WPF/Nuri.WPF.csproj
 
+      - name: Restore Duxel and DevTools package projects
+        run: dotnet restore src/Nuri.DevTools/Nuri.DevTools.csproj
+
       - name: Pack Nuri
         run: dotnet pack src/Nuri/Nuri.csproj -c Release --no-restore -m:1 -p:Version=${{ inputs.version }} -o artifacts/packages
 
       - name: Pack Nuri.WPF
         run: dotnet pack src/Nuri.WPF/Nuri.WPF.csproj -c Release --no-restore -m:1 -p:Version=${{ inputs.version }} -o artifacts/packages
+
+      - name: Pack Nuri.Duxel.Windows
+        run: dotnet pack src/Nuri.Duxel/Nuri.Duxel.Windows/Nuri.Duxel.Windows.csproj -c Release --no-restore -m:1 -p:NuriToolsReleaseVersion=${{ inputs.version }} -o artifacts/packages
+
+      - name: Pack Nuri.DevTools
+        run: dotnet pack src/Nuri.DevTools/Nuri.DevTools.csproj -c Release --no-restore -m:1 -p:NuriToolsReleaseVersion=${{ inputs.version }} -o artifacts/packages
 
       - name: Sign in to NuGet.org with trusted publishing
         id: nuget-login
@@ -45,3 +54,9 @@ jobs:
 
       - name: Publish Nuri.WPF
         run: dotnet nuget push artifacts/packages/Nuri.WPF.${{ inputs.version }}.nupkg --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: Publish Nuri.Duxel.Windows
+        run: dotnet nuget push artifacts/packages/Nuri.Duxel.Windows.${{ inputs.version }}.nupkg --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: Publish Nuri.DevTools
+        run: dotnet nuget push artifacts/packages/Nuri.DevTools.${{ inputs.version }}.nupkg --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
