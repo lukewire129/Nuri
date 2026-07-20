@@ -1,5 +1,10 @@
 using Nuri.DevTools;
+using Nuri.Constants;
 using Nuri.Runtime.Diagnostics;
+using Nuri.UI.Controls;
+using Nuri.UI.Dsl;
+using Nuri.UI.Values;
+using Nuri.UI.Virtualization;
 
 namespace Nuri.DevToolsTests;
 
@@ -13,6 +18,9 @@ internal static class Program
         UseDebugEnablesDiagnosticsAndConfiguresShortcuts();
         LateUseDebugWarnsOnceAndContinues();
         ClosedAndInvalidHostsAreRejected();
+        ComponentTreeUsesVirtualizedRows();
+        DiagnosticListsUseVirtualizedRows();
+        ConsoleSurfaceUsesStarHeight();
         Console.WriteLine("Nuri.DevToolsTests passed.");
     }
 
@@ -68,6 +76,111 @@ internal static class Program
         AssertThrows<ArgumentOutOfRangeException>(
             () => activeHost.UseDebug((DebugKey)13),
             "UseDebug should reject keys outside F1 through F12.");
+    }
+
+    private static void ComponentTreeUsesVirtualizedRows()
+    {
+        var children = Enumerable.Range(0, 500)
+            .Select(index => new ComponentSnapshot(
+                $"child-{index}",
+                "ChildComponent",
+                "Div",
+                $"child-{index}",
+                index + 1,
+                null,
+                null,
+                Array.Empty<HookSnapshot>(),
+                Array.Empty<ComponentSnapshot>()))
+            .ToArray();
+        var rootComponent = new ComponentSnapshot(
+            "tree-root",
+            "TreeRoot",
+            "Div",
+            null,
+            1,
+            null,
+            null,
+            Array.Empty<HookSnapshot>(),
+            children);
+        var snapshot = new RuntimeSnapshot(
+            DateTimeOffset.UtcNow,
+            new[] { new ApplicationRootSnapshot("root-id", "WPF", rootComponent) },
+            Array.Empty<StoreSnapshot>(),
+            Array.Empty<RuntimeLogEntry>());
+        var rows = RuntimeInspectorComponent.BuildTreeRows(
+            snapshot,
+            "child-42",
+            new HashSet<string>(StringComparer.Ordinal),
+            static _ => { },
+            static _ => { });
+
+        AssertEqual(502, rows.Count, "The flat tree model should contain one application root and every expanded component.");
+        AssertEqual(true, rows.Single(row => row.NodeId == "component:child-42").Selected, "The selected component row should remain selected in the flat model.");
+
+        var tree = (ItemsView)RuntimeInspectorComponent.BuildVirtualizedTree(rows);
+        AssertEqual(ItemsTypes.Virtualized, tree.Kind, "The DevTools component tree should use the virtualized items contract.");
+        var source = (IVirtualizedItemsSource)tree.Properties[PropertyKeys.VirtualizedItemsSource];
+        AssertEqual(rows.Count, source.Count, "The virtualized source should receive the full lightweight row model.");
+        AssertEqual(36d, source.ItemExtent, "The DevTools tree should use the fixed-extent virtualization fast path.");
+        _ = source.RenderItem(42);
+
+        var collapsedRows = RuntimeInspectorComponent.BuildTreeRows(
+            snapshot,
+            null,
+            new HashSet<string>(StringComparer.Ordinal) { "component:tree-root" },
+            static _ => { },
+            static _ => { });
+        AssertEqual(2, collapsedRows.Count, "Collapsing a component should remove its descendants from the visible row model.");
+    }
+
+    private static void DiagnosticListsUseVirtualizedRows()
+    {
+        var timestamp = DateTimeOffset.UtcNow;
+        var logs = Enumerable.Range(1, 500)
+            .Select(index => new RuntimeLogEntry(
+                index,
+                timestamp.AddMilliseconds(index),
+                index % 2 == 0 ? RuntimeLogKind.Console : RuntimeLogKind.ComponentRendered,
+                "root-id",
+                $"component-{index}",
+                $"Message {index}",
+                sourceType: "SampleComponent",
+                sourceMember: "Render"))
+            .ToArray();
+        var snapshot = new RuntimeSnapshot(
+            timestamp,
+            Array.Empty<ApplicationRootSnapshot>(),
+            Array.Empty<StoreSnapshot>(),
+            logs);
+
+        var runtimeList = (ItemsView)RuntimeInspectorComponent.BuildRuntimeLogs(snapshot);
+        var runtimeSource = (IVirtualizedItemsSource)runtimeList.Properties[PropertyKeys.VirtualizedItemsSource];
+        AssertEqual(200, runtimeSource.Count, "Runtime events should retain the existing visible-log limit.");
+        AssertEqual(false, runtimeSource.MeasuresItemExtent, "Single-line runtime events should use fixed-extent virtualization.");
+        AssertEqual(26d, runtimeSource.ItemExtent, "Runtime event virtualization should use the configured row extent.");
+        _ = runtimeSource.RenderItem(0);
+
+        var consoleList = (ItemsView)RuntimeInspectorComponent.BuildConsoleLogs(snapshot);
+        var consoleSource = (IVirtualizedItemsSource)consoleList.Properties[PropertyKeys.VirtualizedItemsSource];
+        AssertEqual(200, consoleSource.Count, "Console output should retain the existing visible-log limit.");
+        AssertEqual(true, consoleSource.MeasuresItemExtent, "Console output should measure variable-height messages.");
+        AssertEqual(58d, consoleSource.ItemExtent, "Console output should use its estimate until rows are measured.");
+        _ = consoleSource.RenderItem(0);
+    }
+
+    private static void ConsoleSurfaceUsesStarHeight()
+    {
+        var snapshot = new RuntimeSnapshot(
+            DateTimeOffset.UtcNow,
+            Array.Empty<ApplicationRootSnapshot>(),
+            Array.Empty<StoreSnapshot>(),
+            Array.Empty<RuntimeLogEntry>());
+
+        var console = (Div)RuntimeInspectorComponent.BuildConsole(snapshot);
+        AssertEqual(DivTypes.Grid, console.Kind, "The Console surface should use a Grid so Duxel can assign the remaining height.");
+        var rows = (IReadOnlyList<LengthValue>)console.Properties["RowDefinitions"];
+        AssertEqual(1, rows.Count, "The Console surface Grid should contain one row.");
+        AssertEqual(LengthUnit.Star, rows[0].Unit, "The Console surface should occupy a Star row.");
     }
 
     private static void AssertEqual<T>(T expected, T actual, string message)

@@ -119,6 +119,10 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
         LayoutConstraint constraint,
         ref bool hasActiveAnimations)
     {
+        var slotStart = ui.GetCursorPos();
+        var arrangedConstraint = ArrangeEntry(ui, entry, constraint);
+        var restoreHorizontalSlot = constraint.Width is not null
+            && entry.Properties.ContainsKey("HorizontalAlignment");
         var localOpacity = ResolveOpacity(ui, entry, ref hasActiveAnimations);
         var effectiveOpacity = Math.Clamp(inheritedOpacity * localOpacity, 0f, 1f);
         var margin = GetThickness(entry, "Margin");
@@ -128,7 +132,7 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
             ui.Indent(ToFloat(margin.Left));
         }
 
-        var contentConstraint = constraint.Inset(margin);
+        var contentConstraint = arrangedConstraint.Inset(margin);
         var styleScope = PushEntryStyle(ui, entry, localOpacity, effectiveOpacity);
         try
         {
@@ -163,7 +167,66 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
             }
 
             ApplyBottomPadding(ui, margin.Bottom);
+
+            var cursor = ui.GetCursorPos();
+            if (restoreHorizontalSlot)
+            {
+                cursor = cursor with { X = slotStart.X };
+            }
+
+            ui.SetCursorPos(cursor);
         }
+    }
+
+    private static LayoutConstraint ArrangeEntry(
+        UiImmediateContext ui,
+        VirtualEntry entry,
+        LayoutConstraint constraint)
+    {
+        var cursor = ui.GetCursorPos();
+        var width = constraint.Width;
+        var height = constraint.Height;
+
+        if (width is float slotWidth
+            && TryGetHorizontalLayoutAlignment(entry, "HorizontalAlignment", out var horizontalAlignment)
+            && horizontalAlignment != LayoutAlignmentKind.Stretch)
+        {
+            var desiredWidth = MathF.Min(slotWidth, EstimateEntryWidth(ui, entry));
+            cursor = cursor with
+            {
+                X = cursor.X + GetAlignmentOffset(slotWidth, desiredWidth, horizontalAlignment)
+            };
+            width = desiredWidth;
+        }
+
+        if (height is float slotHeight
+            && TryGetVerticalLayoutAlignment(entry, "VerticalAlignment", out var verticalAlignment)
+            && verticalAlignment != LayoutAlignmentKind.Stretch)
+        {
+            var desiredHeight = MathF.Min(slotHeight, EstimateEntryHeight(ui, entry));
+            cursor = cursor with
+            {
+                Y = cursor.Y + GetAlignmentOffset(slotHeight, desiredHeight, verticalAlignment)
+            };
+            height = desiredHeight;
+        }
+
+        ui.SetCursorPos(cursor);
+        return new LayoutConstraint(width, height, constraint.TrailingSpacing);
+    }
+
+    private static float GetAlignmentOffset(
+        float slotExtent,
+        float desiredExtent,
+        LayoutAlignmentKind alignment)
+    {
+        var remaining = MathF.Max(0f, slotExtent - desiredExtent);
+        return alignment switch
+        {
+            LayoutAlignmentKind.Center => remaining / 2f,
+            LayoutAlignmentKind.End => remaining,
+            _ => 0f
+        };
     }
 
     private void RenderEntryCore(
@@ -183,7 +246,7 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
                 RenderDiv(ui, entry, decorations, effectiveOpacity, constraint, ref hasActiveAnimations);
                 return;
             case VirtualControlTypes.Text:
-                RenderText(ui, entry, constraint);
+                RenderText(ui, entry);
                 return;
             case VirtualControlTypes.Input:
                 RenderInput(ui, entry, effectiveOpacity, constraint);
@@ -216,8 +279,11 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
         var decorate = decorations is not null && HasPanelDecoration(entry);
         var panelStart = default(UiVector2);
         var availableSize = default(UiVector2);
+        var decorationIndex = -1;
         if (decorate)
         {
+            decorationIndex = decorations!.Count;
+            decorations.Add(default);
             panelStart = ui.GetCursorScreenPos();
             var region = ui.GetContentRegionAvail();
             availableSize = new UiVector2(
@@ -291,13 +357,21 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
 
             if (decorate)
             {
+                var layoutEndY = ui.GetCursorPosY();
+                var layoutEndScreenY = ui.GetCursorScreenPos().Y;
+                var desiredCursorY = layoutEndY + constraint.TrailingSpacing;
                 ui.EndGroup();
+                var groupCursor = ui.GetCursorPos();
+                if (groupCursor.Y < desiredCursorY)
+                {
+                    ui.SetCursorPos(new UiVector2(groupCursor.X, desiredCursorY));
+                }
+
                 var panelEnd = ui.GetItemRectMax();
                 var margin = GetThickness(entry, "Margin");
                 var width = TryGetSingle(entry, PropertyKeys.Width, out var explicitWidth) && explicitWidth > 0
                     ? explicitWidth
                     : MathF.Max(0f, constraint.Width ?? (availableSize.X - ToFloat(margin.Right)));
-                var padding = GetThickness(entry, "Padding");
                 var height = TryGetSingle(entry, PropertyKeys.Height, out var explicitHeight) && explicitHeight > 0
                     ? explicitHeight
                     : constraint.Height ?? 0f;
@@ -307,7 +381,7 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
                 var panelBottom = constraint.Height is not null
                     ? panelStart.Y + MathF.Max(1f, height)
                     : MathF.Max(
-                        panelEnd.Y + ToFloat(padding.Bottom),
+                        MathF.Max(panelEnd.Y, layoutEndScreenY),
                         panelStart.Y + MathF.Max(1f, height));
                 var rect = new UiRect(
                     panelStart.X,
@@ -317,7 +391,11 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
                 var clipRect = _panelClipRects.TryPeek(out var activeClip)
                     ? activeClip
                     : (UiRect?)null;
-                decorations!.Add(CreatePanelDecoration(entry, rect, effectiveOpacity, clipRect));
+                decorations![decorationIndex] = CreatePanelDecoration(
+                    entry,
+                    rect,
+                    effectiveOpacity,
+                    clipRect);
             }
         }
     }
@@ -771,7 +849,8 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
             itemEntry.RewriteIdentity(
                 $"{hostEntry.Id}#item:{identities[index]}",
                 hostEntry.Id);
-            ui.SetCursorPos(new UiVector2(contentX, contentY + rowOffset));
+            var rowY = contentY + rowOffset;
+            ui.SetCursorPos(new UiVector2(contentX, rowY));
             ui.BeginGroup();
             RenderEntry(
                 ui,
@@ -780,6 +859,7 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
                 effectiveOpacity,
                 new LayoutConstraint(contentWidth, null),
                 ref hasActiveAnimations);
+            var cursorExtent = MathF.Max(1f, ui.GetCursorPosY() - rowY);
             ui.EndGroup();
 
             var margin = GetThickness(itemEntry, "Margin");
@@ -787,7 +867,9 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
                 + ToFloat(margin.Top + margin.Bottom);
             var measuredExtent = MathF.Max(
                 1f,
-                MathF.Max(ui.GetItemRectSize().Y, declaredExtent));
+                MathF.Max(
+                    cursorExtent,
+                    MathF.Max(ui.GetItemRectSize().Y, declaredExtent)));
             if (layout.Measure(index, measuredExtent, out var measuredDelta))
             {
                 HasPendingLayout = true;
@@ -940,6 +1022,11 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
             switch (entry.Kind)
             {
                 case DivTypes.Row:
+                    var rowHeight = contentConstraint.Height
+                        ?? (entry.Children.Count > 0
+                            ? entry.Children.Max(child => EstimateEntryHeight(ui, child))
+                            : 0f);
+                    var rowStartY = ui.GetCursorPosY();
                     ui.BeginRow();
                     try
                     {
@@ -948,12 +1035,14 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
                             entry,
                             decorations,
                             effectiveOpacity,
-                            LayoutConstraint.Unconstrained,
+                            new LayoutConstraint(null, rowHeight),
                             ref hasActiveAnimations);
                     }
                     finally
                     {
                         ui.EndRow();
+                        var cursor = ui.GetCursorPos();
+                        ui.SetCursorPos(cursor with { Y = rowStartY + rowHeight });
                     }
 
                     break;
@@ -1366,16 +1455,155 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
         var text = entry.Type == VirtualControlTypes.Text
             ? GetString(entry, PropertyKeys.Text)
             : GetString(entry, "Content");
-        var measured = string.IsNullOrEmpty(text) ? 1f : ui.CalcTextSize(text).X;
+        if (entry.Type == VirtualControlTypes.Text)
+        {
+            return MathF.Max(1f, MeasureEntryTextWidth(ui, entry, text) + marginWidth);
+        }
+
         if (entry.Type == VirtualControlTypes.Input)
         {
             var padding = GetThickness(entry, "Padding");
+            var measured = MeasureEntryTextWidth(ui, entry, text);
             measured += padding.Left > 0 || padding.Right > 0
                 ? ToFloat(padding.Left + padding.Right)
                 : 16f;
+            return MathF.Max(1f, measured + marginWidth);
         }
 
-        return MathF.Max(1f, measured + marginWidth);
+        if (entry.Type != VirtualControlTypes.Div)
+        {
+            return MathF.Max(1f, MeasureEntryTextWidth(ui, entry, text) + marginWidth);
+        }
+
+        var paddingValue = GetThickness(entry, "Padding");
+        var paddingWidth = ToFloat(paddingValue.Left + paddingValue.Right);
+        if (entry.Children.Count == 0)
+        {
+            return MathF.Max(1f, paddingWidth + marginWidth);
+        }
+
+        float contentWidth;
+        if (string.Equals(entry.Kind, DivTypes.Row, StringComparison.Ordinal))
+        {
+            var spacing = TryGetSingle(entry, PropertyKeys.Spacing, out var configuredSpacing)
+                ? configuredSpacing
+                : ui.GetItemSpacing().X;
+            contentWidth = entry.Children.Sum(child => EstimateEntryWidth(ui, child));
+            contentWidth += spacing * Math.Max(0, entry.Children.Count - 1);
+        }
+        else if (string.Equals(entry.Kind, DivTypes.Grid, StringComparison.Ordinal))
+        {
+            contentWidth = EstimateGridContentWidth(ui, entry);
+        }
+        else
+        {
+            contentWidth = entry.Children.Max(child => EstimateEntryWidth(ui, child));
+        }
+
+        return MathF.Max(1f, contentWidth + paddingWidth + marginWidth);
+    }
+
+    private static float EstimateGridContentWidth(UiImmediateContext ui, VirtualEntry entry)
+    {
+        var definitions = GetColumnDefinitions(entry);
+        var columnCount = Math.Max(1, definitions.Count);
+        var rowCount = Math.Max(1, GetRowDefinitions(entry).Count);
+        var cells = BuildGridCells(entry, columnCount, rowCount);
+        var spacing = TryGetSingle(entry, PropertyKeys.ColumnSpacing, out var configuredSpacing)
+            ? configuredSpacing
+            : 0f;
+        var widths = new float[columnCount];
+
+        for (var index = 0; index < columnCount; index++)
+        {
+            if (index < definitions.Count && definitions[index].Unit == LengthUnit.Pixel)
+            {
+                widths[index] = MathF.Max(1f, ToFloat(definitions[index].Value));
+            }
+        }
+
+        foreach (var cell in cells)
+        {
+            var span = TryGetInt32(cell.Entry, "Grid.ColumnSpan", out var configuredSpan)
+                ? Math.Clamp(configuredSpan, 1, columnCount - cell.Column)
+                : 1;
+            if (span != 1
+                || cell.Column < definitions.Count
+                    && definitions[cell.Column].Unit == LengthUnit.Pixel)
+            {
+                continue;
+            }
+
+            widths[cell.Column] = MathF.Max(
+                widths[cell.Column],
+                EstimateEntryWidth(ui, cell.Entry));
+        }
+
+        foreach (var cell in cells)
+        {
+            var span = TryGetInt32(cell.Entry, "Grid.ColumnSpan", out var configuredSpan)
+                ? Math.Clamp(configuredSpan, 1, columnCount - cell.Column)
+                : 1;
+            if (span == 1)
+            {
+                continue;
+            }
+
+            var allocatedWidth = spacing * (span - 1);
+            var flexibleTracks = new List<int>(span);
+            for (var offset = 0; offset < span; offset++)
+            {
+                var column = cell.Column + offset;
+                allocatedWidth += widths[column];
+                if (column >= definitions.Count || definitions[column].Unit != LengthUnit.Pixel)
+                {
+                    flexibleTracks.Add(column);
+                }
+            }
+
+            var deficit = EstimateEntryWidth(ui, cell.Entry) - allocatedWidth;
+            if (deficit <= 0f || flexibleTracks.Count == 0)
+            {
+                continue;
+            }
+
+            var extraWidth = deficit / flexibleTracks.Count;
+            foreach (var column in flexibleTracks)
+            {
+                widths[column] += extraWidth;
+            }
+        }
+
+        return widths.Sum() + (spacing * Math.Max(0, columnCount - 1));
+    }
+
+    private static float MeasureEntryTextWidth(
+        UiImmediateContext ui,
+        VirtualEntry entry,
+        string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return 1f;
+        }
+
+        var fontSizePushed = TryGetSingle(entry, "FontSize", out var fontSize) && fontSize > 0f;
+        if (fontSizePushed)
+        {
+            ui.PushFontSize(fontSize);
+        }
+
+        try
+        {
+            return ui.CalcTextSize(text).X;
+        }
+        finally
+        {
+            if (fontSizePushed)
+            {
+                ui.PopFontSize();
+            }
+        }
     }
 
     private static List<GridCell> BuildGridCells(
@@ -1458,29 +1686,9 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
         }
     }
 
-    private static void RenderText(UiImmediateContext ui, VirtualEntry entry, LayoutConstraint constraint)
+    private static void RenderText(UiImmediateContext ui, VirtualEntry entry)
     {
-        var text = GetString(entry, PropertyKeys.Text);
-        var originalCursorX = ui.GetCursorPosX();
-        var aligned = false;
-        if (TryGetHorizontalAlignment(entry, "HorizontalAlignment", out var alignment)
-            && alignment != UiItemHorizontalAlign.Left)
-        {
-            var cursor = ui.GetCursorPos();
-            var availableWidth = constraint.Width ?? ui.GetContentRegionAvail().X;
-            var textWidth = ui.CalcTextSize(text).X;
-            var offset = alignment == UiItemHorizontalAlign.Right
-                ? availableWidth - textWidth
-                : (availableWidth - textWidth) / 2f;
-            ui.SetCursorPosX(cursor.X + MathF.Max(0f, offset));
-            aligned = true;
-        }
-
-        ui.Text(text);
-        if (aligned)
-        {
-            ui.SetCursorPosX(originalCursorX);
-        }
+        ui.Text(GetString(entry, PropertyKeys.Text));
     }
 
     private static void RenderButton(
@@ -1508,7 +1716,7 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
 
         var height = requestedSize.Y > 0f
             ? requestedSize.Y
-            : textSize.Y + verticalPadding;
+            : constraint.Height ?? (textSize.Y + verticalPadding);
         var clicked = ui.InvisibleButton(widgetLabel, new UiVector2(MathF.Max(1f, width), MathF.Max(1f, height)));
         var itemMin = ui.GetItemRectMin();
         var itemMax = ui.GetItemRectMax();
@@ -1565,12 +1773,18 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
             out var configuredAlignment)
                 ? configuredAlignment
                 : UiItemHorizontalAlign.Center;
+        var verticalAlignment = TryGetVerticalAlignment(
+            entry,
+            "VerticalContentAlignment",
+            out var configuredVerticalAlignment)
+                ? configuredVerticalAlignment
+                : UiItemVerticalAlign.Center;
         ui.DrawTextAligned(
             textRect,
             label,
             ui.GetColorU32(UiStyleColor.ButtonText),
             horizontalAlignment,
-            UiItemVerticalAlign.Center,
+            verticalAlignment,
             null,
             true);
 
@@ -1731,8 +1945,11 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
         LayoutConstraint constraint,
         ref bool hasActiveAnimations)
     {
+        var rowStartY = ui.GetCursorPosY();
         foreach (var child in entry.Children)
         {
+            var cursor = ui.GetCursorPos();
+            ui.SetCursorPos(cursor with { Y = rowStartY });
             RenderEntry(ui, child, decorations, effectiveOpacity, constraint, ref hasActiveAnimations);
         }
     }
@@ -1773,7 +1990,10 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
                 child,
                 decorations,
                 effectiveOpacity,
-                new LayoutConstraint(constraint.Width, childHeight),
+                new LayoutConstraint(
+                    constraint.Width,
+                    childHeight,
+                    hasExplicitSpacing ? spacing : 0f),
                 ref hasActiveAnimations);
         }
 
@@ -2219,6 +2439,19 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
             }
         }
 
+        if (!SupportsButtonContentAlignment(entry))
+        {
+            if (entry.Properties.ContainsKey("HorizontalContentAlignment"))
+            {
+                LogUnsupportedProperty(entry, "HorizontalContentAlignment");
+            }
+
+            if (entry.Properties.ContainsKey("VerticalContentAlignment"))
+            {
+                LogUnsupportedProperty(entry, "VerticalContentAlignment");
+            }
+        }
+
         foreach (var animation in entry.Animations.Values)
         {
             if (animation is AnimationValue animationValue)
@@ -2415,6 +2648,69 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
         return false;
     }
 
+    private static bool TryGetVerticalAlignment(
+        VirtualEntry entry,
+        string propertyName,
+        out UiItemVerticalAlign alignment)
+    {
+        if (entry.Properties.TryGetValue(propertyName, out var value)
+            && value is VerticalAlignmentValue configured)
+        {
+            alignment = configured.Kind switch
+            {
+                LayoutAlignmentKind.Center => UiItemVerticalAlign.Center,
+                LayoutAlignmentKind.End => UiItemVerticalAlign.Bottom,
+                _ => UiItemVerticalAlign.Top
+            };
+            return true;
+        }
+
+        alignment = UiItemVerticalAlign.Top;
+        return false;
+    }
+
+    private static bool TryGetHorizontalLayoutAlignment(
+        VirtualEntry entry,
+        string propertyName,
+        out LayoutAlignmentKind alignment)
+    {
+        if (entry.Properties.TryGetValue(propertyName, out var value)
+            && value is HorizontalAlignmentValue configured)
+        {
+            alignment = configured.Kind;
+            return true;
+        }
+
+        alignment = LayoutAlignmentKind.Stretch;
+        return false;
+    }
+
+    private static bool TryGetVerticalLayoutAlignment(
+        VirtualEntry entry,
+        string propertyName,
+        out LayoutAlignmentKind alignment)
+    {
+        if (entry.Properties.TryGetValue(propertyName, out var value)
+            && value is VerticalAlignmentValue configured)
+        {
+            alignment = configured.Kind;
+            return true;
+        }
+
+        alignment = LayoutAlignmentKind.Stretch;
+        return false;
+    }
+
+    private static bool SupportsButtonContentAlignment(VirtualEntry entry)
+    {
+        return entry.Type == VirtualControlTypes.Input
+            && entry.Kind is not InputTypes.Checkbox
+            and not InputTypes.Toggle
+            and not InputTypes.Radio
+            and not InputTypes.Text
+            and not InputTypes.Password;
+    }
+
     private static bool TryGetSingle(VirtualEntry entry, string propertyName, out float value)
     {
         if (entry.Properties.TryGetValue(propertyName, out var rawValue)
@@ -2535,7 +2831,10 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
 
     private readonly record struct EntryStyleScope(bool FontSizePushed, int ColorCount, int StyleVarCount);
 
-    private readonly record struct LayoutConstraint(float? Width, float? Height)
+    private readonly record struct LayoutConstraint(
+        float? Width,
+        float? Height,
+        float TrailingSpacing = 0f)
     {
         public static LayoutConstraint Unconstrained => new(null, null);
 
@@ -2547,14 +2846,16 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
                     : null,
                 Height is float height
                     ? MathF.Max(0f, height - ToFloat(thickness.Top + thickness.Bottom))
-                    : null);
+                    : null,
+                TrailingSpacing);
         }
 
         public LayoutConstraint WithExplicitSize(UiVector2 size)
         {
             return new LayoutConstraint(
                 size.X > 0f ? size.X : Width,
-                size.Y > 0f ? size.Y : Height);
+                size.Y > 0f ? size.Y : Height,
+                TrailingSpacing);
         }
     }
 
@@ -2567,9 +2868,7 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
         "ScaleX",
         "ScaleY",
         "TranslateX",
-        "TranslateY",
-        "VerticalAlignment",
-        "VerticalContentAlignment"
+        "TranslateY"
     };
 
     private readonly record struct GridCell(int Row, int Column, int DeclarationIndex, VirtualEntry Entry);

@@ -1,6 +1,7 @@
 using Nuri.Runtime.Diagnostics;
 using Nuri.UI.Controls;
 using Nuri.UI.Dsl;
+using Nuri.UI.Values;
 
 namespace Nuri.DevTools;
 
@@ -9,6 +10,9 @@ internal sealed class RuntimeInspectorComponent(
     Func<RuntimeSnapshot>? snapshotProvider = null) : Component
 {
     private const int MaximumVisibleLogs = 200;
+    private const double TreeRowExtent = 36;
+    private const double RuntimeLogRowExtent = 26;
+    private const double ConsoleLogEstimatedExtent = 58;
     private readonly Func<RuntimeSnapshot> _snapshotProvider = snapshotProvider ?? NuriDiagnostics.GetSnapshot;
 
     public override IElement Render()
@@ -39,9 +43,9 @@ internal sealed class RuntimeInspectorComponent(
                         setCollapsedNodes,
                         SelectComponent)
                     : BuildConsole(snapshot))
-            .Background("#F3F3F3")
-            .Padding(14)
-            .Spacing(10);
+            .Background("#EAF0F7")
+            .Padding(18)
+            .Spacing(12);
     }
 
     private static IElement BuildHeader(RuntimeSnapshot snapshot)
@@ -49,43 +53,60 @@ internal sealed class RuntimeInspectorComponent(
         var componentCount = snapshot.Roots.Sum(root => CountComponents(root.RootComponent));
         return Grid(
                 Div(
-                        Text("Nuri DevTools").FontSize(22).FontColor("#1F1F1F"),
-                        Text("Runtime inspector").FontColor("#616161"))
-                    .Spacing(2)
+                        Text("NURI DEVTOOLS").FontSize(12).FontColor("#7DD3FC"),
+                        Text("Runtime inspector").FontSize(24).FontColor("#FFFFFF"),
+                        Text("Inspect components, hooks, stores, and renderer activity in real time.")
+                            .FontColor("#AFC4DF"))
+                    .Spacing(4)
                     .Column(0),
-                Text($"{snapshot.Roots.Count} roots  |  {componentCount} components  |  {snapshot.RecentLogs.Count} logs")
-                    .FontColor("#616161")
-                    .End()
+                Div(
+                        Text("LIVE SNAPSHOT").FontSize(11).FontColor("#7DD3FC"),
+                        Text($"{snapshot.Roots.Count} roots  |  {componentCount} components  |  {snapshot.RecentLogs.Count} logs")
+                            .FontColor("#F8FAFC"))
+                    .Padding(14, 10, 14, 10)
+                    .Spacing(3)
+                    .Background("#1D3352")
+                    .Brush("#2F4D73")
+                    .Thickness(1)
+                    .CornerRadius(8)
                     .Column(1))
             .Columns(Star, Auto)
             .Rows(Auto)
-            .Padding(14)
-            .Background("#FFFFFF")
-            .Brush("#E5E5E5")
+            .Padding(18)
+            .Background("#14233A")
+            .Brush("#223A5E")
             .Thickness(1)
-            .CornerRadius(8);
+            .CornerRadius(12);
     }
 
     private static IElement BuildMainTabs(
         DevToolsTab selected,
         Action<Func<DevToolsTab, DevToolsTab>> setSelected)
     {
-        return Div(
-                DivTypes.Row,
-                TabButton("Inspector", selected == DevToolsTab.Inspector, () => setSelected(_ => DevToolsTab.Inspector)),
-                TabButton("Console", selected == DevToolsTab.Console, () => setSelected(_ => DevToolsTab.Console)),
-                Button("Clear logs", NuriDiagnostics.ClearLogs)
-                    .Size(100, 32)
-                    .Background("#F7F7F7")
-                    .FontColor("#1F1F1F")
-                    .Brush("#D8D8D8")
-                    .Thickness(1))
-            .Spacing(8)
-            .Padding(8)
-            .Background("#FFFFFF")
-            .Brush("#E5E5E5")
-            .Thickness(1)
-            .CornerRadius(8);
+        return Grid(
+                    Div(DivTypes.Row,
+                        TabButton("Inspector", selected == DevToolsTab.Inspector, () => setSelected(_ => DevToolsTab.Inspector)),
+                        TabButton("Console", selected == DevToolsTab.Console, () => setSelected(_ => DevToolsTab.Console))
+                        )
+                        .Spacing(8)
+                        .VCenter ()
+                        .Column(0),
+                    Button("Clear logs", NuriDiagnostics.ClearLogs)
+                        .Size(100, 32)
+                        .Background("#EEF3F8")
+                        .FontColor("#334155")
+                        .Brush("#CBD7E5")
+                        .VCenter ()
+                        .Thickness(1)
+                        .Column(1)
+                )
+                .Columns(Star, Auto)
+                .Rows(Auto)
+                .Padding(18)
+                .Background("#F8FAFD")
+                .Brush("#D8E2EE")
+                .Thickness(1)
+                .CornerRadius(10);
     }
 
     private static IElement BuildInspector(
@@ -107,8 +128,8 @@ internal sealed class RuntimeInspectorComponent(
         return Grid(
                 Surface(
                         "Component tree",
-                        Div(DivTypes.Scroll, Div(treeRows.ToArray())
-                                .Spacing(4))
+                        BuildVirtualizedTree(treeRows),
+                        $"{treeRows.Count:N0} visible"
                 )
                     .Column(0),
                 Grid(
@@ -127,19 +148,19 @@ internal sealed class RuntimeInspectorComponent(
             .Grow();
     }
 
-    private static IReadOnlyList<IElement> BuildTreeRows(
+    internal static IReadOnlyList<InspectorTreeRow> BuildTreeRows(
         RuntimeSnapshot snapshot,
         string? selectedComponentId,
         HashSet<string> collapsedNodes,
         Action<Func<HashSet<string>, HashSet<string>>> setCollapsedNodes,
         Action<ComponentSnapshot> selectComponent)
     {
-        var rows = new List<IElement>();
+        var rows = new List<InspectorTreeRow>();
         foreach (var root in snapshot.Roots)
         {
             var nodeId = "root:" + root.RootId;
             var expanded = !collapsedNodes.Contains(nodeId);
-            rows.Add(BuildTreeRow(
+            rows.Add(new InspectorTreeRow(
                 nodeId,
                 0,
                 expanded,
@@ -147,7 +168,9 @@ internal sealed class RuntimeInspectorComponent(
                 $"{root.RootId} ({root.Renderer})  patches={root.PatchCount}",
                 () => ToggleNode(nodeId, setCollapsedNodes),
                 null,
-                false));
+                false,
+                false,
+                rows.Count));
 
             if (expanded && root.RootComponent is not null)
             {
@@ -164,24 +187,44 @@ internal sealed class RuntimeInspectorComponent(
 
         if (rows.Count == 0)
         {
-            rows.Add(Text("No diagnostic roots are registered.").FontColor("#616161"));
+            rows.Add(new InspectorTreeRow(
+                "empty",
+                0,
+                false,
+                false,
+                "No diagnostic roots are registered.",
+                static () => { },
+                null,
+                false,
+                true,
+                0));
         }
 
         return rows;
+    }
+
+    internal static IElement BuildVirtualizedTree(IReadOnlyList<InspectorTreeRow> rows)
+    {
+        return VirtualizedItems(
+                rows,
+                row => row.NodeId,
+                TreeRowExtent,
+                BuildTreeRow)
+            .Grow();
     }
 
     private static void AddComponentRows(
         ComponentSnapshot component,
         string? selectedComponentId,
         int depth,
-        ICollection<IElement> rows,
+        ICollection<InspectorTreeRow> rows,
         HashSet<string> collapsedNodes,
         Action<Func<HashSet<string>, HashSet<string>>> setCollapsedNodes,
         Action<ComponentSnapshot> selectComponent)
     {
         var nodeId = "component:" + component.ComponentId;
         var expanded = !collapsedNodes.Contains(nodeId);
-        rows.Add(BuildTreeRow(
+        rows.Add(new InspectorTreeRow(
             nodeId,
             depth,
             expanded,
@@ -189,7 +232,9 @@ internal sealed class RuntimeInspectorComponent(
             $"{component.TypeName}  renders={component.RenderCount}",
             () => ToggleNode(nodeId, setCollapsedNodes),
             () => selectComponent(component),
-            string.Equals(component.ComponentId, selectedComponentId, StringComparison.Ordinal)));
+            string.Equals(component.ComponentId, selectedComponentId, StringComparison.Ordinal),
+            false,
+            rows.Count));
 
         if (!expanded)
         {
@@ -209,39 +254,46 @@ internal sealed class RuntimeInspectorComponent(
         }
     }
 
-    private static IElement BuildTreeRow(
-        string nodeId,
-        int depth,
-        bool expanded,
-        bool hasChildren,
-        string label,
-        Action toggle,
-        Action? select,
-        bool selected)
+    private static IElement BuildTreeRow(InspectorTreeRow row)
     {
-        var toggleButton = Button(hasChildren ? (expanded ? "-" : "+") : "·", hasChildren ? toggle : () => { })
-            .Size(30, 28)
-            .Background("#FFFFFF")
-            .FontColor("#3B3B3B")
-            .Brush("#D8D8D8")
+        if (row.IsPlaceholder)
+        {
+            return Div(Text(row.Label).FontColor("#64748B"))
+                .Height(TreeRowExtent)
+                .Padding(10, 8, 10, 8)
+                .Background("#F7FAFC")
+                .Key(row.NodeId);
+        }
+
+        var idleBackground = row.Depth == 0
+            ? "#E7F0FA"
+            : row.Index % 2 == 0 ? "#FBFDFF" : "#F5F8FC";
+        var rowBackground = row.Selected ? "#DCEEFF" : idleBackground;
+        var toggleButton = Button(
+                row.HasChildren ? (row.Expanded ? "-" : "+") : ".",
+                row.HasChildren ? row.Toggle : static () => { })
+            .Size(30, 32)
+            .Background(rowBackground)
+            .FontColor(row.Selected ? "#0369A1" : "#64748B")
+            .Brush(row.Selected ? "#7DD3FC" : "#D8E2EE")
             .Thickness(0)
             .Column(0);
-        var selectButton = Button(label, select ?? toggle)
-            .Height(28)
+        var selectButton = Button(row.Label, row.Select ?? row.Toggle)
+            .Height(32)
             .TextStart()
-            .Background(selected ? "#E5F1FB" : depth == 0 ? "#F0F6FA" : "#FFFFFF")
-            .FontColor(selected ? "#005A9E" : "#1F1F1F")
-            .Brush(selected ? "#99C9EF" : "#E5E5E5")
+            .Background(rowBackground)
+            .FontColor(row.Selected ? "#075985" : row.Depth == 0 ? "#1E3A5F" : "#26364A")
+            .Brush(row.Selected ? "#7DD3FC" : "#D8E2EE")
             .Thickness(0)
             .Column(1);
 
         return Grid(toggleButton, selectButton)
-            .Key(nodeId)
+            .Key(row.NodeId)
             .Columns(Pixels(32), Star)
-            .Rows(Pixels(28))
-            .ColumnSpacing(4)
-            .Background ("#FFFFFF")
-            .Margin(left: depth * 14);
+            .Rows(Pixels(32))
+            .ColumnSpacing(2)
+            .Background(rowBackground)
+            .Margin(left: row.Depth * 14, bottom: 4);
     }
 
     private static IElement BuildDetails(
@@ -319,69 +371,110 @@ internal sealed class RuntimeInspectorComponent(
             : Div(rows.ToArray()).Spacing(5);
     }
 
-    private static IElement BuildRuntimeLogs(RuntimeSnapshot snapshot)
+    internal static IElement BuildRuntimeLogs(RuntimeSnapshot snapshot)
     {
         var logs = snapshot.RecentLogs
             .Where(log => log.Kind != RuntimeLogKind.Console && log.Kind != RuntimeLogKind.AppLog)
             .Reverse()
             .Take(MaximumVisibleLogs)
-            .Select(log => (IElement)Text($"{log.LocalTime}  {log.Kind,-20}  {log.Message}").FontColor(LogColor(log.Kind)))
             .ToArray();
 
-        return Div(
-            DivTypes.Scroll,
-            logs.Length == 0
-                ? Text("No runtime events.").FontColor("#616161")
-                : Div(logs).Spacing(3));
+        return logs.Length == 0
+            ? Text("No runtime events.").FontColor("#616161")
+            : VirtualizedItems(
+                    logs,
+                    log => $"runtime:{log.Sequence}",
+                    RuntimeLogRowExtent,
+                    RenderRuntimeLog)
+                .Grow();
     }
 
-    private static IElement BuildConsole(RuntimeSnapshot snapshot)
+    internal static IElement BuildConsole(RuntimeSnapshot snapshot)
+    {
+        return Grid(
+                Surface(
+                        "Console output",
+                        BuildConsoleLogs(snapshot))
+                    .Row(0))
+            .Rows(Star)
+            .Grow();
+    }
+
+    internal static IElement BuildConsoleLogs(RuntimeSnapshot snapshot)
     {
         var logs = snapshot.RecentLogs
             .Where(log => log.Kind is RuntimeLogKind.Console or RuntimeLogKind.AppLog or RuntimeLogKind.FullRebuild)
             .Reverse()
             .Take(MaximumVisibleLogs)
-            .Select(log => (IElement)Div(
-                    Text($"{log.LocalTime}  {log.Message}").FontColor("#1F1F1F"),
-                    Text(log.SourceDisplay).FontColor("#707070"))
-                .Spacing(2)
-                .Padding(6)
-                .Background("#FAFAFA")
-                .Brush("#EDEDED")
-                .Thickness(1)
-                .CornerRadius(4))
             .ToArray();
 
-        return Surface(
-                "Console output",
-                Div(
-                    DivTypes.Scroll,
-                    logs.Length == 0
-                        ? Text("No console output.").FontColor("#616161")
-                        : Div(logs).Spacing(3)))
-            .Grow();
+        return logs.Length == 0
+            ? Text("No console output.").FontColor("#616161")
+            : VirtualizedItems(
+                    logs,
+                    RenderConsoleLog,
+                    estimatedItemExtent: ConsoleLogEstimatedExtent,
+                    bufferPixels: 320,
+                    itemKey: log => $"console:{log.Sequence}")
+                .Grow();
     }
 
-    private static Div Surface(string title, IElement content)
+    private static IElement RenderRuntimeLog(RuntimeLogEntry log)
+    {
+        var background = log.Kind is RuntimeLogKind.UnsupportedEvent
+            or RuntimeLogKind.UnsupportedProperty
+            or RuntimeLogKind.DuplicateKey
+            ? "#FFF7E6"
+            : "#F7FAFC";
+
+        return Div(
+                Text($"{log.LocalTime}  {log.Kind,-20}  {log.Message}")
+                    .FontColor(LogColor(log.Kind)))
+            .Height(RuntimeLogRowExtent)
+            .Padding(6, 3, 6, 3)
+            .Background(background);
+    }
+
+    private static IElement RenderConsoleLog(RuntimeLogEntry log)
     {
         return Div(
-                Text(title).FontSize(15).FontColor("#1F1F1F"),
-                content)
-            .Padding(10)
-            .Spacing(8)
-            .Background("#FFFFFF")
-            .Brush("#E5E5E5")
+                Text($"{log.LocalTime}  {log.Message}").FontColor("#26364A"),
+                Text(log.SourceDisplay).FontColor("#708197"))
+            .Spacing(2)
+            .Padding(8)
+            .Margin(bottom: 6)
+            .Background("#F5F8FC")
+            .Brush("#DCE5F0")
             .Thickness(1)
-            .CornerRadius(8);
+            .CornerRadius(6);
+    }
+
+    private static Div Surface(string title, IElement content, string? caption = null)
+    {
+        var heading = Grid(
+                Text(title).FontSize(15).FontColor("#26364A").Column(0),
+                Text(caption ?? string.Empty).FontSize(12).FontColor("#708197").End().Column(1))
+            .Columns(Star, Auto)
+            .Rows(Auto);
+
+        return Div(
+                heading,
+                content)
+            .Padding(12)
+            .Spacing(10)
+            .Background(Colors.White)
+            .Brush(Colors.Black)
+            .Thickness(0.3)
+            .CornerRadius(12);
     }
 
     private static Input TabButton(string label, bool selected, Action handler)
     {
         return Button(label, handler)
             .Size(100, 32)
-            .Background(selected ? "#0067C0" : "#F7F7F7")
-            .FontColor(selected ? "#FFFFFF" : "#1F1F1F")
-            .Brush(selected ? "#0067C0" : "#D8D8D8")
+            .Background(selected ? "#1479B8" : "#EEF3F8")
+            .FontColor(selected ? "#FFFFFF" : "#334155")
+            .Brush(selected ? "#1479B8" : "#CBD7E5")
             .Thickness(1);
     }
 
@@ -469,3 +562,15 @@ internal sealed class RuntimeInspectorComponent(
         Stores
     }
 }
+
+internal sealed record InspectorTreeRow(
+    string NodeId,
+    int Depth,
+    bool Expanded,
+    bool HasChildren,
+    string Label,
+    Action Toggle,
+    Action? Select,
+    bool Selected,
+    bool IsPlaceholder,
+    int Index);

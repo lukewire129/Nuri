@@ -26,8 +26,17 @@ internal static class Program
             ("measured client size overrides viewport bounds", MeasuredClientSizeOverridesViewportBounds),
             ("grid rows advance by their tallest cell", GridRowsAdvanceByTallestCell),
             ("grid has no implicit track spacing", GridHasNoImplicitTrackSpacing),
+            ("auto grid padding centers an equal-height row and button", AutoGridPaddingCentersEqualHeightControls),
+            ("grid applies horizontal and vertical element alignment", GridAppliesElementAlignment),
+            ("row applies child vertical alignment", RowAppliesChildVerticalAlignment),
+            ("column applies child horizontal alignment", ColumnAppliesChildHorizontalAlignment),
+            ("button content alignment is supported without diagnostics", ButtonContentAlignmentIsSupported),
+            ("auto grid columns measure nested div content", AutoGridColumnsMeasureNestedDivContent),
+            ("decorated grid preserves bottom padding before its sibling", DecoratedGridPreservesBottomPaddingBeforeSibling),
+            ("header grid preserves visible bottom padding", HeaderGridPreservesVisibleBottomPadding),
             ("scroll projects one spaced Column child", ScrollProjectsOneSpacedColumnChild),
             ("scroll clips deferred panel decorations", ScrollClipsDeferredPanelDecorations),
+            ("nested panel backgrounds preserve painter order", NestedPanelBackgroundsPreservePainterOrder),
             ("scrollbar respects viewport corners", ScrollbarRespectsViewportCorners),
             ("fixed grid tracks do not expand to overflowing content", FixedGridTracksDoNotExpand),
             ("implicit grid row fills its arranged height", ImplicitGridRowFillsArrangedHeight),
@@ -44,6 +53,7 @@ internal static class Program
             ("virtualized items project bounded viewport rows", VirtualizedItemsProjectBoundedViewportRows),
             ("virtualized items clip rows before the scrollbar", VirtualizedItemsClipRowsBeforeScrollbar),
             ("measured virtualized items learn variable row heights", MeasuredVirtualizedItemsLearnVariableRowHeights),
+            ("measured decorated rows stay aligned without overlap", MeasuredDecoratedRowsStayAlignedWithoutOverlap),
             ("wheel routes independently to Nuri scroll regions", WheelRoutesIndependentlyToNuriScrollRegions),
             ("shared Animated Dashboard projects headlessly", SharedAnimatedDashboardProjectsHeadlessly),
             ("shared Explorer tree projects headlessly", SharedExplorerTreeProjectsHeadlessly)
@@ -159,6 +169,243 @@ internal static class Program
             "An explicit RowSpacing must be measured from zero rather than Duxel's default item spacing.");
     }
 
+    private static void GridAppliesElementAlignment()
+    {
+        var buttons = RenderAlignmentButtons(
+            new GridElementAlignmentComponent(),
+            "grid-element-alignment-test");
+
+        AssertEqual(3, buttons.Length, "The Grid alignment probe must render three buttons.");
+        var origin = buttons[0].Rect;
+        AssertEqual(origin.X + 140f, buttons[1].Rect.X, "HCenter must center a 20px child in its 100px Grid cell.");
+        AssertEqual(origin.Y + 40f, buttons[1].Rect.Y, "VCenter must center a 20px child in its 100px Grid cell.");
+        AssertEqual(origin.X + 280f, buttons[2].Rect.X, "End must right-align a 20px child in its 100px Grid cell.");
+        AssertEqual(origin.Y + 80f, buttons[2].Rect.Y, "Bottom must bottom-align a 20px child in its 100px Grid cell.");
+    }
+
+    private static void AutoGridPaddingCentersEqualHeightControls()
+    {
+        using var context = CreateContext();
+        using var screen = new NuriDuxelScreen(
+            new AutoGridPaddingAlignmentComponent(),
+            () => { },
+            "auto-grid-padding-alignment-test");
+        var drawData = RenderFrameWithDrawData(context, screen, FrameInfo);
+        try
+        {
+            var fills = drawData.DrawLists
+                .SelectMany(drawList => drawList.RectFilledPrimitives?.ToArray()
+                    ?? Array.Empty<UiRectFilledPrimitive>())
+                .ToArray();
+            var parents = fills
+                .Where(primitive =>
+                    primitive.Rect.Width > 300f
+                    && MathF.Abs(primitive.Rect.Height - 48f) <= 0.01f)
+                .ToArray();
+            AssertEqual(
+                1,
+                parents.Length,
+                $"The natural-height toolbar must measure 48px. Fills: {string.Join(" | ", fills.Select(primitive => primitive.Rect))}");
+            var parent = parents[0];
+            var buttons = fills
+                .Where(primitive =>
+                    MathF.Abs(primitive.Rect.Width - 100f) <= 0.01f
+                    && MathF.Abs(primitive.Rect.Height - 32f) <= 0.01f)
+                .ToArray();
+
+            AssertEqual(3, buttons.Length, "The natural-height toolbar must render its three 32px buttons.");
+            foreach (var button in buttons)
+            {
+                AssertEqual(
+                    parent.Rect.Y + 8f,
+                    button.Rect.Y,
+                    "Auto sizing must place each button after the 8px top padding.");
+                AssertEqual(
+                    parent.Rect.Y + parent.Rect.Height - 8f,
+                    button.Rect.Y + button.Rect.Height,
+                    "Auto sizing must preserve the matching 8px bottom padding.");
+            }
+        }
+        finally
+        {
+            drawData.ReleasePooled();
+        }
+    }
+
+    private static void RowAppliesChildVerticalAlignment()
+    {
+        var buttons = RenderAlignmentButtons(
+            new RowChildAlignmentComponent(),
+            "row-child-alignment-test");
+
+        AssertEqual(3, buttons.Length, "The Row alignment probe must render three buttons.");
+        var originY = buttons[0].Rect.Y;
+        AssertEqual(originY + 40f, buttons[1].Rect.Y, "VCenter must center a Row child in the Row height.");
+        AssertEqual(originY + 80f, buttons[2].Rect.Y, "Bottom must align a Row child to the Row bottom.");
+    }
+
+    private static void ColumnAppliesChildHorizontalAlignment()
+    {
+        var buttons = RenderAlignmentButtons(
+            new ColumnChildAlignmentComponent(),
+            "column-child-alignment-test");
+
+        AssertEqual(3, buttons.Length, "The Column alignment probe must render three buttons.");
+        var originX = buttons[0].Rect.X;
+        AssertEqual(originX + 40f, buttons[1].Rect.X, "HCenter must center a Column child in the Column width.");
+        AssertEqual(originX + 80f, buttons[2].Rect.X, "End must align a Column child to the Column end.");
+    }
+
+    private static void ButtonContentAlignmentIsSupported()
+    {
+        NuriDiagnostics.Enable();
+        NuriDiagnostics.ClearLogs();
+        try
+        {
+            using var context = CreateContext();
+            using var screen = new NuriDuxelScreen(
+                new ButtonContentAlignmentComponent(),
+                () => { },
+                "button-content-alignment-test");
+
+            RenderFrame(context, screen);
+
+            AssertTrue(
+                NuriDiagnostics.GetSnapshot().RecentLogs.All(log =>
+                    log.Kind != RuntimeLogKind.UnsupportedProperty
+                    || !log.Message.Contains("Alignment", StringComparison.Ordinal)),
+                "Button horizontal and vertical content alignment must not emit unsupported diagnostics.");
+        }
+        finally
+        {
+            NuriDiagnostics.Disable();
+            NuriDiagnostics.ClearLogs();
+        }
+    }
+
+    private static UiRectFilledPrimitive[] RenderAlignmentButtons(Component component, string rootId)
+    {
+        using var context = CreateContext();
+        using var screen = new NuriDuxelScreen(component, () => { }, rootId);
+        var drawData = RenderFrameWithDrawData(context, screen, FrameInfo);
+        try
+        {
+            return drawData.DrawLists
+                .SelectMany(drawList => drawList.RectFilledPrimitives?.ToArray()
+                    ?? Array.Empty<UiRectFilledPrimitive>())
+                .Where(primitive =>
+                    MathF.Abs(primitive.Rect.Width - 20f) <= 0.01f
+                    && MathF.Abs(primitive.Rect.Height - 20f) <= 0.01f)
+                .OrderBy(primitive => primitive.Rect.X)
+                .ToArray();
+        }
+        finally
+        {
+            drawData.ReleasePooled();
+        }
+    }
+
+    private static void AutoGridColumnsMeasureNestedDivContent()
+    {
+        using var context = CreateContext();
+        using var screen = new NuriDuxelScreen(
+            new AutoColumnNestedDivComponent(),
+            () => { },
+            "grid-auto-column-nested-div-test");
+
+        var drawData = RenderFrameWithDrawData(context, screen, FrameInfo);
+        try
+        {
+            var autoColumnSurface = drawData.DrawLists
+                .SelectMany(drawList => drawList.RectFilledPrimitives?.ToArray()
+                    ?? Array.Empty<UiRectFilledPrimitive>())
+                .Single(primitive => MathF.Abs(primitive.Rect.Height - 30f) <= 0.01f);
+
+            AssertEqual(
+                148f,
+                autoColumnSurface.Rect.Width,
+                "An Auto Grid column must include a nested Div's child width and horizontal padding.");
+        }
+        finally
+        {
+            drawData.ReleasePooled();
+        }
+    }
+
+    private static void DecoratedGridPreservesBottomPaddingBeforeSibling()
+    {
+        using var context = CreateContext();
+        using var screen = new NuriDuxelScreen(
+            new DecoratedGridBottomPaddingComponent(),
+            () => { },
+            "grid-bottom-padding-test");
+
+        var drawData = RenderFrameWithDrawData(context, screen, FrameInfo);
+        try
+        {
+            var fills = drawData.DrawLists
+                .SelectMany(drawList => drawList.RectFilledPrimitives?.ToArray()
+                    ?? Array.Empty<UiRectFilledPrimitive>())
+                .ToArray();
+            var paddedGrid = fills.Single(primitive =>
+                MathF.Abs(primitive.Rect.Width - 200f) <= 0.01f
+                && MathF.Abs(primitive.Rect.Height - 56f) <= 0.01f);
+            var sibling = fills.Single(primitive =>
+                MathF.Abs(primitive.Rect.Width - 200f) <= 0.01f
+                && MathF.Abs(primitive.Rect.Height - 24f) <= 0.01f);
+
+            AssertTrue(
+                sibling.Rect.Y + 0.01f >= paddedGrid.Rect.Y + paddedGrid.Rect.Height,
+                $"A decorated Grid's bottom padding must advance its sibling. Grid: {paddedGrid.Rect}; Sibling: {sibling.Rect}.");
+        }
+        finally
+        {
+            drawData.ReleasePooled();
+        }
+    }
+
+    private static void HeaderGridPreservesVisibleBottomPadding()
+    {
+        using var context = CreateContext();
+        using var screen = new NuriDuxelScreen(
+            new HeaderGridPaddingComponent(),
+            () => { },
+            "header-grid-padding-test");
+
+        var drawData = RenderFrameWithDrawData(context, screen, FrameInfo);
+        try
+        {
+            var fills = drawData.DrawLists
+                .SelectMany(drawList => drawList.RectFilledPrimitives?.ToArray()
+                    ?? Array.Empty<UiRectFilledPrimitive>())
+                .ToArray();
+            var outer = fills.Single(primitive =>
+                MathF.Abs(primitive.Rect.Width - 600f) <= 0.01f
+                && primitive.Rect.Height > 24f);
+            var inner = fills
+                .Where(primitive => primitive.Rect.Width < 600f)
+                .MaxBy(primitive => primitive.Rect.Width);
+            var sibling = fills.Single(primitive =>
+                MathF.Abs(primitive.Rect.Width - 600f) <= 0.01f
+                && MathF.Abs(primitive.Rect.Height - 24f) <= 0.01f);
+            var bottomGap = outer.Rect.Y + outer.Rect.Height - (inner.Rect.Y + inner.Rect.Height);
+            var siblingGap = sibling.Rect.Y - (outer.Rect.Y + outer.Rect.Height);
+
+            AssertEqual(
+                18f,
+                bottomGap,
+                $"The header Grid must keep 18px below its nested surface. Outer: {outer.Rect}; Inner: {inner.Rect}");
+            AssertEqual(
+                12f,
+                siblingGap,
+                $"A decorated header must preserve its parent's Spacing before the next sibling. Header: {outer.Rect}; Sibling: {sibling.Rect}");
+        }
+        finally
+        {
+            drawData.ReleasePooled();
+        }
+    }
+
     private static void ScrollProjectsOneSpacedColumnChild()
     {
         var withoutSpacing = RenderScrollMaxOffset(0, "scroll-spacing-zero-test");
@@ -241,6 +488,42 @@ internal static class Program
         }
     }
 
+    private static void NestedPanelBackgroundsPreservePainterOrder()
+    {
+        using var context = CreateContext();
+        using var screen = new NuriDuxelScreen(
+            new NestedPanelDecorationComponent(),
+            () => { },
+            "nested-panel-decoration-test");
+
+        var drawData = RenderFrameWithDrawData(context, screen, FrameInfo);
+        try
+        {
+            var fills = drawData.DrawLists
+                .SelectMany(drawList => drawList.RectFilledPrimitives?.ToArray()
+                    ?? Array.Empty<UiRectFilledPrimitive>())
+                .ToArray();
+            var parentIndex = Array.FindIndex(
+                fills,
+                primitive => MathF.Abs(primitive.Rect.Width - 220f) <= 0.01f
+                    && MathF.Abs(primitive.Rect.Height - 120f) <= 0.01f);
+            var childIndex = Array.FindIndex(
+                fills,
+                primitive => MathF.Abs(primitive.Rect.Width - 100f) <= 0.01f
+                    && MathF.Abs(primitive.Rect.Height - 40f) <= 0.01f);
+
+            AssertTrue(parentIndex >= 0, "The nested decoration test must draw the parent background.");
+            AssertTrue(childIndex >= 0, "The nested decoration test must draw the child background.");
+            AssertTrue(
+                parentIndex < childIndex,
+                "A parent background must be painted before its child background so it cannot cover the child surface.");
+        }
+        finally
+        {
+            drawData.ReleasePooled();
+        }
+    }
+
     private static void FixedGridTracksDoNotExpand()
     {
         var normalBottom = RenderGridBottom(new FixedTrackOverflowComponent(40), "grid-fixed-track-normal-test");
@@ -277,15 +560,16 @@ internal static class Program
                         < region.Bounds.Y + region.Bounds.Height,
                 "The scrollbar track must stay inside the viewport edges so it cannot square off rounded corners.");
 
-            var squareScrollbarPrimitives = drawData.DrawLists
+            var scrollbarPrimitives = drawData.DrawLists
                 .SelectMany(drawList => drawList.RectFilledPrimitives?.ToArray()
                     ?? Array.Empty<UiRectFilledPrimitive>())
                 .Where(primitive => primitive.Rect.Equals(region.ScrollbarTrack)
                     || primitive.Rect.Equals(region.ScrollbarHandle))
                 .ToArray();
             AssertTrue(
-                squareScrollbarPrimitives.Length == 0,
-                "The scrollbar track and handle must use rounded geometry instead of square filled rectangles.");
+                scrollbarPrimitives.Length == 2
+                    && scrollbarPrimitives.All(primitive => primitive.CornerRadius > 0f),
+                "The scrollbar track and handle must use filled rectangles with rounded corners.");
         }
         finally
         {
@@ -1178,6 +1462,153 @@ internal static class Program
         }
     }
 
+    private sealed class AutoColumnNestedDivComponent : Component
+    {
+        public override IElement Render()
+        {
+            return Grid(
+                    Text("flexible").Column(0),
+                    Div(Button("content").Size(120, 20))
+                        .Padding(14, 5, 14, 5)
+                        .Background("#135E75")
+                        .Column(1))
+                .Columns(Star, Auto)
+                .Rows(Auto)
+                .Size(500, 80);
+        }
+    }
+
+    private sealed class GridElementAlignmentComponent : Component
+    {
+        public override IElement Render()
+        {
+            return Grid(
+                    Button("start").Size(20, 20).Start().Top().Column(0),
+                    Button("center").Size(20, 20).Center().Column(1),
+                    Button("end").Size(20, 20).End().Bottom().Column(2))
+                .Columns(Pixels(100), Pixels(100), Pixels(100))
+                .Rows(Pixels(100))
+                .Size(300, 100);
+        }
+    }
+
+    private sealed class AutoGridPaddingAlignmentComponent : Component
+    {
+        public override IElement Render()
+        {
+            var toolbar = Grid(
+                    Div(
+                            DivTypes.Row,
+                            Button("Inspector").Size(100, 32),
+                            Button("Console").Size(100, 32))
+                        .Spacing(8)
+                        .VCenter()
+                        .Column(0),
+                    Button("Clear logs").Size(100, 32).VCenter().Column(1))
+                .Columns(Star, Auto)
+                .Rows(Auto)
+                .Padding(8)
+                .Background("#F8FAFD");
+
+            return Div(
+                    toolbar,
+                    Div().Size(200, 20))
+                .Spacing(0);
+        }
+    }
+
+    private sealed class RowChildAlignmentComponent : Component
+    {
+        public override IElement Render()
+        {
+            return Div(
+                    DivTypes.Row,
+                    Button("top").Size(20, 20).Top(),
+                    Button("center").Size(20, 20).VCenter(),
+                    Button("bottom").Size(20, 20).Bottom())
+                .Size(100, 100)
+                .Spacing(10);
+        }
+    }
+
+    private sealed class ColumnChildAlignmentComponent : Component
+    {
+        public override IElement Render()
+        {
+            return Div(
+                    Button("start").Size(20, 20).Start(),
+                    Button("center").Size(20, 20).HCenter(),
+                    Button("end").Size(20, 20).End())
+                .Size(100, 100)
+                .Spacing(5);
+        }
+    }
+
+    private sealed class ButtonContentAlignmentComponent : Component
+    {
+        public override IElement Render()
+        {
+            return Grid(
+                    Button("top-left").Size(120, 50).TextStart().TextTop().Column(0),
+                    Button("center").Size(120, 50).TextCenter().Column(1),
+                    Button("bottom-right").Size(120, 50).TextEnd().TextBottom().Column(2))
+                .Columns(Pixels(120), Pixels(120), Pixels(120))
+                .Rows(Pixels(50));
+        }
+    }
+
+    private sealed class DecoratedGridBottomPaddingComponent : Component
+    {
+        public override IElement Render()
+        {
+            return Div(
+                    Grid(Button("content").Size(100, 20))
+                        .Columns(Pixels(100))
+                        .Rows(Auto)
+                        .Padding(18)
+                        .Background("#14233A"),
+                    Div(Text("sibling"))
+                        .Size(200, 24)
+                        .Background("#EAF0F7"))
+                .Width(200)
+                .Spacing(0);
+        }
+    }
+
+    private sealed class HeaderGridPaddingComponent : Component
+    {
+        public override IElement Render()
+        {
+            var header = Grid(
+                    Div(
+                            Text("NURI DEVTOOLS").FontSize(12),
+                            Text("Runtime inspector").FontSize(24),
+                            Text("Inspect components, hooks, stores, and renderer activity in real time."))
+                        .Spacing(4)
+                        .Column(0),
+                    Div(
+                            Text("LIVE SNAPSHOT").FontSize(11),
+                            Text("1 roots  |  12 components  |  30 logs"))
+                        .Padding(14, 10, 14, 10)
+                        .Spacing(3)
+                        .Background("#1D3352")
+                        .Column(1))
+                .Columns(Star, Auto)
+                .Rows(Auto)
+                .Padding(18)
+                .Width(600)
+                .Background("#14233A");
+
+            return Div(
+                    header,
+                    Div(Text("following content"))
+                        .Size(600, 24)
+                        .Background("#EAF0F7"))
+                .Width(600)
+                .Spacing(12);
+        }
+    }
+
     private sealed class ScrollSpacingComponent(double spacing) : Component
     {
         public override IElement Render()
@@ -1373,6 +1804,59 @@ internal static class Program
             "A direct Duxel host must also keep measured row projection bounded.");
     }
 
+    private static void MeasuredDecoratedRowsStayAlignedWithoutOverlap()
+    {
+        using var context = CreateContext();
+        var input = new DuxelInputEventQueue();
+        using var screen = new NuriDuxelScreen(
+            new MeasuredDecoratedRowsProbeComponent(),
+            () => { },
+            "measured-decorated-rows-test",
+            input);
+
+        for (var frame = 0; frame < 4; frame++)
+        {
+            RenderFrame(context, screen);
+        }
+
+        var drawData = RenderFrameWithDrawData(context, screen, FrameInfo);
+        try
+        {
+            var fills = drawData.DrawLists
+                .SelectMany(drawList => drawList.RectFilledPrimitives?.ToArray()
+                    ?? Array.Empty<UiRectFilledPrimitive>())
+                .ToArray();
+            var backgrounds = fills
+                .Where(primitive => primitive.Rect.Width >= 100f
+                    && primitive.Rect.Height is > 20f and < 120f)
+                .OrderBy(primitive => primitive.Rect.Y)
+                .ToArray();
+
+            AssertTrue(
+                backgrounds.Length >= 3,
+                $"The decorated row test must draw several measured row backgrounds. Fills: {string.Join(" | ", fills.Select(primitive => primitive.Rect))}");
+            for (var index = 1; index < backgrounds.Length; index++)
+            {
+                var previous = backgrounds[index - 1].Rect;
+                var current = backgrounds[index].Rect;
+                AssertTrue(
+                    current.Y + 0.01f >= previous.Y + previous.Height,
+                    $"Measured row backgrounds must not overlap. Previous: {previous}; Current: {current}.");
+                AssertTrue(
+                    current.Y - (previous.Y + previous.Height) >= 5.5f,
+                    $"Measured row spacing must preserve the declared bottom margin. Previous: {previous}; Current: {current}.");
+                AssertTrue(
+                    MathF.Abs(current.X - previous.X) <= 0.01f
+                        && MathF.Abs(current.Width - previous.Width) <= 0.01f,
+                    $"Measured row backgrounds must share one aligned content column. Previous: {previous}; Current: {current}.");
+            }
+        }
+        finally
+        {
+            drawData.ReleasePooled();
+        }
+    }
+
     private sealed class DecoratedScrollComponent : Component
     {
         public override IElement Render()
@@ -1395,6 +1879,24 @@ internal static class Program
             return Div(Text(label))
                 .Padding(30)
                 .Background("#7c3aed");
+        }
+    }
+
+    private sealed class NestedPanelDecorationComponent : Component
+    {
+        public override IElement Render()
+        {
+            return Div(
+                    Div(Text("child"))
+                        .Size(100, 40)
+                        .Background("#ffffff")
+                        .Brush("#000000")
+                        .Thickness(1))
+                .Size(220, 120)
+                .Padding(10)
+                .Background("#1e293b")
+                .Brush("#0f172a")
+                .Thickness(1);
         }
     }
 
@@ -1460,6 +1962,30 @@ internal static class Program
                     bufferPixels: 64,
                     itemKey: item => item.ToString())
                 .Size(300, 160);
+        }
+    }
+
+    private sealed class MeasuredDecoratedRowsProbeComponent : Component
+    {
+        private static readonly int[] SourceItems = Enumerable.Range(0, 20).ToArray();
+
+        public override IElement Render()
+        {
+            return VirtualizedItems(
+                    SourceItems,
+                    item => Div(
+                            Text($"12:34:56.789  Message {item}"),
+                            Text($"SampleComponent.Render:{item}"))
+                        .Spacing(2)
+                        .Padding(8)
+                        .Margin(bottom: 6)
+                        .Background("#f5f8fc")
+                        .Brush("#dce5f0")
+                        .Thickness(1),
+                    estimatedItemExtent: 58,
+                    bufferPixels: 320,
+                    itemKey: item => item.ToString())
+                .Size(420, 240);
         }
     }
 }

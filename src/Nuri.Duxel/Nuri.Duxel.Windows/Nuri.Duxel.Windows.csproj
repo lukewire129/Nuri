@@ -1,7 +1,7 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
@@ -24,7 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Nuri.Duxel\Nuri.Duxel.csproj" />
-    <PackageReference Include="Duxel.Windows.App" Version="0.2.8-preview" />
+    <PackageReference Include="Duxel.Windows.App" Version="0.2.10-preview" />
   </ItemGroup>
 
 </Project>
