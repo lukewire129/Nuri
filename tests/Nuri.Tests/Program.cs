@@ -51,6 +51,7 @@ internal static class Program
         MultipleNavigationHooksKeepIndependentState();
         NestedNavigationComponentsKeepIndependentState();
         RouterKeysSelectedRouteHost();
+        NamedColorsUseWpfCompatibleValues();
         LayoutDistributionDslUsesNeutralProperties();
         GridLengthDslTreatsNumbersAsPixels();
         GridLengthDslParsesStringDefinitions();
@@ -62,6 +63,18 @@ internal static class Program
         VirtualizedItemsUseSafeDuplicateIdentities();
         VirtualizedItemsRejectComponentTemplatesLazily();
         Console.WriteLine("Nuri.Tests passed.");
+    }
+
+    private static void NamedColorsUseWpfCompatibleValues()
+    {
+        AssertEqual(ColorValue.FromRgb(100, 149, 237), Colors.CornflowerBlue, "Named colors should expose stable platform-neutral RGB values.");
+        AssertEqual(ColorValue.FromArgb(0, 255, 255, 255), Colors.Transparent, "Transparent should preserve the WPF-compatible ARGB channels.");
+        AssertEqual(Colors.Aqua, Colors.Cyan, "WPF-compatible color aliases should retain equal values.");
+        AssertEqual(Colors.Fuchsia, Colors.Magenta, "WPF-compatible color aliases should retain equal values.");
+
+        var element = Component.Div().Background(Colors.CornflowerBlue);
+        var background = (BrushValue.Solid)element.Properties[PropertyKeys.Background];
+        AssertEqual(Colors.CornflowerBlue, background.Color, "Named colors should flow through the neutral background DSL.");
     }
 
     private static void VirtualizedItemsStayLazyAndProduceKeyedChanges()

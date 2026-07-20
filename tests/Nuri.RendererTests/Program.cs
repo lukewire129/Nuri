@@ -23,6 +23,8 @@ using WpfPanel = System.Windows.Controls.Panel;
 using WpfTextBlock = System.Windows.Controls.TextBlock;
 using WpfUIElement = System.Windows.UIElement;
 using WpfColor = System.Windows.Media.Color;
+using NuriColors = Nuri.UI.Values.Colors;
+using WpfColors = System.Windows.Media.Colors;
 using WpfRotateTransform = System.Windows.Media.RotateTransform;
 using WpfScaleTransform = System.Windows.Media.ScaleTransform;
 using WpfSolidColorBrush = System.Windows.Media.SolidColorBrush;
@@ -45,6 +47,7 @@ internal static class Program
     [STAThread]
     private static void Main()
     {
+        WpfNamedColorsMatchCorePalette();
         RunSuite(() => new WpfDriver());
         WpfRepeatedEffectLifecycleRemainsStable();
         WpfDisposedRootIgnoresQueuedInvalidations();
@@ -61,6 +64,30 @@ internal static class Program
         RunSuite(() => new AvaloniaDriver());
         WpfRunBootstrapsStaAndClosesEveryWindowWithTheMainWindow();
         Console.WriteLine("Nuri.RendererTests passed.");
+    }
+
+    private static void WpfNamedColorsMatchCorePalette()
+    {
+        var nuriProperties = typeof(NuriColors)
+            .GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+            .ToDictionary(property => property.Name, StringComparer.Ordinal);
+        var wpfProperties = typeof(WpfColors)
+            .GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+            .ToDictionary(property => property.Name, StringComparer.Ordinal);
+
+        AssertEqual(wpfProperties.Count, nuriProperties.Count, "Core should expose the complete WPF Colors property set.");
+
+        foreach (var pair in wpfProperties)
+        {
+            AssertEqual(true, nuriProperties.TryGetValue(pair.Key, out var nuriProperty), $"Core should expose WPF color '{pair.Key}'.");
+
+            var wpfColor = (WpfColor)pair.Value.GetValue(null)!;
+            var nuriColor = (ColorValue)nuriProperty!.GetValue(null)!;
+            AssertEqual(
+                ColorValue.FromArgb(wpfColor.A, wpfColor.R, wpfColor.G, wpfColor.B),
+                nuriColor,
+                $"Core color '{pair.Key}' should match the WPF ARGB value.");
+        }
     }
 
     private static void WpfRunBootstrapsStaAndClosesEveryWindowWithTheMainWindow()

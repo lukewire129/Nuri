@@ -487,7 +487,7 @@ namespace Nuri.WPF
                 if (animation == null)
                     return brush;
 
-                solidBrush = new SolidColorBrush(Colors.Transparent);
+                solidBrush = new SolidColorBrush(System.Windows.Media.Colors.Transparent);
             }
 
             if (solidBrush.IsFrozen)
