@@ -24,6 +24,7 @@ internal static class Program
             ("effect flush and cleanup", EffectFlushAndCleanup),
             ("root content uses viewport bounds", RootContentUsesViewportBounds),
             ("measured client size overrides viewport bounds", MeasuredClientSizeOverridesViewportBounds),
+            ("preview content scale is applied to the Duxel context", PreviewContentScaleIsApplied),
             ("grid rows advance by their tallest cell", GridRowsAdvanceByTallestCell),
             ("grid has no implicit track spacing", GridHasNoImplicitTrackSpacing),
             ("auto grid padding centers an equal-height row and button", AutoGridPaddingCentersEqualHeightControls),
@@ -43,6 +44,7 @@ internal static class Program
             ("measured auto row reduces remaining star height", MeasuredAutoRowReducesRemainingStarHeight),
             ("dirty state requests and projects a frame", DirtyStateRequestsAndProjectsFrame),
             ("full rebuild requests and projects a frame", FullRebuildRequestsAndProjectsFrame),
+            ("root replacement preserves or resets state", RootReplacementPreservesOrResetsState),
             ("runtime theme changes request and apply on the next frame", RuntimeThemeChangesRequestAndApply),
             ("Duxel theme colors use the neutral Background DSL", DuxelThemeColorsUseNeutralBackgroundDsl),
             ("opacity animation requests frames and supports interruption", OpacityAnimationRequestsFramesAndSupportsInterruption),
@@ -121,6 +123,23 @@ internal static class Program
             new UiRect(0, 0, 320, 180),
             region.Bounds,
             "A host-provided client size must define the renderer bounds independently of the Duxel viewport size.");
+    }
+
+    private static void PreviewContentScaleIsApplied()
+    {
+        using var context = CreateContext();
+        using var screen = new NuriDuxelScreen(
+            new ViewportRootComponent(),
+            () => { },
+            "content-scale-test",
+            contentScaleProvider: () => 1.75f);
+        var probe = new ContentScaleProbeScreen(screen);
+
+        RenderFrame(context, probe);
+
+        AssertTrue(
+            MathF.Abs(probe.ContentScale - 1.75f) <= 0.01f,
+            $"The preview scale must be applied to the Duxel context. Actual: {probe.ContentScale}.");
     }
 
     private static void EffectFlushAndCleanup()
@@ -667,6 +686,35 @@ internal static class Program
             2,
             ProbeComponent.Log.Count(item => item == "render:1"),
             "A requested full rebuild must invoke the root component again while preserving state.");
+    }
+
+    private static void RootReplacementPreservesOrResetsState()
+    {
+        RootReplacementProbeComponent.Reset();
+        using var context = CreateContext();
+        var requestedFrames = 0;
+        using var screen = new NuriDuxelScreen(
+            new RootReplacementProbeComponent(),
+            () => requestedFrames++,
+            "root-replacement-test");
+
+        RenderFrame(context, screen);
+        RootReplacementProbeComponent.Update!(7);
+        RenderFrame(context, screen);
+        AssertEqual(7, RootReplacementProbeComponent.LastValue, "The test state must update before replacement.");
+
+        requestedFrames = 0;
+        screen.ReplaceRoot(new RootReplacementProbeComponent(), resetState: false);
+        AssertEqual(1, requestedFrames, "Replacing the root must request a Duxel frame.");
+        RenderFrame(context, screen);
+        AssertEqual(7, RootReplacementProbeComponent.LastValue, "A partial preview replacement must preserve hook state.");
+        AssertEqual(1, RootReplacementProbeComponent.MountCount, "A partial replacement must not remount a stable effect.");
+
+        screen.ReplaceRoot(new RootReplacementProbeComponent(), resetState: true);
+        RenderFrame(context, screen);
+        AssertEqual(0, RootReplacementProbeComponent.LastValue, "A full preview replacement must reset hook state.");
+        AssertEqual(2, RootReplacementProbeComponent.MountCount, "A full replacement must mount a fresh effect.");
+        AssertEqual(1, RootReplacementProbeComponent.CleanupCount, "A full replacement must clean up the previous effect.");
     }
 
     private static void RuntimeThemeChangesRequestAndApply()
@@ -1459,6 +1507,49 @@ internal static class Program
                 .Rows(Pixels(20), Pixels(20))
                 .Columns(Pixels(100));
             return rowSpacing is double spacing ? grid.RowSpacing(spacing) : grid;
+        }
+    }
+
+    private sealed class ContentScaleProbeScreen(UiScreen content) : UiScreen
+    {
+        public float ContentScale { get; private set; }
+
+        public override void Render(UiImmediateContext ui)
+        {
+            content.Render(ui);
+            ContentScale = ui.ContentScale;
+        }
+    }
+
+    private sealed class RootReplacementProbeComponent : Component
+    {
+        public static Action<int>? Update { get; private set; }
+
+        public static int LastValue { get; private set; }
+
+        public static int MountCount { get; private set; }
+
+        public static int CleanupCount { get; private set; }
+
+        public static void Reset()
+        {
+            Update = null;
+            LastValue = -1;
+            MountCount = 0;
+            CleanupCount = 0;
+        }
+
+        public override IElement Render()
+        {
+            var (value, setValue) = useState(0);
+            Update = next => setValue(_ => next);
+            LastValue = value;
+            useEffect(() =>
+            {
+                MountCount++;
+                return () => CleanupCount++;
+            }, []);
+            return Text($"replacement:{value}");
         }
     }
 

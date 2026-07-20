@@ -29,7 +29,7 @@ public static class RootComponentDiscovery
             return components[0];
 
         throw new InvalidOperationException(
-            "Could not determine the StartupProject root component. Add a NuriApplication.Run<T>, Show<T>, or Attach<T> call, or keep only one previewable component.");
+            "Could not determine the StartupProject root component. Add a NuriApplication.Create<T>, Run<T>, Show<T>, or Attach<T> call, or keep only one previewable component.");
     }
 
     private static IReadOnlyList<string> FindNuriApplicationRootNames(string projectPath)
@@ -92,7 +92,8 @@ public static class RootComponentDiscovery
 
     private static bool IsNuriApplicationMethod(string methodName)
     {
-        return string.Equals(methodName, "Run", StringComparison.Ordinal)
+        return string.Equals(methodName, "Create", StringComparison.Ordinal)
+            || string.Equals(methodName, "Run", StringComparison.Ordinal)
             || string.Equals(methodName, "Show", StringComparison.Ordinal)
             || string.Equals(methodName, "Attach", StringComparison.Ordinal);
     }

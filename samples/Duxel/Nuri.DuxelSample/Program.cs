@@ -4,7 +4,7 @@ using Nuri.UI.Controls;
 using Nuri.UI.Dsl;
 
 NuriApplication.Run(
-    UiTheme.Nord,
+    UiCompiledDesign.Windows11Dark.Theme,
     theme => new CounterComponent(theme),
     title: "Nuri + Duxel",
     width: 720,

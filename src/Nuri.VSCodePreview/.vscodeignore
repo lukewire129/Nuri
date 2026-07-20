@@ -3,3 +3,5 @@ node_modules/**
 *.vsix
 preview-host/**/*.pdb
 preview-host/**/*.resources.dll
+duxel-preview-host/**/*.pdb
+duxel-preview-host/**/*.resources.dll

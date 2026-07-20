@@ -19,7 +19,9 @@ public static class NuriApplication
         bool useDuxelTitleBar = false,
         bool integrateSystemChrome = false,
         bool includeInDiagnostics = true,
-        Action<NuriDuxelScreen>? screenCreated = null)
+        Action<NuriDuxelScreen>? screenCreated = null,
+        Action<IntPtr>? windowCreated = null,
+        Func<float>? contentScaleProvider = null)
         where TComponent : Component, new()
     {
         Run(
@@ -33,7 +35,9 @@ public static class NuriApplication
             useDuxelTitleBar,
             integrateSystemChrome,
             includeInDiagnostics,
-            screenCreated);
+            screenCreated,
+            windowCreated,
+            contentScaleProvider);
     }
 
     public static void Run(
@@ -96,14 +100,19 @@ public static class NuriApplication
         bool useDuxelTitleBar = false,
         bool integrateSystemChrome = false,
         bool includeInDiagnostics = true,
-        Action<NuriDuxelScreen>? screenCreated = null)
+        Action<NuriDuxelScreen>? screenCreated = null,
+        Action<IntPtr>? windowCreated = null,
+        Func<float>? contentScaleProvider = null)
     {
         ArgumentNullException.ThrowIfNull(rootElement);
 
         const float duxelTitleBarHeight = 48f;
         var session = new DuxelAppSession();
         var inputEvents = new DuxelInputEventQueue();
-        using var inputBridge = new WindowsInputEventBridge(inputEvents, session.RequestFrame);
+        using var inputBridge = new WindowsInputEventBridge(
+            inputEvents,
+            session.RequestFrame,
+            contentScaleProvider);
         Action<UiTheme>? observeTheme = themeController is null
             ? null
             : themeController.ObserveTheme;
@@ -122,7 +131,8 @@ public static class NuriApplication
             inputEvents,
             GetContentAreaSize,
             observeTheme,
-            includeInDiagnostics);
+            includeInDiagnostics,
+            contentScaleProvider);
         screenCreated?.Invoke(screen);
         var options = DuxelApp.Options(screen, title, width, height, vsync);
         if (theme is { } selectedTheme)
@@ -151,6 +161,7 @@ public static class NuriApplication
                 {
                     existingWindowCreated?.Invoke(windowHandle);
                     inputBridge.Attach(windowHandle);
+                    windowCreated?.Invoke(windowHandle);
                 }
             }
         };

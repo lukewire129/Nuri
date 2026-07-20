@@ -39,7 +39,7 @@ WPF Dispatcher, Duxel frame scheduling, and future renderer schedulers remain re
 
 As of 2026-07-15, Duxel is the next UI backend development priority. Avalonia remains an existing adapter and regression baseline, but new backend parity, materialization, and sample expansion should target Duxel first unless the project is explicitly reprioritized.
 
-Duxel development must preserve Core neutrality. The physical and solution folder `Nuri.Duxel` contains two projects: `src/Nuri.Duxel/Nuri.Duxel` owns immediate-mode frame projection and Duxel-specific property, event, and animation materialization, while `src/Nuri.Duxel/Nuri.Duxel.Windows` owns Windows application and frame-loop integration. Neither project may reshape Core around retained native-control assumptions.
+Duxel development must preserve Core neutrality. The physical and solution folder `Nuri.Duxel` contains three projects: `src/Nuri.Duxel/Nuri.Duxel` owns immediate-mode frame projection and Duxel-specific property, event, and animation materialization, `src/Nuri.Duxel/Nuri.Duxel.Windows` owns Windows application and frame-loop integration, and `src/Nuri.Duxel/Nuri.Duxel.PreviewHost` owns the out-of-process Visual Studio/VS Code preview host. None of these projects may reshape Core around retained native-control assumptions. The preview extensions select WPF or Duxel from the selected project's transitive references; a project that references both renderers is rejected as ambiguous. The Visual Studio VSIX and VS Code prepublish output both package the WPF and Duxel hosts.
 
 ## Current Runtime Shape
 

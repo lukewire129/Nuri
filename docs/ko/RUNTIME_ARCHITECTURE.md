@@ -39,7 +39,7 @@ WPF Dispatcher, Duxel frame scheduling 및 향후 renderer scheduler는 renderer
 
 2026-07-15부터 Duxel을 다음 UI backend 개발 우선순위로 둡니다. Avalonia는 기존 adapter 및 regression baseline으로 유지하지만, 프로젝트 우선순위를 명시적으로 다시 정하지 않는 한 신규 backend parity, materialization 및 sample 확장은 Duxel부터 진행합니다.
 
-Duxel 개발에서도 Core 중립성을 유지해야 합니다. 물리 및 solution folder인 `Nuri.Duxel` 아래에는 두 project를 둡니다. `src/Nuri.Duxel/Nuri.Duxel`은 immediate-mode frame projection과 Duxel 전용 property, event, animation materialization을 소유하고, `src/Nuri.Duxel/Nuri.Duxel.Windows`는 Windows application 및 frame-loop integration을 소유합니다. 어느 project도 retained native-control 가정을 중심으로 Core 구조를 바꾸면 안 됩니다.
+Duxel 개발에서도 Core 중립성을 유지해야 합니다. 물리 및 solution folder인 `Nuri.Duxel` 아래에는 세 project를 둡니다. `src/Nuri.Duxel/Nuri.Duxel`은 immediate-mode frame projection과 Duxel 전용 property, event, animation materialization을 소유하고, `src/Nuri.Duxel/Nuri.Duxel.Windows`는 Windows application 및 frame-loop integration을 소유하며, `src/Nuri.Duxel/Nuri.Duxel.PreviewHost`는 out-of-process Visual Studio/VS Code preview host를 소유합니다. 어느 project도 retained native-control 가정을 중심으로 Core 구조를 바꾸면 안 됩니다. Preview extension은 선택한 project의 transitive reference에서 WPF 또는 Duxel을 선택하며, 두 renderer를 모두 참조하는 project는 모호하므로 거부합니다. Visual Studio VSIX와 VS Code prepublish output은 모두 WPF 및 Duxel host를 package합니다.
 
 ## 현재 Runtime 구조
 

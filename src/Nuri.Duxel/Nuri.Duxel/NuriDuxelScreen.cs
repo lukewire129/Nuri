@@ -17,11 +17,16 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
     private readonly ApplicationRuntime<IElement> _runtime;
     private readonly DuxelVirtualEntryRenderer _renderer;
     private readonly Func<UiVector2?>? _viewportSizeProvider;
+    private readonly Func<float>? _contentScaleProvider;
     private readonly Action<UiTheme>? _themeObserver;
     private readonly bool _includeInDiagnostics;
     private readonly object _themeGate = new();
+    private readonly object _rootReplacementGate = new();
     private readonly ComponentInvalidationQueue _invalidations = new();
+    private readonly string _treePrefix;
     private readonly string _rootId;
+    private IElement _rootElement;
+    private RootReplacement? _pendingRootReplacement;
     private bool _initialized;
     private bool _diagnosticsRegistered;
     private bool _disposed;
@@ -29,6 +34,8 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
     private UiTheme _currentTheme;
     private bool _hasCurrentTheme;
     private ThemeBox? _pendingTheme;
+    private float _baseContentScale;
+    private bool _hasBaseContentScale;
 
     public NuriDuxelScreen(
         IElement rootElement,
@@ -37,18 +44,20 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
         DuxelInputEventQueue? inputEvents = null,
         Func<UiVector2?>? viewportSizeProvider = null,
         Action<UiTheme>? themeObserver = null,
-        bool includeInDiagnostics = true)
+        bool includeInDiagnostics = true,
+        Func<float>? contentScaleProvider = null)
     {
         ArgumentNullException.ThrowIfNull(rootElement);
         _requestFrame = requestFrame ?? throw new ArgumentNullException(nameof(requestFrame));
         _renderer = new DuxelVirtualEntryRenderer(inputEvents);
         _viewportSizeProvider = viewportSizeProvider;
+        _contentScaleProvider = contentScaleProvider;
         _themeObserver = themeObserver;
         _includeInDiagnostics = includeInDiagnostics;
 
-        var treePrefix = $"duxel{Interlocked.Increment(ref _nextTreeIndex)}";
-        rootElement.LoadNodeNumber(treePrefix, 0);
-        Nuri.UI.ElementTree<IElement, AnimationValue>.AssignDescendantIds(rootElement.Id, rootElement);
+        _treePrefix = $"duxel{Interlocked.Increment(ref _nextTreeIndex)}";
+        PrepareRoot(rootElement, _treePrefix);
+        _rootElement = rootElement;
         _rootId = rootElement.Id;
 
         if (!_includeInDiagnostics)
@@ -56,7 +65,7 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
             NuriDiagnostics.ExcludeRoot(_rootId);
         }
 
-        _runtime = new ApplicationRuntime<IElement>(() => rootElement, element => element.ToVirtualEntry());
+        _runtime = new ApplicationRuntime<IElement>(() => _rootElement, element => element.ToVirtualEntry());
         Component.AnyStateChanged += OnAnyStateChanged;
     }
 
@@ -84,6 +93,7 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
             return;
         }
 
+        ApplyContentScale(ui);
         var currentTheme = CaptureTheme(ui);
         lock (_themeGate)
         {
@@ -100,6 +110,26 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
 
         ApplicationRenderResult<IElement>? pendingCommit = null;
         var shouldFlushEffects = false;
+        var rootReplacement = TakePendingRootReplacement();
+        if (rootReplacement is not null)
+        {
+            Interlocked.Exchange(ref _fullRebuildRequested, 0);
+            _invalidations.Clear();
+            if (rootReplacement.ResetState)
+            {
+                ComponentLifecycle.DisposeSubtree(_rootId);
+            }
+
+            PrepareRoot(rootReplacement.RootElement, _treePrefix);
+            _rootElement = rootReplacement.RootElement;
+            if (_initialized)
+            {
+                pendingCommit = _runtime.CreateRebuild();
+                ComponentLifecycle.CleanupRemovedComponentState(pendingCommit.Operations);
+                shouldFlushEffects = true;
+            }
+        }
+
         if (!_initialized)
         {
             Interlocked.Exchange(ref _fullRebuildRequested, 0);
@@ -182,6 +212,21 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
         return theme;
     }
 
+    private void ApplyContentScale(UiImmediateContext ui)
+    {
+        if (_contentScaleProvider is null)
+            return;
+
+        if (!_hasBaseContentScale)
+        {
+            _baseContentScale = MathF.Max(0.01f, ui.ContentScale);
+            _hasBaseContentScale = true;
+        }
+
+        var previewScale = Math.Clamp(_contentScaleProvider(), 0.05f, 4f);
+        ui.SetContentScale(_baseContentScale * previewScale);
+    }
+
     public void RequestFullRebuild()
     {
         if (_disposed)
@@ -190,6 +235,23 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
         }
 
         Interlocked.Exchange(ref _fullRebuildRequested, 1);
+        _requestFrame();
+    }
+
+    public void ReplaceRoot(IElement rootElement, bool resetState = false)
+    {
+        ArgumentNullException.ThrowIfNull(rootElement);
+        if (_disposed)
+        {
+            return;
+        }
+
+        lock (_rootReplacementGate)
+        {
+            var mustResetState = resetState || (_pendingRootReplacement?.ResetState ?? false);
+            _pendingRootReplacement = new RootReplacement(rootElement, mustResetState);
+        }
+
         _requestFrame();
     }
 
@@ -293,6 +355,22 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
         _requestFrame();
     }
 
+    private RootReplacement? TakePendingRootReplacement()
+    {
+        lock (_rootReplacementGate)
+        {
+            var replacement = _pendingRootReplacement;
+            _pendingRootReplacement = null;
+            return replacement;
+        }
+    }
+
+    private static void PrepareRoot(IElement rootElement, string treePrefix)
+    {
+        rootElement.LoadNodeNumber(treePrefix, 0);
+        Nuri.UI.ElementTree<IElement, AnimationValue>.AssignDescendantIds(rootElement.Id, rootElement);
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -303,6 +381,10 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
         Component.AnyStateChanged -= OnAnyStateChanged;
         Interlocked.Exchange(ref _fullRebuildRequested, 0);
         Interlocked.Exchange(ref _pendingTheme, null);
+        lock (_rootReplacementGate)
+        {
+            _pendingRootReplacement = null;
+        }
         _invalidations.Clear();
         _renderer.Dispose();
         ComponentLifecycle.DisposeSubtree(_rootId);
@@ -320,4 +402,6 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
     }
 
     private sealed record ThemeBox(UiTheme Theme);
+
+    private sealed record RootReplacement(IElement RootElement, bool ResetState);
 }

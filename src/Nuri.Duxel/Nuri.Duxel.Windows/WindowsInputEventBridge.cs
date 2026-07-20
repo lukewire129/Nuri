@@ -50,6 +50,7 @@ internal sealed class WindowsInputEventBridge : IDisposable
 
     private readonly DuxelInputEventQueue _events;
     private readonly Action _requestFrame;
+    private readonly Func<float>? _contentScaleProvider;
     private readonly SubclassProc _windowProc;
     private readonly nuint _subclassId;
     private nint _windowHandle;
@@ -61,10 +62,14 @@ internal sealed class WindowsInputEventBridge : IDisposable
     private Point _resizeStartCursor;
     private Rect _resizeStartWindow;
 
-    public WindowsInputEventBridge(DuxelInputEventQueue events, Action requestFrame)
+    public WindowsInputEventBridge(
+        DuxelInputEventQueue events,
+        Action requestFrame,
+        Func<float>? contentScaleProvider = null)
     {
         _events = events ?? throw new ArgumentNullException(nameof(events));
         _requestFrame = requestFrame ?? throw new ArgumentNullException(nameof(requestFrame));
+        _contentScaleProvider = contentScaleProvider;
         _windowProc = WindowProc;
         _subclassId = unchecked((nuint)Interlocked.Increment(ref _nextSubclassId));
     }
@@ -404,7 +409,7 @@ internal sealed class WindowsInputEventBridge : IDisposable
         _requestFrame();
     }
 
-    private static UiVector2 ClientPoint(nint windowHandle, nint lParam)
+    private UiVector2 ClientPoint(nint windowHandle, nint lParam)
     {
         var packed = lParam.ToInt64();
         return ToLogical(
@@ -414,7 +419,7 @@ internal sealed class WindowsInputEventBridge : IDisposable
                 unchecked((short)((packed >> 16) & 0xffff))));
     }
 
-    private static UiVector2 ScreenPoint(nint windowHandle, nint lParam)
+    private UiVector2 ScreenPoint(nint windowHandle, nint lParam)
     {
         var packed = lParam.ToInt64();
         var point = new Point(
@@ -424,10 +429,10 @@ internal sealed class WindowsInputEventBridge : IDisposable
         return ToLogical(windowHandle, point);
     }
 
-    private static UiVector2 ClientSize(nint windowHandle, nint lParam)
+    private UiVector2 ClientSize(nint windowHandle, nint lParam)
     {
         var packed = lParam.ToInt64();
-        var scale = ContentScale(windowHandle);
+        var scale = EffectiveContentScale(windowHandle);
         return new UiVector2(
             (ushort)(packed & 0xffff) / scale,
             (ushort)((packed >> 16) & 0xffff) / scale);
@@ -440,7 +445,7 @@ internal sealed class WindowsInputEventBridge : IDisposable
             return;
         }
 
-        var scale = ContentScale(windowHandle);
+        var scale = EffectiveContentScale(windowHandle);
         UpdateClientSize(new UiVector2(
             MathF.Max(0f, rect.Right - rect.Left) / scale,
             MathF.Max(0f, rect.Bottom - rect.Top) / scale));
@@ -452,16 +457,20 @@ internal sealed class WindowsInputEventBridge : IDisposable
         Volatile.Write(ref _clientHeight, size.Y);
     }
 
-    private static UiVector2 ToLogical(nint windowHandle, Point point)
+    private UiVector2 ToLogical(nint windowHandle, Point point)
     {
-        var scale = ContentScale(windowHandle);
+        var scale = EffectiveContentScale(windowHandle);
         return new UiVector2(point.X / scale, point.Y / scale);
     }
 
-    private static float ContentScale(nint windowHandle)
+    private float EffectiveContentScale(nint windowHandle)
     {
         var dpi = GetDpiForWindow(windowHandle);
-        return dpi > 0 ? dpi / 96f : 1f;
+        var platformScale = dpi > 0 ? dpi / 96f : 1f;
+        var previewScale = _contentScaleProvider is null
+            ? 1f
+            : Math.Clamp(_contentScaleProvider(), 0.05f, 4f);
+        return platformScale * previewScale;
     }
 
     private static float WheelDelta(nuint wParam)

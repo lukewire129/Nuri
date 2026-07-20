@@ -359,5 +359,9 @@ MigrationBackup/
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
 
+# VS Code preview extension packaging output
+/src/Nuri.VSCodePreview/preview-host/
+/src/Nuri.VSCodePreview/duxel-preview-host/
+
 # Fody - auto-generated XML schema
 FodyWeavers.xsd

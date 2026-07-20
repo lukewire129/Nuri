@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFrameworks>net8.0-windows;net9.0-windows</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Nuri.PreviewHost.Core\Nuri.PreviewHost.Core.csproj" />
+    <ProjectReference Include="..\Nuri.Duxel.Windows\Nuri.Duxel.Windows.csproj" />
+  </ItemGroup>
+
+</Project>

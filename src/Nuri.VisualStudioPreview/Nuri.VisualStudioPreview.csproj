@@ -28,8 +28,10 @@
     <CreatePkgDefAssemblyToProcess>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\$(AssemblyName).dll</CreatePkgDefAssemblyToProcess>
     <CreateVsixContainerDependsOn>GeneratePkgDef;$(CreateVsixContainerDependsOn)</CreateVsixContainerDependsOn>
     <DeployVSTemplates>false</DeployVSTemplates>
-    <PreviewHostProject>$(MSBuildProjectDirectory)\..\Nuri.WPF.PreviewHost\Nuri.WPF.PreviewHost.csproj</PreviewHostProject>
-    <PreviewHostOutputDirectory>$(MSBuildProjectDirectory)\..\Nuri.WPF.PreviewHost\bin\$(Configuration)\net8.0-windows</PreviewHostOutputDirectory>
+    <WpfPreviewHostProject>$(MSBuildProjectDirectory)\..\Nuri.WPF.PreviewHost\Nuri.WPF.PreviewHost.csproj</WpfPreviewHostProject>
+    <WpfPreviewHostOutputDirectory>$(MSBuildProjectDirectory)\..\Nuri.WPF.PreviewHost\bin\$(Configuration)\net8.0-windows</WpfPreviewHostOutputDirectory>
+    <DuxelPreviewHostProject>$(MSBuildProjectDirectory)\..\Nuri.Duxel\Nuri.Duxel.PreviewHost\Nuri.Duxel.PreviewHost.csproj</DuxelPreviewHostProject>
+    <DuxelPreviewHostOutputDirectory>$(MSBuildProjectDirectory)\..\Nuri.Duxel\Nuri.Duxel.PreviewHost\bin\$(Configuration)\net9.0-windows</DuxelPreviewHostOutputDirectory>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
@@ -68,16 +70,20 @@
 
   <Target Name="IncludePreviewHostInVsix" BeforeTargets="GetVsixSourceItems">
     <ItemGroup>
-      <Content Include="$(PreviewHostOutputDirectory)\**\*" Exclude="$(PreviewHostOutputDirectory)\**\*.pdb;$(PreviewHostOutputDirectory)\**\*.resources.dll">
+      <Content Include="$(WpfPreviewHostOutputDirectory)\**\*" Exclude="$(WpfPreviewHostOutputDirectory)\**\*.pdb;$(WpfPreviewHostOutputDirectory)\**\*.resources.dll">
         <IncludeInVSIX>true</IncludeInVSIX>
         <VSIXSubPath>PreviewHost\%(RecursiveDir)</VSIXSubPath>
+      </Content>
+      <Content Include="$(DuxelPreviewHostOutputDirectory)\**\*" Exclude="$(DuxelPreviewHostOutputDirectory)\**\*.pdb;$(DuxelPreviewHostOutputDirectory)\**\*.resources.dll">
+        <IncludeInVSIX>true</IncludeInVSIX>
+        <VSIXSubPath>DuxelPreviewHost\%(RecursiveDir)</VSIXSubPath>
       </Content>
     </ItemGroup>
   </Target>
 
   <Target Name="BuildPreviewHostForVsix" BeforeTargets="CreateVsixAfterBuild">
     <MSBuild
-      Projects="$(PreviewHostProject)"
+      Projects="$(WpfPreviewHostProject);$(DuxelPreviewHostProject)"
       Targets="Restore;Build"
       Properties="Configuration=$(Configuration);RestoreBuildInParallel=false"
       BuildInParallel="false" />

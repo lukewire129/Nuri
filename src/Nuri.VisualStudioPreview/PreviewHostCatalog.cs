@@ -11,6 +11,15 @@ internal static class PreviewHostCatalog
     private static readonly PreviewHostDefinition[] Hosts =
     {
         new PreviewHostDefinition(
+            id: "duxel",
+            displayName: "Duxel",
+            referenceNames: new[] { "Nuri.Duxel", "Nuri.Duxel.Windows" },
+            executableName: "Nuri.Duxel.PreviewHost.exe",
+            installedDirectoryName: "DuxelPreviewHost",
+            sourceProjectDirectoryName: Path.Combine("Nuri.Duxel", "Nuri.Duxel.PreviewHost"),
+            targetFrameworkDirectories: new[]  { "net8.0-windows", "net9.0-windows" },
+            isFallback: false),
+        new PreviewHostDefinition(
             id: "wpf",
             displayName: "WPF",
             referenceNames: new[] { "Nuri.WPF" },
@@ -32,10 +41,23 @@ internal static class PreviewHostCatalog
 
         if (matches.Length > 1)
         {
+            var sourceRendererId = PreviewRendererSourceDiscovery.Detect(projectPath);
+            var sourceMatch = matches.SingleOrDefault(host =>
+                string.Equals(host.Id, sourceRendererId, StringComparison.OrdinalIgnoreCase));
+            if (sourceMatch != null)
+                return PreviewHostSelection.Success(sourceMatch);
+
+            var directMatches = matches
+                .Where(host => PreviewProjectReferenceGraph.DirectlyReferencesAny(projectPath, host.ReferenceNames))
+                .ToArray();
+            if (directMatches.Length == 1)
+                return PreviewHostSelection.Success(directMatches[0]);
+
             return PreviewHostSelection.Failure(
                 "Multiple Nuri preview renderers were detected: "
                 + string.Join(", ", matches.Select(host => host.DisplayName))
-                + ". Select a project with one preview renderer.");
+                + ". Qualify the startup call with Nuri.WPF.NuriApplication or Nuri.Duxel.NuriApplication, "
+                + "or keep only one direct renderer reference.");
         }
 
         var fallback = Hosts.SingleOrDefault(host => host.IsFallback);
@@ -109,6 +131,62 @@ internal sealed class PreviewHostSelection
 
 internal static class PreviewProjectReferenceGraph
 {
+    public static bool DirectlyReferencesAny(string projectPath, IReadOnlyList<string> referenceNames)
+    {
+        var names = new HashSet<string>(referenceNames, StringComparer.OrdinalIgnoreCase);
+
+        string fullProjectPath;
+        try
+        {
+            fullProjectPath = Path.GetFullPath(projectPath);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+
+        if (!File.Exists(fullProjectPath))
+            return false;
+
+        XDocument document;
+        try
+        {
+            document = XDocument.Load(fullProjectPath);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+
+        var projectDirectory = Path.GetDirectoryName(fullProjectPath) ?? Environment.CurrentDirectory;
+        foreach (var item in document.Descendants())
+        {
+            var itemName = item.Name.LocalName;
+            var include = item.Attribute("Include")?.Value ?? item.Attribute("Update")?.Value;
+            if (string.IsNullOrWhiteSpace(include))
+                continue;
+
+            if ((string.Equals(itemName, "PackageReference", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(itemName, "Reference", StringComparison.OrdinalIgnoreCase))
+                && MatchesReference(include!, names))
+            {
+                return true;
+            }
+
+            if (!string.Equals(itemName, "ProjectReference", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var referencedProjectPath = TryResolveProjectReferencePath(projectDirectory, include!);
+            if (referencedProjectPath != null
+                && MatchesReference(Path.GetFileNameWithoutExtension(referencedProjectPath), names))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static bool ReferencesAny(string projectPath, IReadOnlyList<string> referenceNames)
     {
         var names = new HashSet<string>(referenceNames, StringComparer.OrdinalIgnoreCase);

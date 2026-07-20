@@ -153,7 +153,8 @@ namespace Nuri.UI.Dsl
 
         public static Input TextBox()
         {
-            return new Input(InputTypes.Text);
+            return new Input(InputTypes.Text)
+                        .TextVCenter();
         }
 
         public static Input TextBox(string text)

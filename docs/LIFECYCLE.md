@@ -18,6 +18,7 @@ Runtime identity, key, and required regression-test contracts are defined in [RU
 - If a dirty component's old virtual subtree cannot be found, the runtime falls back to a full rebuild.
 - If replacing the committed subtree fails after patching, the runtime falls back to a full rebuild.
 - If both a parent and child are dirty, the parent rebuild covers the child.
+- A renderer-requested root replacement keeps the existing root identity. A partial replacement preserves hook/effect state for stable component identities, while a reset replacement disposes the previous root state before rendering the new root. Duxel applies the replacement at the next frame boundary and flushes newly pending effects only after the replacement projection commits.
 
 ## Effects
 

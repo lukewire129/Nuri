@@ -7,6 +7,24 @@ const os = require("os");
 const path = require("path");
 
 const protocol = "nuri-preview-v1";
+const previewRenderers = {
+  duxel: {
+    id: "duxel",
+    displayName: "Duxel",
+    executableName: "Nuri.Duxel.PreviewHost.exe",
+    installedDirectoryName: "duxel-preview-host",
+    sourceProjectParts: ["src", "Nuri.Duxel", "Nuri.Duxel.PreviewHost"],
+    targetFrameworks: ["net9.0-windows"],
+  },
+  wpf: {
+    id: "wpf",
+    displayName: "WPF",
+    executableName: "Nuri.WPF.PreviewHost.exe",
+    installedDirectoryName: "preview-host",
+    sourceProjectParts: ["src", "Nuri.WPF.PreviewHost"],
+    targetFrameworks: ["net8.0-windows", "net9.0-windows"],
+  },
+};
 let previewProcess;
 let previewConnection;
 let previewPanel;
@@ -69,10 +87,17 @@ async function startPreview() {
     return;
   }
 
-  const previewHostPath = resolvePreviewHostPath(contextOrThrow());
+  const rendererSelection = selectPreviewRenderer(projectPath);
+  if (!rendererSelection.renderer) {
+    vscode.window.showErrorMessage(rendererSelection.error);
+    return;
+  }
+
+  const renderer = rendererSelection.renderer;
+  const previewHostPath = resolvePreviewHostPath(contextOrThrow(), renderer);
   if (!previewHostPath) {
     vscode.window.showErrorMessage(
-      "Nuri.WPF.PreviewHost.exe was not found. Build the preview host or set nuri.preview.previewHostPath."
+      `${renderer.executableName} was not found. Build the preview host or set nuri.preview.previewHostPath.`
     );
     return;
   }
@@ -153,8 +178,8 @@ async function startPreview() {
   }
 
   showPreviewPanel(previewConnection);
-  statusBarItem.text = `$(eye) Nuri: ${path.basename(projectPath, ".csproj")}`;
-  statusBarItem.tooltip = "Click to focus the native Nuri preview window.";
+  statusBarItem.text = `$(eye) Nuri ${renderer.displayName}: ${path.basename(projectPath, ".csproj")}`;
+  statusBarItem.tooltip = `Click to focus the native Nuri ${renderer.displayName} preview window.`;
 }
 
 function findProjectForFile(filePath) {
@@ -193,7 +218,146 @@ function findProjectForFile(filePath) {
   }
 }
 
-function resolvePreviewHostPath(context) {
+function selectPreviewRenderer(projectPath) {
+  const referenceNames = collectProjectReferenceNames(projectPath, new Set());
+  const hasWpf = referenceNames.has("nuri.wpf");
+  const hasDuxel =
+    referenceNames.has("nuri.duxel") ||
+    referenceNames.has("nuri.duxel.windows");
+
+  if (hasWpf && hasDuxel) {
+    const sourceRendererId = detectPreviewRendererFromSource(projectPath);
+    if (sourceRendererId) {
+      return { renderer: previewRenderers[sourceRendererId] };
+    }
+
+    const directReferenceNames = collectProjectReferenceNames(
+      projectPath,
+      new Set(),
+      false
+    );
+    const directlyReferencesWpf = directReferenceNames.has("nuri.wpf");
+    const directlyReferencesDuxel =
+      directReferenceNames.has("nuri.duxel") ||
+      directReferenceNames.has("nuri.duxel.windows");
+    if (directlyReferencesWpf !== directlyReferencesDuxel) {
+      return {
+        renderer: directlyReferencesWpf ? previewRenderers.wpf : previewRenderers.duxel,
+      };
+    }
+
+    return {
+      error:
+        "Multiple Nuri preview renderers were detected: WPF, Duxel. Qualify the startup call with Nuri.WPF.NuriApplication or Nuri.Duxel.NuriApplication, or keep only one direct renderer reference.",
+    };
+  }
+
+  if (hasDuxel) {
+    return { renderer: previewRenderers.duxel };
+  }
+
+  return { renderer: previewRenderers.wpf };
+}
+
+function collectProjectReferenceNames(projectPath, visitedProjects, includeTransitive = true) {
+  const names = new Set();
+  const fullProjectPath = path.resolve(projectPath);
+  const visitKey = fullProjectPath.toLowerCase();
+  if (visitedProjects.has(visitKey) || !fs.existsSync(fullProjectPath)) return names;
+  visitedProjects.add(visitKey);
+
+  let projectText;
+  try {
+    projectText = fs.readFileSync(fullProjectPath, "utf8");
+  } catch {
+    return names;
+  }
+
+  const projectDirectory = path.dirname(fullProjectPath);
+  const itemPattern = /<(PackageReference|Reference|ProjectReference)\b[^>]*>/gi;
+  for (const match of projectText.matchAll(itemPattern)) {
+    const includeMatch = /\b(?:Include|Update)\s*=\s*["']([^"']+)["']/i.exec(match[0]);
+    if (!includeMatch) continue;
+
+    const include = includeMatch[1].trim();
+    if (match[1].toLowerCase() !== "projectreference") {
+      names.add(include.split(",", 1)[0].trim().toLowerCase());
+      continue;
+    }
+
+    const referencedProjectPath = path.resolve(projectDirectory, include);
+    names.add(path.basename(referencedProjectPath, path.extname(referencedProjectPath)).toLowerCase());
+    if (includeTransitive) {
+      for (const name of collectProjectReferenceNames(referencedProjectPath, visitedProjects, true)) {
+        names.add(name);
+      }
+    }
+  }
+
+  return names;
+}
+
+function detectPreviewRendererFromSource(projectPath) {
+  const detected = new Set();
+  for (const sourcePath of collectProjectSourceFiles(path.dirname(path.resolve(projectPath)))) {
+    let source;
+    try {
+      source = fs.readFileSync(sourcePath, "utf8");
+    } catch {
+      continue;
+    }
+
+    if (
+      /\b(?:global::)?Nuri\.WPF\.NuriApplication\s*\.\s*(?:Create|Run|Show)\s*(?:<|\()/.test(source) ||
+      /\bNuriApplication\s*\.\s*Create\s*(?:<|\()/.test(source)
+    ) {
+      detected.add("wpf");
+    }
+
+    if (/\b(?:global::)?Nuri\.Duxel\.NuriApplication\s*\.\s*Run\s*(?:<|\()/.test(source)) {
+      detected.add("duxel");
+    }
+
+    if (!/\bNuriApplication\s*\.\s*(?:Run|Show)\s*(?:<|\()/.test(source)) continue;
+
+    const usesWpf = /\busing\s+(?:global::)?Nuri\.WPF\s*;/.test(source);
+    const usesDuxel = /\busing\s+(?:global::)?Nuri\.Duxel\s*;/.test(source);
+    if (usesWpf && !usesDuxel) detected.add("wpf");
+    if (usesDuxel && !usesWpf) detected.add("duxel");
+  }
+
+  return detected.size === 1 ? detected.values().next().value : undefined;
+}
+
+function collectProjectSourceFiles(projectDirectory) {
+  const sourceFiles = [];
+  const pending = [projectDirectory];
+  const excludedDirectories = new Set(["bin", "obj", ".git", ".vs", "node_modules"]);
+
+  while (pending.length > 0) {
+    const directory = pending.pop();
+    let entries;
+    try {
+      entries = fs.readdirSync(directory, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        if (!excludedDirectories.has(entry.name.toLowerCase())) {
+          pending.push(path.join(directory, entry.name));
+        }
+      } else if (entry.isFile() && entry.name.toLowerCase().endsWith(".cs")) {
+        sourceFiles.push(path.join(directory, entry.name));
+      }
+    }
+  }
+
+  return sourceFiles;
+}
+
+function resolvePreviewHostPath(context, renderer) {
   const configuredPath = vscode.workspace
     .getConfiguration("nuri.preview")
     .get("previewHostPath", "")
@@ -201,30 +365,24 @@ function resolvePreviewHostPath(context) {
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   const candidates = [
     configuredPath,
-    path.join(context.extensionPath, "preview-host", "Nuri.WPF.PreviewHost.exe"),
+    path.join(context.extensionPath, renderer.installedDirectoryName, renderer.executableName),
   ];
 
   if (workspaceRoot) {
-    candidates.push(
-      path.join(
-        workspaceRoot,
-        "src",
-        "Nuri.WPF.PreviewHost",
-        "bin",
-        "Release",
-        "net8.0-windows",
-        "Nuri.WPF.PreviewHost.exe"
-      ),
-      path.join(
-        workspaceRoot,
-        "src",
-        "Nuri.WPF.PreviewHost",
-        "bin",
-        "Debug",
-        "net8.0-windows",
-        "Nuri.WPF.PreviewHost.exe"
-      )
-    );
+    for (const configuration of ["Release", "Debug"]) {
+      for (const targetFramework of renderer.targetFrameworks) {
+        candidates.push(
+          path.join(
+            workspaceRoot,
+            ...renderer.sourceProjectParts,
+            "bin",
+            configuration,
+            targetFramework,
+            renderer.executableName
+          )
+        );
+      }
+    }
   }
 
   return candidates

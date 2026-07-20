@@ -3,11 +3,32 @@
   "tasks": [
     {
       "label": "build Nuri PreviewHost",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "build Nuri WPF PreviewHost",
+        "build Nuri Duxel PreviewHost"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "build Nuri WPF PreviewHost",
       "type": "process",
       "command": "dotnet",
       "args": [
         "build",
         "../Nuri.WPF.PreviewHost/Nuri.WPF.PreviewHost.csproj",
+        "-c",
+        "Debug"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "build Nuri Duxel PreviewHost",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "../Nuri.Duxel/Nuri.Duxel.PreviewHost/Nuri.Duxel.PreviewHost.csproj",
         "-c",
         "Debug"
       ],

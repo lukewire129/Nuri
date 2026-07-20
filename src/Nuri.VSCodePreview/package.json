@@ -1,7 +1,7 @@
 {
   "name": "nuri-preview",
   "displayName": "Nuri Preview",
-  "description": "Live WPF preview panel for Nuri components",
+  "description": "Live WPF and Duxel preview panel for Nuri components",
   "version": "0.2.0",
   "publisher": "lukewire129",
   "engines": {
@@ -47,7 +47,7 @@
         "nuri.preview.previewHostPath": {
           "type": "string",
           "default": "",
-          "description": "Optional absolute path to Nuri.WPF.PreviewHost.exe."
+          "description": "Optional absolute path to the WPF or Duxel preview host executable selected for the active project."
         },
         "nuri.preview.refreshOnSave": {
           "type": "boolean",
@@ -65,6 +65,7 @@
     }
   },
   "scripts": {
+    "vscode:prepublish": "node scripts/prepare-preview-hosts.js",
     "test": "node --check src/extension.js"
   }
 }

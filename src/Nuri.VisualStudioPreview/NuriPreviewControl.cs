@@ -34,6 +34,7 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
     private string? _commandFilePath;
     private string? _statusFilePath;
     private string? _startupProjectDirectory;
+    private bool _previewOwnsEmbeddedLayout;
     private int _zoomPercent = 100;
     private const int MinimumZoomPercent = 25;
     private const int MaximumZoomPercent = 400;
@@ -118,7 +119,7 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
             Child = _hostPanel,
             Background = workspaceBrush
         };
-        _hostPanel.Resize += (_, _) => ResizeEmbeddedWindow();
+        _hostPanel.Resize += (_, _) => UpdateEmbeddedWindowLayout();
 
         root.Children.Add(toolbar);
         root.Children.Add(formsHost);
@@ -213,7 +214,7 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
         }
 
         SubscribeDocumentEvents(dte, projectPath!);
-        StartPreviewHost(previewHostPath!, projectPath!);
+        StartPreviewHost(previewHost, previewHostPath!, projectPath!);
     }
 
     public void Dispose()
@@ -225,8 +226,15 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
         });
     }
 
-    private void StartPreviewHost(string previewHostPath, string projectPath)
+    private void StartPreviewHost(
+        PreviewHostDefinition previewHost,
+        string previewHostPath,
+        string projectPath)
     {
+        _previewOwnsEmbeddedLayout = string.Equals(
+            previewHost.Id,
+            "duxel",
+            StringComparison.OrdinalIgnoreCase);
         //var channelDirectory = Path.Combine(Path.GetTempPath(), "NuriVisualStudioPreview", Guid.NewGuid().ToString("N"));
         //Directory.CreateDirectory(channelDirectory);
         //_commandFilePath = Path.Combine(channelDirectory, "preview.cmd");
@@ -324,14 +332,25 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
     {
         _previewWindowHandle = windowHandle;
 
-        ResizeEmbeddedWindow ();
+        UpdateEmbeddedWindowLayout();
 
         ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
         {
             await Task.Yield();
             await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
-            ResizeEmbeddedWindow();
+            UpdateEmbeddedWindowLayout();
         }).FileAndForget("NuriPreview/ResizeEmbeddedWindow");
+    }
+
+    private void UpdateEmbeddedWindowLayout()
+    {
+        if (_previewOwnsEmbeddedLayout)
+        {
+            SendPreviewCommand("viewport-resize");
+            return;
+        }
+
+        ResizeEmbeddedWindow();
     }
 
     private void ResizeEmbeddedWindow()
@@ -359,6 +378,7 @@ public sealed class NuriPreviewControl : UserControl, IDisposable
         ThreadHelper.ThrowIfNotOnUIThread();
 
         _previewWindowHandle = IntPtr.Zero;
+        _previewOwnsEmbeddedLayout = false;
         _statusWatcher?.Dispose();
         _statusWatcher = null;
         UnsubscribeDocumentEvents();

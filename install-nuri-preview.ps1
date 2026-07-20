@@ -89,7 +89,13 @@ if ($instances.Count -eq 0) {
 Write-Host "[1/3] Building Nuri Preview ($Configuration)..." -ForegroundColor Cyan
 Push-Location $repositoryRoot
 try {
-    & dotnet build $previewProjectPath -c $Configuration -p:RestoreBuildInParallel=false
+    & dotnet build $previewProjectPath `
+        -c $Configuration `
+        -p:RestoreBuildInParallel=false `
+        --disable-build-servers `
+        -m:1 `
+        -nr:false `
+        -p:UseSharedCompilation=false
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet build failed with exit code $LASTEXITCODE."
     }
