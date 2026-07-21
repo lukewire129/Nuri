@@ -51,6 +51,7 @@ internal sealed class WindowsInputEventBridge : IDisposable
     private readonly DuxelInputEventQueue _events;
     private readonly Action _requestFrame;
     private readonly Func<float>? _contentScaleProvider;
+    private readonly Action<NuriDuxelResizeMessage>? _resizeMessageObserver;
     private readonly SubclassProc _windowProc;
     private readonly nuint _subclassId;
     private nint _windowHandle;
@@ -65,11 +66,13 @@ internal sealed class WindowsInputEventBridge : IDisposable
     public WindowsInputEventBridge(
         DuxelInputEventQueue events,
         Action requestFrame,
-        Func<float>? contentScaleProvider = null)
+        Func<float>? contentScaleProvider = null,
+        Action<NuriDuxelResizeMessage>? resizeMessageObserver = null)
     {
         _events = events ?? throw new ArgumentNullException(nameof(events));
         _requestFrame = requestFrame ?? throw new ArgumentNullException(nameof(requestFrame));
         _contentScaleProvider = contentScaleProvider;
+        _resizeMessageObserver = resizeMessageObserver;
         _windowProc = WindowProc;
         _subclassId = unchecked((nuint)Interlocked.Increment(ref _nextSubclassId));
     }
@@ -258,6 +261,7 @@ internal sealed class WindowsInputEventBridge : IDisposable
             case WmSize:
                 var clientSize = ClientSize(windowHandle, lParam);
                 UpdateClientSize(clientSize);
+                _resizeMessageObserver?.Invoke(new NuriDuxelResizeMessage(timestamp, clientSize));
                 Enqueue(
                     timestamp,
                     DuxelInputEventKind.Resize,

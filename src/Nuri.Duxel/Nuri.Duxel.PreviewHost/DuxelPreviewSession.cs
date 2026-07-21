@@ -6,6 +6,7 @@ namespace Nuri.Duxel.PreviewHost;
 
 internal sealed class DuxelPreviewSession : IDisposable
 {
+    private const int ReloadDebounceMilliseconds = 150;
     private static readonly string[] SharedAssemblyNames =
     {
         "Nuri",
@@ -203,7 +204,7 @@ internal sealed class DuxelPreviewSession : IDisposable
                 _pendingPartialReload = true;
             }
 
-            _reloadTimer.Change(500, Timeout.Infinite);
+            _reloadTimer.Change(ReloadDebounceMilliseconds, Timeout.Infinite);
         }
     }
 

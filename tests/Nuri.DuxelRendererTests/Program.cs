@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Duxel.Core;
 using Nuri.AnimatedDashboardSample.Components;
 using Nuri.Duxel;
@@ -22,9 +23,11 @@ internal static class Program
         {
             ("renderer assembly excludes Windows host dependencies", RendererAssemblyExcludesWindowsHostDependencies),
             ("effect flush and cleanup", EffectFlushAndCleanup),
+            ("initial frame commit callback runs once after effects", InitialFrameCommitCallbackRunsOnceAfterEffects),
             ("root content uses viewport bounds", RootContentUsesViewportBounds),
             ("measured client size overrides viewport bounds", MeasuredClientSizeOverridesViewportBounds),
             ("preview content scale is applied to the Duxel context", PreviewContentScaleIsApplied),
+            ("frame timing separates initial and resize projection work", FrameTimingSeparatesInitialAndResizeProjectionWork),
             ("grid rows advance by their tallest cell", GridRowsAdvanceByTallestCell),
             ("grid has no implicit track spacing", GridHasNoImplicitTrackSpacing),
             ("auto grid padding centers an equal-height row and button", AutoGridPaddingCentersEqualHeightControls),
@@ -143,6 +146,42 @@ internal static class Program
             $"The preview scale must be applied to the Duxel context. Actual: {probe.ContentScale}.");
     }
 
+    private static void FrameTimingSeparatesInitialAndResizeProjectionWork()
+    {
+        using var context = CreateContext();
+        var input = new DuxelInputEventQueue();
+        var timings = new List<NuriDuxelFrameTiming>();
+        input.Enqueue(
+            Stopwatch.GetTimestamp(),
+            DuxelInputEventKind.Resize,
+            delta: new UiVector2(640, 360));
+        using var screen = new NuriDuxelScreen(
+            new ViewportRootComponent(),
+            () => { },
+            "frame-timing-test",
+            input,
+            () => new UiVector2(640, 360),
+            frameTimingObserver: timings.Add);
+
+        RenderFrame(context, screen);
+        RenderFrame(context, screen);
+
+        AssertEqual(2, timings.Count, "The observer must receive one record per projected frame.");
+        AssertTrue(timings[0].IsInitialFrame, "The first projected frame must be marked as initial.");
+        AssertTrue(timings[0].HadRuntimeUpdate, "The first projected frame must include runtime initialization.");
+        AssertTrue(timings[0].HadResizeInput, "The first projected frame must report the queued resize input.");
+        AssertEqual(new UiVector2(640, 360), timings[0].ViewportSize, "Frame timing must report the projected viewport size.");
+        AssertTrue(timings[0].ResizeToProjectionDuration is { } resizeLatency && resizeLatency >= TimeSpan.Zero,
+            "A resize frame must report non-negative resize-to-projection latency.");
+        AssertTrue(timings[0].ProjectionDuration >= TimeSpan.Zero && timings[0].TotalDuration >= timings[0].ProjectionDuration,
+            "Frame timing must contain a bounded projection duration.");
+        AssertTrue(!timings[1].IsInitialFrame, "Only the first projected frame may be marked as initial.");
+        AssertTrue(!timings[1].HadRuntimeUpdate, "An unchanged projection frame must not report runtime work.");
+        AssertTrue(!timings[1].HadResizeInput, "Resize input must not leak into the next frame record.");
+        AssertTrue(timings[1].ResizeToProjectionDuration is null,
+            "A non-resize frame must not report resize latency.");
+    }
+
     private static void EffectFlushAndCleanup()
     {
         ProbeComponent.Reset();
@@ -160,6 +199,25 @@ internal static class Program
             "cleanup:0",
             ProbeComponent.Log[^1],
             "Disposing the Duxel screen must clean the mounted effect.");
+    }
+
+    private static void InitialFrameCommitCallbackRunsOnceAfterEffects()
+    {
+        ProbeComponent.Reset();
+        using var context = CreateContext();
+        using var screen = new NuriDuxelScreen(
+            new ProbeComponent(),
+            () => { },
+            "initial-frame-commit-test",
+            initialFrameCommitted: () => ProbeComponent.Log.Add("commit"));
+
+        RenderFrame(context, screen);
+        RenderFrame(context, screen);
+
+        AssertSequence(
+            new[] { "render:0", "effect:0", "commit" },
+            ProbeComponent.Log,
+            "The initial frame callback must run once after effects flush.");
     }
 
     private static void GridRowsAdvanceByTallestCell()

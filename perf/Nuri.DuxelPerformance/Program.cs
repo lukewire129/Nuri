@@ -2,6 +2,7 @@ using System.Diagnostics;
 using Duxel.Core;
 using Nuri.Duxel;
 using Nuri.UI.Controls;
+using Nuri.UI.Dsl;
 using Nuri.VirtualDom;
 
 internal static class Program
@@ -68,6 +69,7 @@ internal static class Program
         }
 
         PrintResults(label, size, iterations, warmup, results);
+        PrintFirstFrameComparison(size, iterations, warmup);
         return 0;
     }
 
@@ -137,7 +139,7 @@ internal static class Program
             '?');
     }
 
-    private static void RenderFrame(UiContext context, ProjectionScreen screen)
+    private static void RenderFrame(UiContext context, UiScreen screen)
     {
         context.NewFrame(FrameInfo);
         context.Render(screen);
@@ -175,6 +177,97 @@ internal static class Program
         }
 
         Console.WriteLine("```");
+    }
+
+    private static void PrintFirstFrameComparison(int size, int iterations, int warmup)
+    {
+        var projectionEntry = PerfTreeFactory.CreateReorderedTree(size).Old;
+        var scenarios = new (string Name, Func<FirstFrameSample> Run)[]
+        {
+            ("Raw Duxel widgets", () => RunRawDuxelFirstFrame(size)),
+            ("Prebuilt VirtualEntry projection", () => RunProjectionFirstFrame(projectionEntry)),
+            ("Full Nuri component frame", () => RunNuriFirstFrame(size))
+        };
+
+        Console.WriteLine();
+        Console.WriteLine("## First-frame CPU comparison");
+        Console.WriteLine();
+        Console.WriteLine("The timed region is UiContext.NewFrame through GetDrawData; Vulkan submission and present are excluded.");
+        Console.WriteLine();
+        Console.WriteLine("| Scenario | P50 ms | P95 ms | P99 ms | Mean alloc KB |");
+        Console.WriteLine("|---|---:|---:|---:|---:|");
+
+        foreach (var scenario in scenarios)
+        {
+            for (var index = 0; index < warmup; index++)
+            {
+                _ = scenario.Run();
+            }
+
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+
+            var samples = new FirstFrameSample[iterations];
+            for (var index = 0; index < iterations; index++)
+            {
+                samples[index] = scenario.Run();
+            }
+
+            var orderedMilliseconds = samples
+                .Select(sample => sample.Elapsed.TotalMilliseconds)
+                .Order()
+                .ToArray();
+            Console.WriteLine(
+                $"| {scenario.Name} | {Percentile(orderedMilliseconds, 0.50):F4} | {Percentile(orderedMilliseconds, 0.95):F4} | {Percentile(orderedMilliseconds, 0.99):F4} | {samples.Average(sample => sample.AllocatedBytes) / 1024.0:F2} |");
+        }
+    }
+
+    private static FirstFrameSample RunRawDuxelFirstFrame(int size)
+    {
+        using var context = CreateContext();
+        var screen = new RawDuxelScreen(size);
+        return MeasureFirstFrame(() => RenderFrame(context, screen));
+    }
+
+    private static FirstFrameSample RunProjectionFirstFrame(VirtualEntry entry)
+    {
+        using var context = CreateContext();
+        var screen = new ProjectionScreen(entry);
+        return MeasureFirstFrame(() => RenderFrame(context, screen));
+    }
+
+    private static FirstFrameSample RunNuriFirstFrame(int size)
+    {
+        using var context = CreateContext();
+        using var screen = new NuriDuxelScreen(
+            new FirstFrameComponent(size),
+            () => { },
+            "first-frame-performance",
+            includeInDiagnostics: false);
+        return MeasureFirstFrame(() => RenderFrame(context, screen));
+    }
+
+    private static FirstFrameSample MeasureFirstFrame(Action render)
+    {
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var stopwatch = Stopwatch.StartNew();
+        render();
+        stopwatch.Stop();
+        return new FirstFrameSample(
+            stopwatch.Elapsed,
+            GC.GetAllocatedBytesForCurrentThread() - allocatedBefore);
+    }
+
+    private static double Percentile(double[] orderedValues, double percentile)
+    {
+        if (orderedValues.Length == 0)
+        {
+            return 0d;
+        }
+
+        var index = (int)Math.Ceiling(percentile * orderedValues.Length) - 1;
+        return orderedValues[Math.Clamp(index, 0, orderedValues.Length - 1)];
     }
 
     private static string? GetOption(string[] args, string name)
@@ -221,6 +314,39 @@ internal static class Program
         }
     }
 
+    private sealed class RawDuxelScreen(int size) : UiScreen
+    {
+        public override void Render(UiImmediateContext ui)
+        {
+            ui.BeginWindow("Raw Duxel Performance");
+            try
+            {
+                for (var index = 0; index < size; index++)
+                {
+                    ui.Text("value");
+                }
+            }
+            finally
+            {
+                ui.EndWindow();
+            }
+        }
+    }
+
+    private sealed class FirstFrameComponent(int size) : Component
+    {
+        public override IElement Render()
+        {
+            var children = new IElement[size];
+            for (var index = 0; index < children.Length; index++)
+            {
+                children[index] = Text("value").Key($"item-{index}");
+            }
+
+            return Div(children);
+        }
+    }
+
     private sealed record Scenario(
         string Name,
         Func<(VirtualEntry Old, VirtualEntry New)> CreateTrees,
@@ -234,4 +360,8 @@ internal static class Program
         double MeanMilliseconds,
         double AllocatedBytes,
         double PatchCount);
+
+    private readonly record struct FirstFrameSample(
+        TimeSpan Elapsed,
+        long AllocatedBytes);
 }

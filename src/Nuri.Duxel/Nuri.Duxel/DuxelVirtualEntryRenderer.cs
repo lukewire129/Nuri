@@ -2245,6 +2245,7 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
             return;
         }
 
+
         var active = _scrollRegions
             .Where(pair => pair.Value.LastSeenFrame == _frameNumber)
             .Select(pair => new DuxelScrollRegionSnapshot(

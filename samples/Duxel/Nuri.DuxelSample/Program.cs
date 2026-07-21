@@ -4,7 +4,7 @@ using Nuri.UI.Controls;
 using Nuri.UI.Dsl;
 
 NuriApplication.Run(
-    UiCompiledDesign.Windows11Dark.Theme,
+    UiTheme.ImGuiDark,
     theme => new CounterComponent(theme),
     title: "Nuri + Duxel",
     width: 720,
@@ -19,7 +19,7 @@ internal sealed class CounterComponent(UiTheme theme) : Component
         var (enabled, setEnabled) = useState(true);
 
         return Div(
-            Text("Nuri.Duxel layout integration")
+            Text("Nuri.Duxel layout integration!!!!")
                 .FontSize(24)
                 .FontColor("#7DD3FC"),
             Grid(

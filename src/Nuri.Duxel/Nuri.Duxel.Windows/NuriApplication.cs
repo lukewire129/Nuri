@@ -21,7 +21,8 @@ public static class NuriApplication
         bool includeInDiagnostics = true,
         Action<NuriDuxelScreen>? screenCreated = null,
         Action<IntPtr>? windowCreated = null,
-        Func<float>? contentScaleProvider = null)
+        Func<float>? contentScaleProvider = null,
+        NuriDuxelPerformanceOptions? performance = null)
         where TComponent : Component, new()
     {
         Run(
@@ -37,7 +38,8 @@ public static class NuriApplication
             includeInDiagnostics,
             screenCreated,
             windowCreated,
-            contentScaleProvider);
+            contentScaleProvider,
+            performance);
     }
 
     public static void Run(
@@ -48,7 +50,8 @@ public static class NuriApplication
         int height = 720,
         bool vsync = true,
         bool useDuxelTitleBar = false,
-        bool integrateSystemChrome = false)
+        bool integrateSystemChrome = false,
+        NuriDuxelPerformanceOptions? performance = null)
     {
         ArgumentNullException.ThrowIfNull(rootFactory);
 
@@ -61,7 +64,8 @@ public static class NuriApplication
             theme,
             themeController: null,
             useDuxelTitleBar,
-            integrateSystemChrome);
+            integrateSystemChrome,
+            performance: performance);
     }
 
     public static void Run(
@@ -72,7 +76,8 @@ public static class NuriApplication
         bool vsync = true,
         UiTheme? theme = null,
         bool useDuxelTitleBar = false,
-        bool integrateSystemChrome = false)
+        bool integrateSystemChrome = false,
+        NuriDuxelPerformanceOptions? performance = null)
     {
         ArgumentNullException.ThrowIfNull(rootFactory);
 
@@ -86,7 +91,8 @@ public static class NuriApplication
             theme,
             themeController,
             useDuxelTitleBar,
-            integrateSystemChrome);
+            integrateSystemChrome,
+            performance: performance);
     }
 
     public static void Run(
@@ -102,17 +108,20 @@ public static class NuriApplication
         bool includeInDiagnostics = true,
         Action<NuriDuxelScreen>? screenCreated = null,
         Action<IntPtr>? windowCreated = null,
-        Func<float>? contentScaleProvider = null)
+        Func<float>? contentScaleProvider = null,
+        NuriDuxelPerformanceOptions? performance = null)
     {
         ArgumentNullException.ThrowIfNull(rootElement);
 
         const float duxelTitleBarHeight = 48f;
         var session = new DuxelAppSession();
         var inputEvents = new DuxelInputEventQueue();
+        using var windowVisibilityGate = new FirstFrameWindowVisibilityGate();
         using var inputBridge = new WindowsInputEventBridge(
             inputEvents,
             session.RequestFrame,
-            contentScaleProvider);
+            contentScaleProvider,
+            performance?.ResizeMessageReceived);
         Action<UiTheme>? observeTheme = themeController is null
             ? null
             : themeController.ObserveTheme;
@@ -132,12 +141,53 @@ public static class NuriApplication
             GetContentAreaSize,
             observeTheme,
             includeInDiagnostics,
-            contentScaleProvider);
+            contentScaleProvider,
+            performance?.FrameCompleted,
+            windowVisibilityGate.Release);
         screenCreated?.Invoke(screen);
         var options = DuxelApp.Options(screen, title, width, height, vsync);
+        options = options with
+        {
+            Renderer = options.Renderer with
+            {
+                Profile = DuxelPerformanceProfile.Render,
+                TextRendering = DuxelTextRenderingMode.DirectText
+            }
+        };
         if (theme is { } selectedTheme)
         {
             options = options with { Theme = selectedTheme };
+        }
+
+        if (performance is not null)
+        {
+            if (performance.DuxelLogEveryNFrames < 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(performance),
+                    "DuxelLogEveryNFrames must be zero or greater.");
+            }
+
+            var existingLog = options.Debug.Log;
+            Action<string>? combinedLog = existingLog is null
+                ? performance.DuxelLog
+                : performance.DuxelLog is null
+                    ? existingLog
+                    : message =>
+                    {
+                        existingLog(message);
+                        performance.DuxelLog(message);
+                    };
+            options = options with
+            {
+                Debug = options.Debug with
+                {
+                    Log = combinedLog,
+                    LogStartupTimings = options.Debug.LogStartupTimings
+                        || performance.LogDuxelStartupTimings,
+                    LogEveryNFrames = performance.DuxelLogEveryNFrames
+                }
+            };
         }
 
         var existingAnimationProvider = options.Frame.IsAnimationActiveProvider;
@@ -162,6 +212,7 @@ public static class NuriApplication
                     existingWindowCreated?.Invoke(windowHandle);
                     inputBridge.Attach(windowHandle);
                     windowCreated?.Invoke(windowHandle);
+                    windowVisibilityGate.Attach(windowHandle);
                 }
             }
         };

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Threading;
 using Duxel.Core;
 using Nuri.Runtime;
@@ -19,7 +20,9 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
     private readonly Func<UiVector2?>? _viewportSizeProvider;
     private readonly Func<float>? _contentScaleProvider;
     private readonly Action<UiTheme>? _themeObserver;
+    private readonly Action<NuriDuxelFrameTiming>? _frameTimingObserver;
     private readonly bool _includeInDiagnostics;
+    private Action? _initialFrameCommitted;
     private readonly object _themeGate = new();
     private readonly object _rootReplacementGate = new();
     private readonly ComponentInvalidationQueue _invalidations = new();
@@ -36,6 +39,8 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
     private ThemeBox? _pendingTheme;
     private float _baseContentScale;
     private bool _hasBaseContentScale;
+    private long _frameNumber;
+    private int _lastSubtreePatchCount;
 
     public NuriDuxelScreen(
         IElement rootElement,
@@ -45,7 +50,9 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
         Func<UiVector2?>? viewportSizeProvider = null,
         Action<UiTheme>? themeObserver = null,
         bool includeInDiagnostics = true,
-        Func<float>? contentScaleProvider = null)
+        Func<float>? contentScaleProvider = null,
+        Action<NuriDuxelFrameTiming>? frameTimingObserver = null,
+        Action? initialFrameCommitted = null)
     {
         ArgumentNullException.ThrowIfNull(rootElement);
         _requestFrame = requestFrame ?? throw new ArgumentNullException(nameof(requestFrame));
@@ -53,6 +60,8 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
         _viewportSizeProvider = viewportSizeProvider;
         _contentScaleProvider = contentScaleProvider;
         _themeObserver = themeObserver;
+        _frameTimingObserver = frameTimingObserver;
+        _initialFrameCommitted = initialFrameCommitted;
         _includeInDiagnostics = includeInDiagnostics;
 
         _treePrefix = $"duxel{Interlocked.Increment(ref _nextTreeIndex)}";
@@ -93,6 +102,10 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
             return;
         }
 
+        var timingEnabled = _frameTimingObserver is not null;
+        var frameStarted = timingEnabled ? Stopwatch.GetTimestamp() : 0L;
+        var isInitialFrame = !_initialized;
+
         ApplyContentScale(ui);
         var currentTheme = CaptureTheme(ui);
         lock (_themeGate)
@@ -108,9 +121,19 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
             ui.RequestTheme(pendingTheme.Theme);
         }
 
+        var runtimeStarted = timingEnabled ? Stopwatch.GetTimestamp() : 0L;
         ApplicationRenderResult<IElement>? pendingCommit = null;
         var shouldFlushEffects = false;
+        if (timingEnabled)
+        {
+            _lastSubtreePatchCount = 0;
+        }
         var rootReplacement = TakePendingRootReplacement();
+        var hadRuntimeUpdate = timingEnabled
+            && (!_initialized
+                || rootReplacement is not null
+                || Volatile.Read(ref _fullRebuildRequested) != 0
+                || _invalidations.HasPending);
         if (rootReplacement is not null)
         {
             Interlocked.Exchange(ref _fullRebuildRequested, 0);
@@ -150,6 +173,7 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
             shouldFlushEffects = true;
         }
 
+        var runtimeCompleted = timingEnabled ? Stopwatch.GetTimestamp() : 0L;
         var entry = pendingCommit?.VirtualEntry ?? _runtime.CurrentVirtualEntry;
         ui.EnableRootViewportContentLayout(contentPadding: 0f);
         var viewport = ui.GetMainViewport();
@@ -160,6 +184,7 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
         var viewportHeight = measuredSize is { Y: > 0f }
             ? measuredSize.Value.Y
             : viewport.WorkSize.Y;
+        var projectionStarted = timingEnabled ? Stopwatch.GetTimestamp() : 0L;
         _renderer.Render(
             ui,
             entry,
@@ -168,7 +193,9 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
                 viewport.WorkPos.Y,
                 viewportWidth,
                 viewportHeight));
+        var projectionCompleted = timingEnabled ? Stopwatch.GetTimestamp() : 0L;
 
+        var commitStarted = timingEnabled ? Stopwatch.GetTimestamp() : 0L;
         if (pendingCommit is not null)
         {
             _runtime.Commit(pendingCommit);
@@ -183,10 +210,18 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
             NuriDiagnostics.RegisterRoot(_rootId, "Duxel", () => _runtime.CurrentVirtualEntry);
             _diagnosticsRegistered = true;
         }
+        var commitCompleted = timingEnabled ? Stopwatch.GetTimestamp() : 0L;
 
+        var effectsStarted = timingEnabled ? Stopwatch.GetTimestamp() : 0L;
         if (shouldFlushEffects)
         {
             ComponentLifecycle.FlushPendingEffects();
+        }
+        var effectsCompleted = timingEnabled ? Stopwatch.GetTimestamp() : 0L;
+
+        if (isInitialFrame)
+        {
+            Interlocked.Exchange(ref _initialFrameCommitted, null)?.Invoke();
         }
 
         if (_invalidations.HasPending
@@ -197,6 +232,37 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
             || _renderer.HasPendingInput)
         {
             _requestFrame();
+        }
+
+        if (timingEnabled)
+        {
+            var frameCompleted = Stopwatch.GetTimestamp();
+            var inputEvents = _renderer.LastInputEvents;
+            var latestResizeTimestamp = 0L;
+            for (var index = 0; index < inputEvents.Count; index++)
+            {
+                if (inputEvents[index].Kind == DuxelInputEventKind.Resize)
+                {
+                    latestResizeTimestamp = inputEvents[index].Timestamp;
+                }
+            }
+
+            _frameTimingObserver!(new NuriDuxelFrameTiming(
+                Interlocked.Increment(ref _frameNumber),
+                isInitialFrame,
+                hadRuntimeUpdate,
+                latestResizeTimestamp != 0,
+                inputEvents.Count,
+                pendingCommit?.Operations.Count ?? _lastSubtreePatchCount,
+                new UiVector2(viewportWidth, viewportHeight),
+                Stopwatch.GetElapsedTime(runtimeStarted, runtimeCompleted),
+                Stopwatch.GetElapsedTime(projectionStarted, projectionCompleted),
+                Stopwatch.GetElapsedTime(commitStarted, commitCompleted),
+                Stopwatch.GetElapsedTime(effectsStarted, effectsCompleted),
+                Stopwatch.GetElapsedTime(frameStarted, frameCompleted),
+                latestResizeTimestamp == 0
+                    ? null
+                    : Stopwatch.GetElapsedTime(latestResizeTimestamp, projectionCompleted)));
         }
     }
 
@@ -328,6 +394,10 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
         newEntry.WithComponentId(componentId);
 
         var operations = VirtualTreeDiff.Diff(oldEntry, newEntry);
+        if (_frameTimingObserver is not null)
+        {
+            _lastSubtreePatchCount += operations.Count;
+        }
         ComponentLifecycle.CleanupRemovedComponentState(operations);
 
         if (!_runtime.CurrentVirtualEntry.ReplaceDescendantByComponentId(componentId, newEntry)

@@ -1,0 +1,6 @@
+<Project>
+  <PropertyGroup>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <TieredCompilationQuickJitForLoops>true</TieredCompilationQuickJitForLoops>
+  </PropertyGroup>
+</Project>

@@ -9,6 +9,7 @@ Runtime identity, key, and required regression-test contracts are defined in [RU
 - A root render builds an `IElement` tree and converts it to a `VirtualEntry` tree.
 - The platform renderer materializes the native root from the virtual tree.
 - Pending `useEffect` callbacks run only after the native tree is attached.
+- `NuriDuxelScreen` invokes its optional `initialFrameCommitted` callback once after the initial projection, runtime commit, and effect flush. The Windows host uses this renderer-readiness signal before Duxel submits and presents the frame; it is not a component lifecycle callback.
 
 ## Update
 

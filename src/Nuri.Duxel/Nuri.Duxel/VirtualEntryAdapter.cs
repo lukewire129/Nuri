@@ -14,33 +14,50 @@ internal static class VirtualEntryAdapter
             return ToVirtualEntry(component);
         }
 
-        var properties = new List<KeyValuePair<string, object?>>(element.Properties.Count);
-        foreach (var property in element.Properties)
+        List<KeyValuePair<string, object?>>? properties = null;
+        if (element.Properties.Count > 0)
         {
-            properties.Add(new KeyValuePair<string, object?>(property.Key, property.Value));
+            properties = new List<KeyValuePair<string, object?>>(element.Properties.Count);
+            foreach (var property in element.Properties)
+            {
+                properties.Add(new KeyValuePair<string, object?>(property.Key, property.Value));
+            }
         }
 
-        var animations = new List<KeyValuePair<string, object?>>(element.Animations.Count);
-        foreach (var animation in element.Animations)
+        List<KeyValuePair<string, object?>>? animations = null;
+        if (element.Animations.Count > 0)
         {
-            animations.Add(new KeyValuePair<string, object?>(animation.Key, animation.Value));
+            animations = new List<KeyValuePair<string, object?>>(element.Animations.Count);
+            foreach (var animation in element.Animations)
+            {
+                animations.Add(new KeyValuePair<string, object?>(animation.Key, animation.Value));
+            }
         }
 
-        var children = new List<VirtualEntry>(element.Children.Count);
-        foreach (var child in element.Children)
+        List<VirtualEntry>? children = null;
+        if (element.Children.Count > 0)
         {
-            children.Add(child.ToVirtualEntry());
+            children = new List<VirtualEntry>(element.Children.Count);
+            foreach (var child in element.Children)
+            {
+                children.Add(child.ToVirtualEntry());
+            }
         }
 
-        var events = new List<KeyValuePair<string, object?>>(element.Events.Count + element.VirtualEvents.Count);
-        foreach (var evt in element.Events)
+        List<KeyValuePair<string, object?>>? events = null;
+        var eventCount = element.Events.Count + element.VirtualEvents.Count;
+        if (eventCount > 0)
         {
-            events.Add(new KeyValuePair<string, object?>(evt.Key, evt.Value));
-        }
+            events = new List<KeyValuePair<string, object?>>(eventCount);
+            foreach (var evt in element.Events)
+            {
+                events.Add(new KeyValuePair<string, object?>(evt.Key, evt.Value));
+            }
 
-        foreach (var evt in element.VirtualEvents)
-        {
-            events.Add(new KeyValuePair<string, object?>(evt.Key, evt.Value));
+            foreach (var evt in element.VirtualEvents)
+            {
+                events.Add(new KeyValuePair<string, object?>(evt.Key, evt.Value));
+            }
         }
 
         var entry = new VirtualEntry(
@@ -88,6 +105,7 @@ internal static class VirtualEntryAdapter
 
         return rendered.ToVirtualEntry().WithComponentId(component.Id);
     }
+
 
     private static string? GetKey(string key, string name)
     {

@@ -88,7 +88,7 @@ public sealed class PreviewBuildService
             syntaxTrees.Add(CSharpSyntaxTree.ParseText(text, parseOptions, path: sourceFile, encoding: Encoding.UTF8));
         }
 
-        var compilationOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+        var compilationOptions = new CSharpCompilationOptions(model.OutputKind)
             .WithOptimizationLevel(OptimizationLevel.Debug)
             .WithNullableContextOptions(model.NullableEnabled ? NullableContextOptions.Enable : NullableContextOptions.Disable)
             .WithAssemblyIdentityComparer(AssemblyIdentityComparer.Default);
@@ -272,6 +272,7 @@ internal sealed class PreviewCompilationModel
         string projectDirectory,
         string assemblyName,
         string targetFramework,
+        OutputKind outputKind,
         bool nullableEnabled,
         bool implicitUsingsEnabled,
         IReadOnlyList<string> sourceFiles,
@@ -282,6 +283,7 @@ internal sealed class PreviewCompilationModel
         ProjectDirectory = projectDirectory;
         AssemblyName = assemblyName;
         TargetFramework = targetFramework;
+        OutputKind = outputKind;
         NullableEnabled = nullableEnabled;
         ImplicitUsingsEnabled = implicitUsingsEnabled;
         SourceFiles = sourceFiles;
@@ -296,6 +298,7 @@ internal sealed class PreviewCompilationModel
     public string AssemblyName { get; }
 
     public string TargetFramework { get; }
+    public OutputKind OutputKind { get; }
 
     public bool NullableEnabled { get; }
 
@@ -317,6 +320,7 @@ internal sealed class PreviewCompilationModel
             assemblyName = Path.GetFileNameWithoutExtension(projectPath);
 
         var targetFramework = ReadTargetFramework(root);
+        var outputKind = ReadOutputKind(root);
         var nullableEnabled = string.Equals(ReadProperty(root, "Nullable"), "enable", StringComparison.OrdinalIgnoreCase)
             || string.Equals(ReadProperty(root, "Nullable"), "annotations", StringComparison.OrdinalIgnoreCase)
             || string.Equals(ReadProperty(root, "Nullable"), "warnings", StringComparison.OrdinalIgnoreCase);
@@ -330,12 +334,19 @@ internal sealed class PreviewCompilationModel
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        var references = CreateMetadataReferences(projectPath, root, configuration, targetFramework, out var dependencyAssemblyPaths);
+        var references = CreateMetadataReferences(
+            projectPath,
+            root,
+            configuration,
+            targetFramework,
+            assemblyName,
+            out var dependencyAssemblyPaths);
         return new PreviewCompilationModel(
             projectPath,
             projectDirectory,
             assemblyName,
             targetFramework,
+            outputKind,
             nullableEnabled,
             implicitUsingsEnabled,
             sourceFiles,
@@ -348,6 +359,7 @@ internal sealed class PreviewCompilationModel
         XElement root,
         string configuration,
         string targetFramework,
+        string assemblyName,
         out IReadOnlyList<string> dependencyAssemblyPaths)
     {
         var referencePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -355,6 +367,13 @@ internal sealed class PreviewCompilationModel
 
         AddTrustedPlatformAssemblies(referencePaths);
         AddProjectReferences(projectPath, root, configuration, targetFramework, referencePaths, dependencyPaths);
+        AddProjectOutputAssemblies(
+            Path.GetDirectoryName(projectPath) ?? Directory.GetCurrentDirectory(),
+            configuration,
+            targetFramework,
+            assemblyName,
+            referencePaths,
+            dependencyPaths);
         dependencyAssemblyPaths = dependencyPaths.ToArray();
 
         return referencePaths
@@ -399,6 +418,50 @@ internal sealed class PreviewCompilationModel
                 dependencyPaths.Add(referenceAssemblyPath);
             }
         }
+    }
+
+    private static void AddProjectOutputAssemblies(
+        string projectDirectory,
+        string configuration,
+        string targetFramework,
+        string assemblyName,
+        ISet<string> referencePaths,
+        ISet<string> dependencyPaths)
+    {
+        var outputDirectory = Path.Combine(projectDirectory, "bin", configuration, targetFramework);
+        if (!Directory.Exists(outputDirectory))
+            return;
+
+        foreach (var assemblyPath in Directory.EnumerateFiles(outputDirectory, "*.dll", SearchOption.TopDirectoryOnly))
+        {
+            if (string.Equals(
+                    Path.GetFileNameWithoutExtension(assemblyPath),
+                    assemblyName,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var fileName = Path.GetFileName(assemblyPath);
+            if (referencePaths.Any(existingPath =>
+                    string.Equals(Path.GetFileName(existingPath), fileName, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
+            referencePaths.Add(assemblyPath);
+            dependencyPaths.Add(assemblyPath);
+        }
+    }
+
+    private static OutputKind ReadOutputKind(XElement root)
+    {
+        return ReadProperty(root, "OutputType").ToUpperInvariant() switch
+        {
+            "EXE" => OutputKind.ConsoleApplication,
+            "WINEXE" => OutputKind.WindowsApplication,
+            _ => OutputKind.DynamicallyLinkedLibrary
+        };
     }
 
     private static string? TryResolveProjectAssembly(string projectPath, string configuration, string targetFramework)
