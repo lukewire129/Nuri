@@ -3,7 +3,7 @@
   <Metadata>
     <Identity Id="Nuri.VisualStudioPreview" Version="0.3.0" Language="en-US" Publisher="lukewire129" />
     <DisplayName>Nuri Preview</DisplayName>
-    <Description xml:space="preserve">Visual Studio Tool Window for Nuri component preview.</Description>
+    <Description xml:space="preserve">Visual Studio preview and format-on-save tooling for Nuri components.</Description>
     <Icon>Assets\icon.png</Icon>
     <PreviewImage>Assets\icon.png</PreviewImage>
   </Metadata>
@@ -23,6 +23,7 @@
   </Dependencies>
   <Assets>
     <Asset Type="Microsoft.VisualStudio.VsPackage" Path="Nuri.VisualStudioPreview.pkgdef" />
+    <Asset Type="Microsoft.VisualStudio.MefComponent" Path="Nuri.VisualStudioPreview.dll" />
   </Assets>
   <Prerequisites>
     <Prerequisite Id="Microsoft.VisualStudio.Component.CoreEditor" Version="[17.0,)" DisplayName="Visual Studio core editor" />
