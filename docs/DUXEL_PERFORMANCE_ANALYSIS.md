@@ -25,7 +25,7 @@ The harness alternates the native window between 1120x720 and 700x480, enables D
 - Raw Duxel is slow: investigate Duxel frame scheduling, swapchain recreation, Vulkan submission, present, and the GPU/driver.
 - Raw is fast but prebuilt projection is slow: investigate `DuxelVirtualEntryRenderer` layout and command generation.
 - Prebuilt projection is fast but full Nuri is slow: investigate component render, virtual-tree creation, diff, commit, and effects.
-- All CPU phases are fast but presentation is visibly late: correlate the Duxel log timestamps with PresentMon or PIX. Nuri cannot observe GPU completion through the Duxel 0.2.10 public API.
+- All CPU phases are fast but presentation is visibly late: correlate the Duxel log timestamps with PresentMon or PIX. Nuri cannot observe GPU completion through the current Duxel `0.2.11-preview` public API.
 
 For application-specific tracing, pass `NuriDuxelPerformanceOptions` to `NuriApplication.Run`. Collection is opt-in; without an observer, `NuriDuxelScreen` does not read performance timestamps.
 

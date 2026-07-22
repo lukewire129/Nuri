@@ -4,7 +4,7 @@ This file is intentionally short. Use it only when resuming work after the local
 
 ## Current Goal
 
-Maintain Nuri as a platform-neutral Core virtual UI/runtime/diff model, with WPF, Avalonia, and Duxel attached through Core contracts. Split Duxel into a platform-neutral immediate-mode renderer project and a Windows host project under one physical and solution folder, using Duxel `0.2.8-preview`. Direct the next UI backend implementation work to Duxel while preserving Avalonia as an existing regression baseline.
+Maintain Nuri as a platform-neutral Core virtual UI/runtime/diff model, with WPF, Avalonia, and Duxel attached through Core contracts. Keep Duxel split into a platform-neutral immediate-mode renderer and a Windows host under one physical and solution folder, using Duxel `0.2.11-preview`. Direct the next UI backend parity work to Duxel while preserving Avalonia as an existing regression baseline.
 
 ## Renderer Priority Decision
 
@@ -60,26 +60,26 @@ Maintain Nuri as a platform-neutral Core virtual UI/runtime/diff model, with WPF
   - `src/Nuri.WPF/Controls` was removed. WPF now provides renderer/adapter/materialization, not a framework-specific DSL/control layer.
   - Component instances remain in the Core virtual element tree until adapter conversion; `VirtualEntryAdapter` renders component boundaries using their final assigned IDs so nested component subtree updates can target the correct virtual entry.
 - Public Core namespaces and project paths use `Nuri`.
-- Sample/template entry points now use WPF `App.xaml` + `App.xaml.cs`, calling `NuriApplication.Run<TComponent>("Title", width, height)`.
+- WPF samples use either `Program.cs` or `App.xaml`/`App.xaml.cs` depending on the hosting behavior being demonstrated. Ordinary single-window startup uses `NuriApplication.Run<TComponent>(...)`; explicit application/window ownership uses `Create<TComponent>()`, `Show()`, or `Attach(...)`.
 - `NuriApplication` owns native WPF window creation, root creation/registration, application-level hot reload, and component state-change routing across all registered roots, including subwindows.
 - `WindowView` remains the internal virtual root wrapper for window title/size/content, but samples do not expose it directly.
 - Each native window gets its own `ApplicationRoot` instance and unique tree prefix, so separate windows build separate virtual trees instead of sharing ids.
 - Component cleanup is stronger now: removed and replaced component subtrees are disposed.
 - `src/Nuri.Avalonia` contains the Avalonia renderer and references Avalonia desktop packages.
 - The Avalonia adapter includes application-root scheduling, virtual-entry rendering, control/property/event mapping, hot reload support, and a smoke-test sample. It is no longer a renderer skeleton.
-- The Duxel physical and solution folder is `Nuri.Duxel`. `src/Nuri.Duxel/Nuri.Duxel` is the renderer package, targets `net9.0`, and references `Duxel.App` `0.2.8-preview`. `src/Nuri.Duxel/Nuri.Duxel.Windows` is the Windows host package, targets `net9.0`, references the renderer plus `Duxel.Windows.App` `0.2.8-preview`, and owns `NuriApplication`/`DuxelAppSession` execution.
+- The Duxel physical and solution folder is `Nuri.Duxel`. `src/Nuri.Duxel/Nuri.Duxel` targets `net8.0` and `net9.0` and references `Duxel.App` `0.2.11-preview`. `src/Nuri.Duxel/Nuri.Duxel.Windows` targets `net8.0-windows` and `net9.0-windows`, references the renderer plus `Duxel.Windows.App` `0.2.11-preview`, and owns `NuriApplication`/`DuxelAppSession` execution.
 - `src/Nuri.Duxel/Nuri.Duxel.PreviewHost` is the out-of-process Duxel preview host used by both Visual Studio Preview and VS Code Preview. Both extensions select WPF or Duxel from transitive project references, while the Visual Studio VSIX packages both hosts. Duxel partial refresh replaces the root at a frame boundary while preserving stable hook/effect state; full refresh resets the root state. Preview roots support public parameterless, `UiTheme`, and `DuxelThemeController` constructors.
 - `NuriDuxelScreen` projects root content directly into the Duxel viewport work area, so Nuri content is not represented by a draggable nested Duxel window. Direct hosts use `WorkPos`/`WorkSize`; the Windows host overrides the size with logical client dimensions measured from `GetClientRect` and actual `WM_SIZE` messages. The native Windows title bar is already excluded; do not subtract a title-bar inset again. The Windows host must run the same `DuxelAppSession` whose `RequestFrame` callback is supplied to the screen, otherwise idle-frame skipping can delay state and animation updates.
 - Duxel Grid projection uses nested-safe renderer-owned tracks rather than legacy `UiImmediateContext.Columns`. Pixel/Auto/Star rows and columns, tallest-cell Auto row advancement, Auto-to-Star reallocation, zero default track spacing, one WPF-compatible implicit track, and column spans are materialized; row spans remain unsupported and diagnostic.
 - Duxel vertical layout passes width through but consumes height in document order. An implicit-height Scroll region or Grid with a Star row receives the remaining height. The shared Animated Dashboard root and Explorer detail panel use Scroll so their natural content stays reachable at smaller window sizes.
 - `Nuri.Duxel.Windows/WindowsInputEventBridge.cs` uses the Windows subclass API after Duxel creates the HWND. It records ordered pointer, wheel, key, text, focus, and resize events without replacing Duxel's keyboard/text/IME path. Only wheel and left-pointer interactions over a published Nuri Scroll hit region are consumed by Nuri.
-- The Windows bridge owns mouse resize grips after native `WM_NCLBUTTONDOWN`. It captures the pointer and applies each edge/corner movement with `SetWindowPos` instead of entering Duxel 0.2.8's modal predictive `WM_SIZING` loop. Every resulting actual `WM_SIZE` reaches Duxel's normal snapshot and swapchain path, then Nuri reflows against the new client work area. Pixel/Auto content and native title-bar metrics remain fixed while Star tracks consume the changed space, matching WPF-style layout in both grow and shrink directions.
+- The Windows bridge owns mouse resize grips after native `WM_NCLBUTTONDOWN`. It captures the pointer and applies each edge/corner movement with `SetWindowPos` instead of entering the inherited modal predictive `WM_SIZING` loop. Every resulting actual `WM_SIZE` reaches Duxel's normal snapshot and swapchain path, then Nuri reflows against the new client work area. Pixel/Auto content and native title-bar metrics remain fixed while Star tracks consume the changed space, matching WPF-style layout in both grow and shrink directions.
 - `DuxelInputEventQueue` preserves semantic transition and wheel ordering plus event-time positions; consecutive pointer-move and resize samples coalesce. Frame requests remain wake signals and are not queued as historical frames.
 - With that queue attached, `DuxelVirtualEntryRenderer` owns Scroll offset, clipping, directional boundary routing, scrollbar rendering, and handle dragging. The Windows boundary captures vertical wheel samples by event-time pointer position and overflow only; the renderer evaluates direction and current offset while applying the ordered batch, so rapid reversals do not depend on a stale frame snapshot. Wheel samples add per-region velocity impulses; repeated same-direction input accelerates up to a cap, opposite input decelerates or reverses existing motion, Duxel `GetTime()` frame deltas advance offsets, exponential friction settles motion, and bounds remove outward velocity. One consecutive direction run is presented per frame, and the screen requests continuation frames for deferred input or active Scroll motion. Direct screen hosts without the queue retain Duxel `BeginChild` scrolling.
 - `tests/Nuri.DuxelRendererTests` covers the title-bar-excluded work area at the Basic (720x580), Explorer (1120x720), and Dashboard (900x640) sample sizes, plus Explorer 800x500 and Dashboard 700x480 resize cases.
 - `src/Nuri.Duxel/Nuri.Duxel.Windows/HotReloadService.cs` registers the .NET metadata update handler. An update calls `NuriDuxelScreen.RequestFullRebuild()`, requests the owning Duxel frame, and rebuilds the root while retaining stable logical component state.
 - The 2026-07-16 Duxel headless performance sanity run after the ordered-input/Nuri Scroll slice measured 1.3290 ms / 468.55 KB for initial 1,000-entry projection and 2.6399 ms / 622.78 KB with exactly 1 patch for keyed reorder. The Todo-shaped initial/reorder results were 3.1722/2.2249 ms and retained 0/1 patches. Treat timings as local sanity data; patch counts remained stable.
-- `samples/Duxel/Nuri.DuxelSample` validates Nuri hook state, neutral click/text/check events, Grid, Scroll, size, padding/spacing, and scoped text styling through the Windows host. Duxel `0.2.8-preview` supports `net9.0` and `net10.0`; the current Nuri renderer targets `net9.0`, and Windows samples target `net9.0-windows`.
+- `samples/Duxel/Nuri.DuxelSample` validates hook state, click/text/check events, Grid, Scroll, sizing, spacing, and text styling through the Windows host. The current renderer targets `net8.0` and `net9.0`; Windows samples target `net9.0-windows`.
 - `tests/Nuri.RendererTests` validates post-commit effects, subtree and key-replacement cleanup, repeated keyed native moves, and idempotent root disposal without external test packages. WPF coverage also runs 50-cycle mount/unmount, key replacement, and move stress cases.
 - WPF root disposal clears pending component invalidations and ignores Dispatcher callbacks that were posted before disposal, preventing effects from remounting on a closed root.
 - WPF input-event coverage raises click, text/check, hover, mouse, keyboard, and focus events on native controls, replaces handlers through 50 rebuilds without duplication, and verifies recursive handler detachment on subtree removal and root disposal.
@@ -97,6 +97,7 @@ Maintain Nuri as a platform-neutral Core virtual UI/runtime/diff model, with WPF
 - Application roots register their presence even while diagnostics are disabled, while detailed component, hook, log, and patch recording remains opt-in. This lets F12 enable DevTools after an app has mounted without losing the existing root; unregistration also runs while disabled so stale roots cannot leak.
 - `Nuri.WPF.Diagnostics` and `Nuri.Duxel.Diagnostics` compile the same neutral inspector sources but host them through their matching renderer. `UseAttachDevTools()` defaults to F12 and enables diagnostics before startup. WPF snapshot capture and highlighting use its Dispatcher; Duxel snapshot capture is invoked at a frame boundary.
 - Inspector roots use `includeInDiagnostics: false` in both renderers so the inspector does not diagnose its own render. There is no common `Nuri.DevTools` NuGet package.
+- `Nuri.WPFDiagnosticsSample` and `Nuri.DuxelDiagnosticsSample` exercise hooks, stores, keyed lifecycle, patch counts, console capture, and the matching diagnostics host. The shared inspector uses constrained `Auto`/`Star` surfaces so WPF native virtualization and Duxel renderer-owned scrolling both receive a finite viewport.
 - The former native WPF DevTools window, `Nuri.WPF.DevTools` project, WPF-only configuration API, and `MaterialDesignThemes` dependency have been removed. WPF keeps only `Nuri.WPF.Diagnostics.WpfElementHighlighter` as a renderer integration helper.
 - `Nuri.LargeListSample` is now the WPF 10,000-row stress screen for update, swap, reverse, filter, add, remove, replace, reset, and selection operations. It displays the previous committed patch batch, cumulative patches, component renders, and realized native rows.
 - WPF virtualized reconciliation keeps small keyed edits incremental and switches to one retained-handle collection reset when adds, removes, and LIS-derived moves exceed 256, avoiding quadratic large-reorder behavior.
@@ -146,9 +147,12 @@ Maintain Nuri as a platform-neutral Core virtual UI/runtime/diff model, with WPF
 dotnet run --project "tests\Nuri.Tests\Nuri.Tests.csproj" -c Release
 dotnet run --project "tests\Nuri.RendererTests\Nuri.RendererTests.csproj" -c Release
 dotnet run --project "tests\Nuri.DuxelRendererTests\Nuri.DuxelRendererTests.csproj" -c Release
+dotnet run --project "tests\Nuri.DevToolsTests\Nuri.DevToolsTests.csproj" -c Release
+dotnet run --project "tests\Nuri.DuxelDiagnosticsTests\Nuri.DuxelDiagnosticsTests.csproj" -c Release
+dotnet run --project "tests\Nuri.FormatterTests\Nuri.FormatterTests.csproj" -c Release
 dotnet build "Nuri.sln" -c Release
 dotnet run --project "perf\Nuri.Performance\Nuri.Performance.csproj" -c Release -- --label after
-dotnet run --project "perf\Nuri.WPFPerformance\Nuri.WPFPerformance.csproj" -c Release -- --label after
+dotnet run --project "perf\Nuri.WPFPerformance\Nuri.WpfPerformance.csproj" -c Release -- --label after
 dotnet run --project "perf\Nuri.DuxelPerformance\Nuri.DuxelPerformance.csproj" -c Release -- --label after
 ```
 
@@ -160,7 +164,8 @@ Expected baseline sanity for keyed reorder:
 ## Next Feature Priorities
 
 1. Validate and refine current neutral event semantics across WPF and Duxel instead of adding baseline event kinds.
-   - Click, value changes, hover, mouse down/up, keyboard down/up, focus changes, and loaded/unloaded compatibility events already exist.
+   - Core and WPF cover click, value changes, hover, mouse down/up, keyboard down/up, focus changes, and loaded/unloaded compatibility events.
+   - Duxel currently materializes click, text-change, and check-change events; broader materialization and `UnsupportedEvent` diagnostics remain parity work.
    - Use `useEffect(..., [])` plus cleanup for component mount/unmount.
    - Let samples justify richer pointer and keyboard payloads such as modifiers, repeat state, handled state, coordinates, or device information.
    - Keep Avalonia event behavior as a regression baseline rather than the next expansion target.
@@ -169,12 +174,12 @@ Expected baseline sanity for keyed reorder:
    - Keep WPF `AnimationTimeline` out of Core.
    - Expand `AnimationValue` and supported properties only for demonstrated transitions.
    - Opacity materialization in WPF and Avalonia, plus WPF Margin, color, and transform replacement/removal, remain regression baselines.
-   - Add Duxel animation materialization from focused sample needs while keeping frame-specific behavior in `src/Nuri.Duxel`.
-   - Add actionable unsupported-animation diagnostics.
+   - Extend Duxel beyond its current opacity materialization from focused sample needs while keeping frame-specific behavior in `src/Nuri.Duxel`.
+   - Unsupported Duxel animation properties and opacity easing modes currently use deduplicated `UnsupportedProperty` entries; consider a distinct animation diagnostic only if it improves real debugging flows.
 
 3. Strengthen renderer-level lifecycle/effect coverage.
-   - Verify effects flush after WPF native commit and Duxel frame projection.
-   - Cover subtree removal, key replacement, repeated keyed moves, frame invalidation, and root/window disposal in the applicable renderer model.
+   - Preserve the existing post-commit effect and deterministic cleanup coverage.
+   - Extend coverage only for newly exposed frame invalidation, root replacement, and window-disposal cases.
 
 4. Improve WPF/Duxel semantic parity.
    - Audit property, event, animation, lifecycle, frame invalidation, and host behavior.
@@ -185,10 +190,8 @@ Expected baseline sanity for keyed reorder:
    - Render count, duplicate-key, patch-count, and virtualized-row diagnostics already exist.
    - WPF unsupported property and event warnings are implemented; use sample findings to prioritize actual mapping gaps.
 
-6. Drive the next Core refinements from focused samples.
-   - Start with `Nuri.DuxelSample`, then add Duxel-focused Explorer Tree coverage for recursive keyed subtrees and lifecycle cleanup.
-   - Use a Duxel Animated Dashboard slice for transition coverage.
-   - Use a Duxel Stress slice for reorder/filter/replacement diagnostics and frame invalidation.
+6. Use the existing Duxel Explorer Tree, Virtual Explorer Tree, Animated Dashboard, Editor Stress, Navigation, Router, Router Transition, Theme Gallery, and Diagnostics samples as regression baselines.
+   - Drive the next slices from remaining event, animation, property, diagnostics, and multi-window gaps rather than recreating existing samples.
    - Add Duxel Multi-Window coverage when host capabilities support root registration and window lifecycle boundaries.
 
 ## Documentation Policy
@@ -205,6 +208,6 @@ Expected baseline sanity for keyed reorder:
 - Do not remove existing WPF delegate overloads unless compatibility is intentionally broken.
 - Do not replace `Name` fallback immediately; persisted/sample DSL may rely on it.
 - Keep Avalonia stable as an existing regression baseline; do not spend the next backend expansion slices there unless the project is reprioritized.
-- Keep `Nuri.Duxel` on `Duxel.App` and `Nuri.Duxel.Windows` on `Duxel.Windows.App`; both are pinned to `0.2.8-preview` in this slice. Do not collapse the Windows host back into the renderer package.
+- Keep `Nuri.Duxel` on `Duxel.App` and `Nuri.Duxel.Windows` on `Duxel.Windows.App`; both are pinned to `0.2.11-preview` in this slice. Do not collapse the Windows host back into the renderer package.
 - Keep Duxel Grid nesting independent from Duxel's single active Table state. Do not replace the renderer-owned track layout with nested `BeginTable` calls unless Duxel adds a stack-safe Table scope.
 - Do not trust perf timings from one run; use patch count plus repeated measurements.

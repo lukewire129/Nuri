@@ -5,9 +5,9 @@
 
 Nuri is a C# MVU UI library. Components describe UI with platform-neutral virtual elements, and renderer adapters materialize those descriptions into native controls.
 
-The current supported renderer path is WPF through `Nuri.WPF`.
+The supported renderer paths are WPF through `Nuri.WPF` and Duxel on Windows through `Nuri.Duxel.Windows`. The platform-neutral immediate-mode Duxel renderer is packaged as `Nuri.Duxel` and is referenced by the Windows host.
 
-The next UI backend development priority is Duxel through `Nuri.Duxel`. The existing Avalonia adapter remains available as a regression baseline, but new backend parity, materialization, and sample work should target Duxel first.
+Duxel remains the primary backend parity and expansion priority. The existing Avalonia adapter remains available as a regression baseline.
 
 ## What Nuri Does
 
@@ -22,9 +22,13 @@ The next UI backend development priority is Duxel through `Nuri.Duxel`. The exis
 
 - `src/Nuri`: platform-neutral runtime, DSL, virtual DOM, diffing, patch operations, values, events, routing, and lifecycle hooks.
 - `src/Nuri.WPF`: WPF renderer adapter, WPF control registry, WPF property/event mapping, WPF animation materialization, and application host.
+- `src/Nuri.WPF.Diagnostics`: WPF runtime inspector package and `UseAttachDevTools()` integration.
 - `src/Nuri.Duxel/Nuri.Duxel`: Duxel immediate-mode renderer adapter over `Duxel.App`.
 - `src/Nuri.Duxel/Nuri.Duxel.Windows`: Windows application/frame integration over `Duxel.Windows.App`.
+- `src/Nuri.Duxel/Nuri.Duxel.Diagnostics`: Duxel runtime inspector package and `UseAttachDevTools()` integration.
+- `src/Nuri.WPF.PreviewHost` and `src/Nuri.Duxel/Nuri.Duxel.PreviewHost`: out-of-process preview hosts.
 - `src/Nuri.Avalonia`: existing Avalonia renderer adapter retained as a regression baseline rather than the next backend expansion target.
+- `src/Nuri.Formatter`: conservative C# formatter used by the Visual Studio integration.
 - `samples/WPF`: focused WPF samples that exercise concrete behavior.
 - `samples/Duxel`: focused Duxel samples used to drive the next backend implementation slices.
 - `tests/Nuri.Tests`: lightweight Core behavior tests.
@@ -63,11 +67,10 @@ public sealed class CounterComponent : Component
     {
         var (count, setCount) = useState(0);
 
-            return Div(
-                Button($"Count: {count}", () => setCount(current => current + 1)),
-                Button("Reset", () => setCount(_ => 0))
-            );
-        }
+        return Div(
+            Button($"Count: {count}", () => setCount(current => current + 1)),
+            Button("Reset", () => setCount(_ => 0))
+        );
     }
 }
 ```
@@ -92,7 +95,7 @@ Use `useState` for local component state:
 ```csharp
 var (text, setText) = useState(string.Empty);
 
-return TextBox(text, setText);
+return TextBox(text, value => setText(_ => value));
 ```
 
 Use `useEffect` for post-render effects. Omitting dependencies runs after every render. Passing `[]` runs on mount and cleans up on unmount.
@@ -202,6 +205,39 @@ Text("Play")
 
 Use `.Transitions("Margin", ...)` only when the animated property needs to be selected explicitly.
 
+## Basic Duxel App
+
+Run a Duxel application on Windows through the `Nuri.Duxel.Windows` host:
+
+```csharp
+using Nuri.Duxel;
+
+var app = NuriApplication.Create<CounterComponent>(
+    title: "Nuri Duxel",
+    width: 720,
+    height: 480);
+
+app.Run();
+```
+
+`Nuri.Duxel` owns immediate-mode projection, while `Nuri.Duxel.Windows` owns the native window, input bridge, and frame-loop integration.
+
+## Runtime Diagnostics
+
+Reference the diagnostics package that matches the renderer: `Nuri.WPF.Diagnostics` or `Nuri.Duxel.Diagnostics`. Both expose `UseAttachDevTools()`, default to F12, and compile the same platform-neutral inspector UI into the renderer-specific package.
+
+```csharp
+var app = NuriApplication.Create<AppComponent>("Nuri App", 940, 620);
+
+#if DEBUG
+app.UseAttachDevTools();
+#endif
+
+app.Run();
+```
+
+Import `Nuri.WPF.Diagnostics` for WPF or `Nuri.Duxel.Diagnostics` for Duxel. The matching samples are `Nuri.WPFDiagnosticsSample` and `Nuri.DuxelDiagnosticsSample`.
+
 ## WPF Samples
 
 Run samples with `dotnet run --project ... -c Release`.
@@ -213,6 +249,7 @@ dotnet run --project "samples\WPF\Nuri.ModalDialogSample\Nuri.ModalDialogSample.
 dotnet run --project "samples\WPF\Nuri.CommandPaletteSample\Nuri.CommandPaletteSample.csproj" -c Release
 dotnet run --project "samples\WPF\Nuri.ExplorerTreeSample\Nuri.ExplorerTreeSample.csproj" -c Release
 dotnet run --project "samples\WPF\Nuri.VirtualExplorerTreeSample\Nuri.VirtualExplorerTreeSample.csproj" -c Release
+dotnet run --project "samples\WPF\Nuri.WPFDiagnosticsSample\Nuri.WPFDiagnosticsSample.csproj" -c Debug
 dotnet run --project "samples\WPF\RouterSample\RouterSample.csproj" -c Release
 ```
 
@@ -225,6 +262,16 @@ Sample coverage:
 - `Nuri.ExplorerTreeSample`: recursive keyed components, subtree lifecycle cleanup, rename, add, and delete behavior.
 - `Nuri.VirtualExplorerTreeSample`: 10,101 generated tree nodes flattened into a fixed-extent WPF recycling viewport.
 - `RouterSample`: router, nested router, `useNavigation`, effects, keyed list behavior.
+- `Nuri.WPFDiagnosticsSample`: WPF runtime inspector, hooks, stores, patch counts, console capture, and component highlighting.
+
+## Duxel Samples
+
+```powershell
+dotnet run --project "samples\Duxel\Nuri.DuxelSample\Nuri.DuxelSample.csproj" -c Release
+dotnet run --project "samples\Duxel\Nuri.DuxelExplorerTreeSample\Nuri.DuxelExplorerTreeSample.csproj" -c Release
+dotnet run --project "samples\Duxel\Nuri.DuxelVirtualExplorerTreeSample\Nuri.DuxelVirtualExplorerTreeSample.csproj" -c Release
+dotnet run --project "samples\Duxel\Nuri.DuxelDiagnosticsSample\Nuri.DuxelDiagnosticsSample.csproj" -c Debug
+```
 
 ## Validation
 
@@ -234,17 +281,23 @@ Build the solution after meaningful changes:
 dotnet build "Nuri.sln" -c Release
 ```
 
-Run Core tests:
+Run the Core, renderer, and diagnostics tests:
 
 ```powershell
 dotnet run --project "tests\Nuri.Tests\Nuri.Tests.csproj" -c Release
+dotnet run --project "tests\Nuri.RendererTests\Nuri.RendererTests.csproj" -c Release
+dotnet run --project "tests\Nuri.DuxelRendererTests\Nuri.DuxelRendererTests.csproj" -c Release
+dotnet run --project "tests\Nuri.DevToolsTests\Nuri.DevToolsTests.csproj" -c Release
+dotnet run --project "tests\Nuri.DuxelDiagnosticsTests\Nuri.DuxelDiagnosticsTests.csproj" -c Release
+dotnet run --project "tests\Nuri.FormatterTests\Nuri.FormatterTests.csproj" -c Release
 ```
 
 Performance sanity checks:
 
 ```powershell
 dotnet run --project "perf\Nuri.Performance\Nuri.Performance.csproj" -c Release -- --label after
-dotnet run --project "perf\Nuri.WPFPerformance\Nuri.WPFPerformance.csproj" -c Release -- --label after
+dotnet run --project "perf\Nuri.WPFPerformance\Nuri.WpfPerformance.csproj" -c Release -- --label after
+dotnet run --project "perf\Nuri.DuxelPerformance\Nuri.DuxelPerformance.csproj" -c Release -- --label after
 ```
 
 Patch count matters, especially for keyed reconciliation and reorder behavior.

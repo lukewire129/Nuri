@@ -22,6 +22,7 @@ Duxel is the next UI backend development priority. Keep existing Avalonia sample
 - `ContentControlChildrenTest`: content/child handling
 - `DiffingEngineTest`: diffing behavior checks
 - `Nuri.CommandPaletteSample`: keyboard-driven interaction, controlled input, keyed list rendering
+- `Nuri.TodoValidationSample`: controlled form input, validation, filtering, editing, removal, and keyed rows
 - `Nuri.TodoNotesSample`: productivity flow with add/edit/delete/filter, keyed reorder, and inline editing
 - `Nuri.SettingsPreferencesSample`: settings inputs, validation, disabled state, save/reset behavior
 - `Nuri.DataEntrySample`: form-oriented data entry
@@ -31,50 +32,38 @@ Duxel is the next UI backend development priority. Keep existing Avalonia sample
 - `Nuri.StoreSample`: shared store subscriptions and updates
 - `Nuri.AsyncLoadingSample`: effect-driven asynchronous loading
 - `Nuri.LargeListSample`: larger keyed-list rendering
+- `Nuri.VirtualExplorerTreeSample`: WPF fixed-extent virtualization over 10,101 flattened tree rows
+- `Nuri.RouterTransitionSample`: application-owned route transition sequencing with neutral opacity transitions
 - `Nuri.WPFEditorStressComparison`: side-by-side WPF executables sharing one 1,000-line eager keyed editor component; one references NuGet Nuri.WPF 0.2.0 and the other references the current source project
 - `Nuri.WPFDiagnosticsSample`: WPF runtime diagnostics, component highlighting, hooks, stores, patches, and console capture through `Nuri.WPF.Diagnostics`
 - `Nuri.ExplorerTreeSample`: recursive keyed folders/files with expand, selection, rename, add/delete, and lifecycle cleanup
 - `Nuri.AnimatedDashboardSample`: shared WPF/Avalonia/Duxel opacity transition and interruption baseline
-- `Nuri.WPFAnimatedDashboardSample`: WPF Margin, background, foreground, and Rotate transition replacement coverage
+- `Nuri.WPFAnimatedDashboardSample`: WPF Margin, background, foreground, Rotate, Translate, and Scale transition replacement coverage
 - `Nuri.AvaloniaHotReloadSample`: minimal Avalonia renderer and C# Hot Reload smoke test
 - `Nuri.DuxelSample`: Duxel immediate-mode hook state, Hot Reload, neutral events, nested Grid tracks, Scroll, sizing, spacing, and text-style smoke test
 - `Nuri.DuxelDiagnosticsSample`: Duxel runtime diagnostics, hooks, keyed lifecycle, stores, patches, and console capture through `Nuri.Duxel.Diagnostics`
 - `Nuri.DuxelThemeGallerySample`: runtime Duxel theme switching across the currently materialized text, button, input, selection, Grid, and Scroll controls
 - `Nuri.DuxelExplorerTreeSample`: the WPF Explorer component sources projected through the Duxel host, including keyed subtree state, effect cleanup, work-area sizing, ordered wheel routing, and independent Nuri-owned tree/detail Scroll regions
+- `Nuri.DuxelVirtualExplorerTreeSample`: Duxel fixed-extent projection of 10,101 virtualized tree rows
+- `Nuri.DuxelNavigationSample`: `Navigate`, `Replace`, `GoBack`, route-local state, and keyed route replacement
+- `Nuri.DuxelRouterSample`: compact immediate route-replacement baseline
+- `Nuri.DuxelRouterTransitionSample`: neutral route-transition composition projected through Duxel
 - `Nuri.DuxelEditorStressSample`: a 100,000-line editor-shaped Duxel workload with virtualized projection, single-line edits, adjacent keyed swaps, filtering, patch counts, and projected-row diagnostics
 - `Nuri.DuxelAnimatedDashboardSample`: the shared scrollable Animated Dashboard projected through Duxel `AnimateFloat` opacity tracks and constrained to the viewport work area
 - `Nuri.MultiWindowSample`: WPF root registration, local state isolation, shared Store updates, and per-window lifecycle cleanup
 
-## Next Sample Roadmap
+## Remaining Sample-Driven Gaps
 
-Todo Notes, Settings Preferences, and Explorer Tree now cover the first three roadmap scenarios. The next samples should target gaps that are not already represented.
+Explorer Tree, Virtual Explorer Tree, Animated Dashboard, and Editor Stress are regression samples rather than future roadmap items. Use them to expose the next concrete gaps instead of recreating those scenarios.
 
-### 1. Animated Dashboard Sample
+Current priorities:
 
-Goal:
-Pressure the existing neutral transition model across WPF and Duxel.
-
-What it should pressure:
-
-- supported animated properties and easing values
-- interruption and replacement of active transitions
-- WPF/Duxel semantic parity
-- unsupported-animation diagnostics
-
-Shared WPF/Avalonia/Duxel opacity transitions and interruption/replacement are now regression baselines. The next slice should close Duxel background, foreground, Margin, transform, and remaining easing gaps without moving Duxel types into Core.
-
-### 2. Stress Sample
-
-Goal:
-Combine reorder, filtering, subtree replacement, and diagnostics in one manual regression flow.
-
-What it should pressure:
-
-- patch count and render count visibility
-- keyed identity under repeated mixed updates
-- cleanup and invalidation coalescing
-- unsupported property/event reporting
-- Duxel frame invalidation and immediate-mode projection under repeated mixed updates
+- materialize Duxel neutral events beyond click, text change, and check change
+- close demonstrated Duxel gaps in `FontFamily`, `FontWeight`, `Grid.RowSpan`, and transform properties
+- extend Duxel animation parity beyond opacity to color, margin, and transforms
+- add actionable Duxel `UnsupportedEvent` diagnostics; unsupported animations currently use deduplicated `UnsupportedProperty` entries
+- add Duxel multi-window and root-lifecycle coverage when the host supports it
+- continue property, layout, theme, navigation, diagnostics, and lifecycle parity through existing samples
 
 ## Promotion Rule For Core Features
 

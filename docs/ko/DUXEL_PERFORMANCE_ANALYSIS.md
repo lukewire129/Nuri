@@ -25,7 +25,7 @@ dotnet run --project "perf\Nuri.DuxelWindowsPerformance\Nuri.DuxelWindowsPerform
 - 순수 Duxel부터 느리면 Duxel 프레임 스케줄링, swapchain 재생성, Vulkan 제출, present, GPU/드라이버를 조사한다.
 - 순수 Duxel은 빠르고 미리 만든 트리 투영이 느리면 `DuxelVirtualEntryRenderer` 레이아웃과 명령 생성을 조사한다.
 - 미리 만든 트리 투영은 빠르고 전체 Nuri만 느리면 컴포넌트 렌더, 가상 트리 생성, diff, commit, effect를 조사한다.
-- 모든 CPU 단계는 빠르지만 화면 표시가 늦으면 Duxel 로그 타임스탬프를 PresentMon 또는 PIX와 연계한다. Duxel 0.2.10 공개 API를 통해서는 Nuri가 GPU 완료 시점을 관찰할 수 없다.
+- 모든 CPU 단계는 빠르지만 화면 표시가 늦으면 Duxel 로그 타임스탬프를 PresentMon 또는 PIX와 연계한다. 현재 Duxel `0.2.11-preview` 공개 API를 통해서는 Nuri가 GPU 완료 시점을 관찰할 수 없다.
 
 애플리케이션별 추적에는 `NuriDuxelPerformanceOptions`를 `NuriApplication.Run`에 전달한다. 수집은 명시적으로 켜야 하며 observer가 없으면 `NuriDuxelScreen`은 성능 타임스탬프를 읽지 않는다.
 

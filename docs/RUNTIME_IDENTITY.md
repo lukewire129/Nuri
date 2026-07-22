@@ -84,4 +84,4 @@ dotnet run --project "tests\Nuri.Tests\Nuri.Tests.csproj" -c Release
 dotnet build "Nuri.sln" -c Release
 ```
 
-For reconciliation or performance changes, also run both projects under `perf/` and compare patch count as well as elapsed time.
+For reconciliation or performance changes, run the relevant harnesses explicitly: `Nuri.Performance` for Core, `Nuri.WpfPerformance` for WPF, and `Nuri.DuxelPerformance` or `Nuri.DuxelWindowsPerformance` for Duxel. Compare patch counts as well as elapsed time and allocations.
