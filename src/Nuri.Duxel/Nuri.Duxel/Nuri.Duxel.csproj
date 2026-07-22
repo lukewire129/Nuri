@@ -23,8 +23,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Duxel.App" Version="0.2.11-preview" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\Nuri\Nuri.csproj" />
-    <PackageReference Include="Duxel.App" Version="0.2.10-preview" />
   </ItemGroup>
 
 </Project>

@@ -25,7 +25,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Nuri.Duxel\Nuri.Duxel.csproj" />
-    <PackageReference Include="Duxel.Windows.App" Version="0.2.10-preview" />
+    <PackageReference Include="Duxel.Windows.App" Version="0.2.11-preview" />
   </ItemGroup>
 
 </Project>
