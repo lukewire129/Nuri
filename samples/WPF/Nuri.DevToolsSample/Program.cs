@@ -1,7 +1,7 @@
 using System.Windows;
-using Nuri.DevTools;
 using Nuri.DevToolsSample.Components;
 using Nuri.WPF;
+using Nuri.WPF.Diagnostics;
 
 namespace Nuri.DevToolsSample;
 
@@ -18,7 +18,7 @@ internal static class Program
             height: 620);
 
 #if DEBUG
-        app.UseDebug();
+        app.UseAttachDevTools();
 #endif
 
         var appWindow = app.Show();

@@ -56,6 +56,7 @@ internal static class Program
         WpfUnsupportedPropertyDiagnosticsAreDeduplicated();
         WpfUnsupportedEventDiagnosticsAreDeduplicated();
         WpfDiagnosticsTrackAppliedPatchBatches();
+        WpfDiagnosticsCanExcludeInspectorRoot();
         WpfRootDisposalRemovesVirtualizedDiagnostics();
         WpfDebugHostBuilderMapsShortcutsAndLifecycle();
         WpfTransitionsReplaceAndClearNativeAnimations(new WpfDriver());
@@ -64,6 +65,33 @@ internal static class Program
         RunSuite(() => new AvaloniaDriver());
         WpfRunBootstrapsStaAndClosesEveryWindowWithTheMainWindow();
         Console.WriteLine("Nuri.RendererTests passed.");
+    }
+
+    private static void WpfDiagnosticsCanExcludeInspectorRoot()
+    {
+        NuriDiagnostics.Enable();
+        NuriDiagnostics.ClearLogs();
+        var initialRootCount = NuriDiagnostics.GetSnapshot().Roots.Count;
+        var window = new System.Windows.Window();
+        var root = NuriApplication.Attach(
+            window,
+            new Text("Inspector"),
+            includeInDiagnostics: false);
+
+        AssertEqual(
+            initialRootCount,
+            NuriDiagnostics.GetSnapshot().Roots.Count,
+            "WPF: an excluded inspector root should not appear in diagnostics.");
+        root.Rebuild();
+        AssertEqual(
+            initialRootCount,
+            NuriDiagnostics.GetSnapshot().Roots.Count,
+            "WPF: rebuilding an excluded inspector root should remain excluded.");
+
+        root.Dispose();
+        window.Close();
+        NuriDiagnostics.ClearLogs();
+        NuriDiagnostics.Disable();
     }
 
     private static void WpfNamedColorsMatchCorePalette()

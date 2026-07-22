@@ -24,6 +24,7 @@ internal static class Program
             ("renderer assembly excludes Windows host dependencies", RendererAssemblyExcludesWindowsHostDependencies),
             ("effect flush and cleanup", EffectFlushAndCleanup),
             ("initial frame commit callback runs once after effects", InitialFrameCommitCallbackRunsOnceAfterEffects),
+            ("queued frame invocation is cancelled on disposal", QueuedFrameInvocationIsCancelledOnDisposal),
             ("root content uses viewport bounds", RootContentUsesViewportBounds),
             ("measured client size overrides viewport bounds", MeasuredClientSizeOverridesViewportBounds),
             ("preview content scale is applied to the Duxel context", PreviewContentScaleIsApplied),
@@ -72,6 +73,25 @@ internal static class Program
         }
 
         return 0;
+    }
+
+    private static void QueuedFrameInvocationIsCancelledOnDisposal()
+    {
+        using var frameRequested = new ManualResetEventSlim();
+        var screen = new NuriDuxelScreen(new ProbeComponent(), frameRequested.Set, "invoke-disposal-test");
+        var invocation = Task.Run(() => screen.InvokeOnFrame(static () => 42));
+
+        AssertTrue(frameRequested.Wait(TimeSpan.FromSeconds(5)), "A queued frame invocation should request a frame.");
+        screen.Dispose();
+
+        try
+        {
+            _ = invocation.GetAwaiter().GetResult();
+            throw new InvalidOperationException("A disposed screen should cancel queued frame invocations.");
+        }
+        catch (ObjectDisposedException)
+        {
+        }
     }
 
     private static void RendererAssemblyExcludesWindowsHostDependencies()

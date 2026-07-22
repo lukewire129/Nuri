@@ -5,24 +5,20 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
-  </PropertyGroup>
-
-  <PropertyGroup>
     <Version>0.3.0</Version>
     <PackageVersion Condition="'$(NuriToolsReleaseVersion)' != ''">$(NuriToolsReleaseVersion)</PackageVersion>
     <IsPackable>true</IsPackable>
-    <PackageId>Nuri.DevTools</PackageId>
-    <Title>Nuri DevTools</Title>
+    <PackageId>Nuri.Duxel.Diagnostics</PackageId>
+    <Title>Nuri Duxel Diagnostics</Title>
     <Authors>lukewire129</Authors>
-    <Description>Duxel-backed runtime inspector for Nuri applications.</Description>
+    <Description>Runtime inspector and diagnostics window for Nuri Duxel applications.</Description>
     <PackageProjectUrl>https://github.com/lukewire129/Nuri</PackageProjectUrl>
     <RepositoryUrl>https://github.com/lukewire129/Nuri</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>nuri;devtools;duxel;diagnostics;inspector;csharp;dotnet</PackageTags>
-    <PackageReleaseNotes>Introduces the standalone Duxel-backed runtime inspector for Nuri applications.</PackageReleaseNotes>
+    <PackageTags>nuri;duxel;diagnostics;devtools;inspector;csharp;dotnet</PackageTags>
     <Copyright>Copyright (c) 2026 lukewire129.</Copyright>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <IncludeSymbols>true</IncludeSymbols>
@@ -30,12 +26,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="..\..\assets\icon.png" Pack="true" PackagePath="\" />
-    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <Compile Include="..\..\Nuri.Diagnostics.Shared\*.cs" Link="Shared\%(Filename)%(Extension)" />
+    <None Include="..\..\..\assets\icon.png" Pack="true" PackagePath="\" />
+    <None Include="..\..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Nuri.Duxel\Nuri.Duxel.Windows\Nuri.Duxel.Windows.csproj" />
+    <ProjectReference Include="..\Nuri.Duxel.Windows\Nuri.Duxel.Windows.csproj" AdditionalProperties="Version=$(PackageVersion)" />
   </ItemGroup>
 
 </Project>

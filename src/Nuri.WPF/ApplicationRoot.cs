@@ -25,6 +25,8 @@ namespace Nuri.WPF
         private WpfApplicationHost? _host;
         private IUiScheduler? _scheduler;
         private string _treePrefix = string.Empty;
+        private string? _excludedDiagnosticsRootId;
+        private bool _includeInDiagnostics = true;
         private readonly ComponentInvalidationQueue _invalidations = new ComponentInvalidationQueue();
         private bool _rebuildScheduled;
         private bool _disposed;
@@ -38,8 +40,16 @@ namespace Nuri.WPF
 
         public static ApplicationRoot Initialize(IElement rootElement, Window mainWindow)
         {
+            return Initialize(rootElement, mainWindow, includeInDiagnostics: true);
+        }
+
+        public static ApplicationRoot Initialize(
+            IElement rootElement,
+            Window mainWindow,
+            bool includeInDiagnostics)
+        {
             var instance = new ApplicationRoot();
-            instance.InitializeInternal(rootElement, mainWindow);
+            instance.InitializeInternal(rootElement, mainWindow, includeInDiagnostics);
             return instance;
         }
 
@@ -83,8 +93,9 @@ namespace Nuri.WPF
             Scheduler.Schedule(Rebuild);
         }
 
-        private void InitializeInternal(IElement rootElement, Window mainWindow)
+        private void InitializeInternal(IElement rootElement, Window mainWindow, bool includeInDiagnostics)
         {
+            _includeInDiagnostics = includeInDiagnostics;
             InitializeInternal(
                 rootElement,
                 new WpfApplicationHost(mainWindow),
@@ -107,6 +118,12 @@ namespace Nuri.WPF
             PrepareRoot(rootElement, treePrefix);
             _rootElement = rootElement;
 
+            if (!_includeInDiagnostics)
+            {
+                _excludedDiagnosticsRootId = rootElement.Id;
+                NuriDiagnostics.ExcludeRoot(_excludedDiagnosticsRootId);
+            }
+
             _runtime = new ApplicationRuntime<IElement>(() =>
             {
                 return _rootElement ?? throw new InvalidOperationException("Application root element is not initialized.");
@@ -121,11 +138,14 @@ namespace Nuri.WPF
                 () => _currentRootVisual,
                 root => _currentRootVisual = root,
                 applyHostProperties,
-                _treePrefix);
+                _includeInDiagnostics ? _treePrefix : null);
 
             Coordinator.Initialize();
-            NuriDiagnostics.RegisterRoot(_treePrefix, "WPF", () => _runtime?.CurrentVirtualEntry);
-            WpfDevToolsRuntime.RegisterRoot(_treePrefix, () => _currentRootVisual, () => _runtime?.CurrentVirtualEntry);
+            if (_includeInDiagnostics)
+            {
+                NuriDiagnostics.RegisterRoot(_treePrefix, "WPF", () => _runtime?.CurrentVirtualEntry);
+                WpfDevToolsRuntime.RegisterRoot(_treePrefix, () => _currentRootVisual, () => _runtime?.CurrentVirtualEntry);
+            }
         }
 
         private static void PrepareRoot(IElement rootElement, string treePrefix)
@@ -261,8 +281,15 @@ namespace Nuri.WPF
             if (_currentRootVisual != null)
                 RemoveVirtualizationDiagnostics(_currentRootVisual);
             ComponentLifecycle.DisposeSubtree(_treePrefix + "_0");
-            NuriDiagnostics.UnregisterRoot(_treePrefix);
-            WpfDevToolsRuntime.UnregisterRoot(_treePrefix);
+            if (_includeInDiagnostics)
+            {
+                NuriDiagnostics.UnregisterRoot(_treePrefix);
+                WpfDevToolsRuntime.UnregisterRoot(_treePrefix);
+            }
+            else if (_excludedDiagnosticsRootId != null)
+            {
+                NuriDiagnostics.IncludeRoot(_excludedDiagnosticsRootId);
+            }
         }
 
         private static void RemoveVirtualizationDiagnostics(FrameworkElement element)

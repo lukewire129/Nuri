@@ -28,8 +28,8 @@ jobs:
       - name: Restore package projects
         run: dotnet restore src/Nuri.WPF/Nuri.WPF.csproj
 
-      - name: Restore Duxel and DevTools package projects
-        run: dotnet restore src/Nuri.DevTools/Nuri.DevTools.csproj
+      - name: Restore diagnostics package projects
+        run: dotnet restore src/Nuri.WPF.Diagnostics/Nuri.WPF.Diagnostics.csproj && dotnet restore src/Nuri.Duxel/Nuri.Duxel.Diagnostics/Nuri.Duxel.Diagnostics.csproj
 
       - name: Pack Nuri
         run: dotnet pack src/Nuri/Nuri.csproj -c Release --no-restore -m:1 -p:Version=${{ inputs.version }} -o artifacts/packages
@@ -40,8 +40,11 @@ jobs:
       - name: Pack Nuri.Duxel.Windows
         run: dotnet pack src/Nuri.Duxel/Nuri.Duxel.Windows/Nuri.Duxel.Windows.csproj -c Release --no-restore -m:1 -p:NuriToolsReleaseVersion=${{ inputs.version }} -o artifacts/packages
 
-      - name: Pack Nuri.DevTools
-        run: dotnet pack src/Nuri.DevTools/Nuri.DevTools.csproj -c Release --no-restore -m:1 -p:NuriToolsReleaseVersion=${{ inputs.version }} -o artifacts/packages
+      - name: Pack Nuri.WPF.Diagnostics
+        run: dotnet pack src/Nuri.WPF.Diagnostics/Nuri.WPF.Diagnostics.csproj -c Release --no-restore -m:1 -p:Version=${{ inputs.version }} -p:NuriToolsReleaseVersion=${{ inputs.version }} -o artifacts/packages
+
+      - name: Pack Nuri.Duxel.Diagnostics
+        run: dotnet pack src/Nuri.Duxel/Nuri.Duxel.Diagnostics/Nuri.Duxel.Diagnostics.csproj -c Release --no-restore -m:1 -p:Version=${{ inputs.version }} -p:NuriToolsReleaseVersion=${{ inputs.version }} -o artifacts/packages
 
       - name: Sign in to NuGet.org with trusted publishing
         id: nuget-login
@@ -58,5 +61,8 @@ jobs:
       - name: Publish Nuri.Duxel.Windows
         run: dotnet nuget push artifacts/packages/Nuri.Duxel.Windows.${{ inputs.version }}.nupkg --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
 
-      - name: Publish Nuri.DevTools
-        run: dotnet nuget push artifacts/packages/Nuri.DevTools.${{ inputs.version }}.nupkg --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+      - name: Publish Nuri.WPF.Diagnostics
+        run: dotnet nuget push artifacts/packages/Nuri.WPF.Diagnostics.${{ inputs.version }}.nupkg --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: Publish Nuri.Duxel.Diagnostics
+        run: dotnet nuget push artifacts/packages/Nuri.Duxel.Diagnostics.${{ inputs.version }}.nupkg --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate

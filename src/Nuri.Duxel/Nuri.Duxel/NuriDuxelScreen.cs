@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using Duxel.Core;
 using Nuri.Runtime;
@@ -41,6 +43,9 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
     private bool _hasBaseContentScale;
     private long _frameNumber;
     private int _lastSubtreePatchCount;
+    private readonly ConcurrentQueue<IFrameWorkItem> _frameWorkItems = new();
+    private readonly object _frameWorkGate = new();
+    private int _frameThreadId;
 
     public NuriDuxelScreen(
         IElement rootElement,
@@ -101,6 +106,9 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
         {
             return;
         }
+
+        Volatile.Write(ref _frameThreadId, Environment.CurrentManagedThreadId);
+        DrainFrameWorkItems();
 
         var timingEnabled = _frameTimingObserver is not null;
         var frameStarted = timingEnabled ? Stopwatch.GetTimestamp() : 0L;
@@ -264,6 +272,33 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
                     ? null
                     : Stopwatch.GetElapsedTime(latestResizeTimestamp, projectionCompleted)));
         }
+    }
+
+    public T InvokeOnFrame<T>(Func<T> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        if (Volatile.Read(ref _frameThreadId) == Environment.CurrentManagedThreadId)
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(NuriDuxelScreen));
+            return action();
+        }
+
+        using var workItem = new FrameWorkItem<T>(action);
+        lock (_frameWorkGate)
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(NuriDuxelScreen));
+            _frameWorkItems.Enqueue(workItem);
+        }
+        _requestFrame();
+        return workItem.Wait();
+    }
+
+    private void DrainFrameWorkItems()
+    {
+        while (_frameWorkItems.TryDequeue(out var workItem))
+            workItem.Execute();
     }
 
     private static UiTheme CaptureTheme(UiImmediateContext ui)
@@ -458,6 +493,13 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
             return;
         }
 
+        lock (_frameWorkGate)
+        {
+            _disposed = true;
+            while (_frameWorkItems.TryDequeue(out var workItem))
+                workItem.Cancel();
+        }
+
         Component.AnyStateChanged -= OnAnyStateChanged;
         Interlocked.Exchange(ref _fullRebuildRequested, 0);
         Interlocked.Exchange(ref _pendingTheme, null);
@@ -478,10 +520,58 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
             NuriDiagnostics.IncludeRoot(_rootId);
         }
 
-        _disposed = true;
     }
 
     private sealed record ThemeBox(UiTheme Theme);
 
     private sealed record RootReplacement(IElement RootElement, bool ResetState);
+
+    private interface IFrameWorkItem
+    {
+        void Execute();
+
+        void Cancel();
+    }
+
+    private sealed class FrameWorkItem<T>(Func<T> action) : IFrameWorkItem, IDisposable
+    {
+        private readonly ManualResetEventSlim _completed = new(false);
+        private T? _result;
+        private ExceptionDispatchInfo? _failure;
+
+        public void Execute()
+        {
+            try
+            {
+                _result = action();
+            }
+            catch (Exception exception)
+            {
+                _failure = ExceptionDispatchInfo.Capture(exception);
+            }
+            finally
+            {
+                _completed.Set();
+            }
+        }
+
+        public void Cancel()
+        {
+            _failure = ExceptionDispatchInfo.Capture(
+                new ObjectDisposedException(nameof(NuriDuxelScreen)));
+            _completed.Set();
+        }
+
+        public T Wait()
+        {
+            _completed.Wait();
+            _failure?.Throw();
+            return _result!;
+        }
+
+        public void Dispose()
+        {
+            _completed.Dispose();
+        }
+    }
 }

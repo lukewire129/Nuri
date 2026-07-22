@@ -32,7 +32,7 @@ Duxel is the next UI backend development priority. Keep existing Avalonia sample
 - `Nuri.AsyncLoadingSample`: effect-driven asynchronous loading
 - `Nuri.LargeListSample`: larger keyed-list rendering
 - `Nuri.WPFEditorStressComparison`: side-by-side WPF executables sharing one 1,000-line eager keyed editor component; one references NuGet Nuri.WPF 0.2.0 and the other references the current source project
-- `Nuri.DevToolsSample`: runtime diagnostics and developer tooling
+- `Nuri.DevToolsSample`: WPF runtime diagnostics through `Nuri.WPF.Diagnostics`
 - `Nuri.ExplorerTreeSample`: recursive keyed folders/files with expand, selection, rename, add/delete, and lifecycle cleanup
 - `Nuri.AnimatedDashboardSample`: shared WPF/Avalonia/Duxel opacity transition and interruption baseline
 - `Nuri.WPFAnimatedDashboardSample`: WPF Margin, background, foreground, and Rotate transition replacement coverage

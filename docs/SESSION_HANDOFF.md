@@ -95,8 +95,8 @@ Maintain Nuri as a platform-neutral Core virtual UI/runtime/diff model, with WPF
 - `Nuri.RendererTests` also covers WPF Margin, background, foreground, Rotate, Translate, and Scale native animation replacement, base values, transition removal, and property reset.
 - Runtime diagnostics track component render counts, duplicate keys, root patch batches grouped by `PatchOperationType`, and virtualized item/realized-row counts. WPF also records deduplicated `UnsupportedProperty` entries after every supported property fallback fails and `UnsupportedEvent` entries when event conversion or native event lookup fails.
 - Application roots register their presence even while diagnostics are disabled, while detailed component, hook, log, and patch recording remains opt-in. This lets F12 enable DevTools after an app has mounted without losing the existing root; unregistration also runs while disabled so stale roots cannot leak.
-- `src/Nuri.DevTools` is the canonical Duxel-backed runtime inspector. Core's `INuriDebugHost` and `DebugKey` keep renderer integration neutral; `NuriApplication.Create<TComponent>(...).UseDebug().Show()` enables diagnostics before the first WPF render, defaults to F12, and routes snapshot capture plus selected component highlighting through the WPF Dispatcher. Late `UseDebug` remains functional but warns once that earlier detail may be incomplete. Its `NuriDuxelScreen` uses `includeInDiagnostics: false`, so the inspector subtree does not recursively diagnose its own renders and the exclusion is released on disposal.
-- The public DevTools entry points are `OpenInspector(...)` and `RunInspector(...)`; `Show(...)` and `Run(...)` are obsolete aliases. The Duxel host remains an implementation detail, and DevTools does not apply a Nuri-specific window icon.
+- `Nuri.WPF.Diagnostics` and `Nuri.Duxel.Diagnostics` compile the same neutral inspector sources but host them through their matching renderer. `UseAttachDevTools()` defaults to F12 and enables diagnostics before startup. WPF snapshot capture and highlighting use its Dispatcher; Duxel snapshot capture is invoked at a frame boundary.
+- Inspector roots use `includeInDiagnostics: false` in both renderers so the inspector does not diagnose its own render. There is no common `Nuri.DevTools` NuGet package.
 - The former native WPF DevTools window, `Nuri.WPF.DevTools` project, WPF-only configuration API, and `MaterialDesignThemes` dependency have been removed. WPF keeps only `Nuri.WPF.Diagnostics.WpfElementHighlighter` as a renderer integration helper.
 - `Nuri.LargeListSample` is now the WPF 10,000-row stress screen for update, swap, reverse, filter, add, remove, replace, reset, and selection operations. It displays the previous committed patch batch, cumulative patches, component renders, and realized native rows.
 - WPF virtualized reconciliation keeps small keyed edits incremental and switches to one retained-handle collection reset when adds, removes, and LIS-derived moves exceed 256, avoiding quadratic large-reorder behavior.
@@ -134,8 +134,9 @@ Maintain Nuri as a platform-neutral Core virtual UI/runtime/diff model, with WPF
 - `src/Nuri.Duxel/Nuri.Duxel/DuxelVirtualEntryRenderer.cs`
 - `src/Nuri.Duxel/Nuri.Duxel.Windows/NuriApplication.cs`
 - `src/Nuri.Duxel/Nuri.Duxel.Windows/HotReloadService.cs`
-- `src/Nuri.DevTools/DuxelDevToolsComponent.cs`
-- `src/Nuri.DevTools/NuriDevTools.cs`
+- `src/Nuri.Diagnostics.Shared/RuntimeInspectorComponent.cs`
+- `src/Nuri.WPF.Diagnostics/WpfDevTools.cs`
+- `src/Nuri.Duxel/Nuri.Duxel.Diagnostics/DuxelDevTools.cs`
 - `perf/Nuri.Performance/Program.cs`
 - `perf/Nuri.WPFPerformance/Program.cs`
 

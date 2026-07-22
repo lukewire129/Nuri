@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Duxel.Core;
+using Nuri.Runtime.Diagnostics;
 
 namespace Nuri.Duxel;
 
@@ -52,6 +53,8 @@ internal sealed class WindowsInputEventBridge : IDisposable
     private readonly Action _requestFrame;
     private readonly Func<float>? _contentScaleProvider;
     private readonly Action<NuriDuxelResizeMessage>? _resizeMessageObserver;
+    private readonly DebugKey? _debugKey;
+    private readonly Action? _debugShortcut;
     private readonly SubclassProc _windowProc;
     private readonly nuint _subclassId;
     private nint _windowHandle;
@@ -67,12 +70,16 @@ internal sealed class WindowsInputEventBridge : IDisposable
         DuxelInputEventQueue events,
         Action requestFrame,
         Func<float>? contentScaleProvider = null,
-        Action<NuriDuxelResizeMessage>? resizeMessageObserver = null)
+        Action<NuriDuxelResizeMessage>? resizeMessageObserver = null,
+        DebugKey? debugKey = null,
+        Action? debugShortcut = null)
     {
         _events = events ?? throw new ArgumentNullException(nameof(events));
         _requestFrame = requestFrame ?? throw new ArgumentNullException(nameof(requestFrame));
         _contentScaleProvider = contentScaleProvider;
         _resizeMessageObserver = resizeMessageObserver;
+        _debugKey = debugKey;
+        _debugShortcut = debugShortcut;
         _windowProc = WindowProc;
         _subclassId = unchecked((nuint)Interlocked.Increment(ref _nextSubclassId));
     }
@@ -239,11 +246,17 @@ internal sealed class WindowsInputEventBridge : IDisposable
             }
             case WmKeyDown:
             case WmSysKeyDown:
+                var isRepeat = (lParam.ToInt64() & (1L << 30)) != 0;
+                if (!isRepeat && IsDebugShortcut(wParam))
+                {
+                    _debugShortcut?.Invoke();
+                    return 0;
+                }
                 Enqueue(
                     timestamp,
                     DuxelInputEventKind.KeyDown,
                     code: unchecked((int)wParam),
-                    isRepeat: (lParam.ToInt64() & (1L << 30)) != 0);
+                    isRepeat: isRepeat);
                 break;
             case WmKeyUp:
             case WmSysKeyUp:
@@ -276,6 +289,13 @@ internal sealed class WindowsInputEventBridge : IDisposable
         }
 
         return captured ? 0 : DefSubclassProc(windowHandle, message, wParam, lParam);
+    }
+
+    private bool IsDebugShortcut(nuint virtualKey)
+    {
+        return _debugKey is { } key
+            && _debugShortcut is not null
+            && virtualKey == unchecked((nuint)(0x70 + (int)key - 1));
     }
 
     private bool BeginWindowResize(nint windowHandle, int hitTest)

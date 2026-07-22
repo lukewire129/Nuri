@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0-windows;net9.0-windows</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <Version>0.3.0</Version>
+    <PackageVersion Condition="'$(NuriToolsReleaseVersion)' != ''">$(NuriToolsReleaseVersion)</PackageVersion>
+    <IsPackable>true</IsPackable>
+    <PackageId>Nuri.WPF.Diagnostics</PackageId>
+    <Title>Nuri WPF Diagnostics</Title>
+    <Authors>lukewire129</Authors>
+    <Description>Runtime inspector and diagnostics window for Nuri WPF applications.</Description>
+    <PackageProjectUrl>https://github.com/lukewire129/Nuri</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/lukewire129/Nuri</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>nuri;wpf;diagnostics;devtools;inspector;csharp;dotnet</PackageTags>
+    <Copyright>Copyright (c) 2026 lukewire129.</Copyright>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Nuri.Diagnostics.Shared\*.cs" Link="Shared\%(Filename)%(Extension)" />
+    <None Include="..\..\assets\icon.png" Pack="true" PackagePath="\" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Nuri.WPF\Nuri.WPF.csproj" AdditionalProperties="Version=$(PackageVersion)" />
+  </ItemGroup>
+
+</Project>

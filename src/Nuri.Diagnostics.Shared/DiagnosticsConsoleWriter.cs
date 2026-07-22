@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using Nuri.Runtime.Diagnostics;
 
-namespace Nuri.DevTools;
+namespace Nuri.Diagnostics.Internal;
 
 internal sealed class DiagnosticsConsoleWriter(TextWriter inner) : TextWriter
 {
@@ -51,7 +51,9 @@ internal sealed class DiagnosticsConsoleWriter(TextWriter inner) : TextWriter
             if (string.IsNullOrWhiteSpace(typeName)
                 || typeName.StartsWith("System.", StringComparison.Ordinal)
                 || typeName.StartsWith("Nuri.Runtime.Diagnostics.", StringComparison.Ordinal)
-                || typeName.StartsWith("Nuri.DevTools.", StringComparison.Ordinal))
+                || typeName.StartsWith("Nuri.Diagnostics.", StringComparison.Ordinal)
+                || typeName.StartsWith("Nuri.WPF.Diagnostics.", StringComparison.Ordinal)
+                || typeName.StartsWith("Nuri.Duxel.Diagnostics.", StringComparison.Ordinal))
             {
                 continue;
             }

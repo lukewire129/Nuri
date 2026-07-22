@@ -2,6 +2,7 @@ using System.Runtime.Versioning;
 using Duxel.App;
 using Duxel.Core;
 using Duxel.Windows.App;
+using Nuri.Runtime.Diagnostics;
 using Nuri.UI.Dsl;
 
 namespace Nuri.Duxel;
@@ -9,6 +10,28 @@ namespace Nuri.Duxel;
 [SupportedOSPlatform("windows")]
 public static class NuriApplication
 {
+    public static NuriApplicationBuilder<TComponent> Create<TComponent>(
+        string title = "Nuri Duxel",
+        int width = 1280,
+        int height = 720,
+        bool vsync = true,
+        UiTheme? theme = null,
+        bool useDuxelTitleBar = false,
+        bool integrateSystemChrome = false,
+        NuriDuxelPerformanceOptions? performance = null)
+        where TComponent : Component, new()
+    {
+        return new NuriApplicationBuilder<TComponent>(
+            title,
+            width,
+            height,
+            vsync,
+            theme,
+            useDuxelTitleBar,
+            integrateSystemChrome,
+            performance);
+    }
+
     public static void Run<TComponent>(
         string title = "Nuri Duxel",
         int width = 1280,
@@ -111,6 +134,43 @@ public static class NuriApplication
         Func<float>? contentScaleProvider = null,
         NuriDuxelPerformanceOptions? performance = null)
     {
+        RunCore(
+            rootElement,
+            title,
+            width,
+            height,
+            vsync,
+            theme,
+            themeController,
+            useDuxelTitleBar,
+            integrateSystemChrome,
+            includeInDiagnostics,
+            screenCreated,
+            windowCreated,
+            contentScaleProvider,
+            performance,
+            debugKey: null,
+            debugShortcut: null);
+    }
+
+    internal static void RunCore(
+        IElement rootElement,
+        string title,
+        int width,
+        int height,
+        bool vsync,
+        UiTheme? theme,
+        DuxelThemeController? themeController,
+        bool useDuxelTitleBar,
+        bool integrateSystemChrome,
+        bool includeInDiagnostics,
+        Action<NuriDuxelScreen>? screenCreated,
+        Action<IntPtr>? windowCreated,
+        Func<float>? contentScaleProvider,
+        NuriDuxelPerformanceOptions? performance,
+        DebugKey? debugKey,
+        Action? debugShortcut)
+    {
         ArgumentNullException.ThrowIfNull(rootElement);
 
         const float duxelTitleBarHeight = 48f;
@@ -121,7 +181,9 @@ public static class NuriApplication
             inputEvents,
             session.RequestFrame,
             contentScaleProvider,
-            performance?.ResizeMessageReceived);
+            performance?.ResizeMessageReceived,
+            debugKey,
+            debugShortcut);
         Action<UiTheme>? observeTheme = themeController is null
             ? null
             : themeController.ObserveTheme;

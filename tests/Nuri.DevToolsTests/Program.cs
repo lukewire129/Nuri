@@ -1,5 +1,5 @@
-using Nuri.DevTools;
 using Nuri.Constants;
+using Nuri.Diagnostics.Internal;
 using Nuri.Runtime.Diagnostics;
 using Nuri.UI.Controls;
 using Nuri.UI.Dsl;
@@ -11,12 +11,12 @@ namespace Nuri.DevToolsTests;
 internal static class Program
 {
     private const string LateConfigurationMessage =
-        "UseDebug was configured after the application started. Initial diagnostics may be incomplete. Configure UseDebug before Show() or Run().";
+        "UseAttachDevTools was configured after the application started. Initial diagnostics may be incomplete. Configure UseAttachDevTools before Show() or Run().";
 
     private static void Main()
     {
-        UseDebugEnablesDiagnosticsAndConfiguresShortcuts();
-        LateUseDebugWarnsOnceAndContinues();
+        AttachDevToolsEnablesDiagnosticsAndConfiguresShortcuts();
+        LateAttachDevToolsWarnsOnceAndContinues();
         ClosedAndInvalidHostsAreRejected();
         ComponentTreeUsesVirtualizedRows();
         DiagnosticListsUseVirtualizedRows();
@@ -24,25 +24,24 @@ internal static class Program
         Console.WriteLine("Nuri.DevToolsTests passed.");
     }
 
-    private static void UseDebugEnablesDiagnosticsAndConfiguresShortcuts()
+    private static void AttachDevToolsEnablesDiagnosticsAndConfiguresShortcuts()
     {
         NuriDiagnostics.Disable();
         NuriDiagnostics.ClearLogs();
         var host = new FakeDebugHost();
 
-        var returned = host.UseDebug();
+        DevToolsRuntime.Configure(host, DebugKey.F12, static () => { });
 
-        AssertSame(host, returned, "UseDebug should preserve the concrete host for fluent chaining.");
-        AssertEqual(true, NuriDiagnostics.IsEnabled, "UseDebug should enable diagnostics immediately.");
-        AssertEqual(DebugKey.F12, host.Key, "UseDebug should configure F12 by default.");
-        AssertEqual(1, host.ConfigurationCount, "UseDebug should configure one shortcut.");
+        AssertEqual(true, NuriDiagnostics.IsEnabled, "UseAttachDevTools should enable diagnostics immediately.");
+        AssertEqual(DebugKey.F12, host.Key, "UseAttachDevTools should configure F12 by default.");
+        AssertEqual(1, host.ConfigurationCount, "UseAttachDevTools should configure one shortcut.");
 
-        host.UseDebug(DebugKey.F1);
-        AssertEqual(DebugKey.F1, host.Key, "UseDebug should accept a custom function key.");
-        AssertEqual(2, host.ConfigurationCount, "Repeated UseDebug should replace the host configuration through one setter.");
+        DevToolsRuntime.Configure(host, DebugKey.F1, static () => { });
+        AssertEqual(DebugKey.F1, host.Key, "UseAttachDevTools should accept a custom function key.");
+        AssertEqual(2, host.ConfigurationCount, "Repeated UseAttachDevTools should replace the host configuration through one setter.");
     }
 
-    private static void LateUseDebugWarnsOnceAndContinues()
+    private static void LateAttachDevToolsWarnsOnceAndContinues()
     {
         NuriDiagnostics.ClearLogs();
         var host = new FakeDebugHost
@@ -50,10 +49,10 @@ internal static class Program
             HasStarted = true
         };
 
-        host.UseDebug(DebugKey.F8);
-        host.UseDebug(DebugKey.F9);
+        DevToolsRuntime.Configure(host, DebugKey.F8, static () => { });
+        DevToolsRuntime.Configure(host, DebugKey.F9, static () => { });
 
-        AssertEqual(DebugKey.F9, host.Key, "Late UseDebug should still apply the latest shortcut.");
+        AssertEqual(DebugKey.F9, host.Key, "Late UseAttachDevTools should still apply the latest shortcut.");
         AssertEqual(
             1,
             NuriDiagnostics.GetSnapshot().RecentLogs.Count(entry =>
@@ -69,13 +68,13 @@ internal static class Program
             IsClosed = true
         };
         AssertThrows<ObjectDisposedException>(
-            () => closedHost.UseDebug(),
-            "UseDebug should reject a closed host.");
+            () => DevToolsRuntime.Configure(closedHost, DebugKey.F12, static () => { }),
+            "UseAttachDevTools should reject a closed host.");
 
         var activeHost = new FakeDebugHost();
         AssertThrows<ArgumentOutOfRangeException>(
-            () => activeHost.UseDebug((DebugKey)13),
-            "UseDebug should reject keys outside F1 through F12.");
+            () => DevToolsRuntime.Configure(activeHost, (DebugKey)13, static () => { }),
+            "UseAttachDevTools should reject keys outside F1 through F12.");
     }
 
     private static void ComponentTreeUsesVirtualizedRows()
@@ -187,12 +186,6 @@ internal static class Program
     {
         if (!EqualityComparer<T>.Default.Equals(expected, actual))
             throw new InvalidOperationException($"{message} Expected: {expected}; Actual: {actual}");
-    }
-
-    private static void AssertSame(object expected, object actual, string message)
-    {
-        if (!ReferenceEquals(expected, actual))
-            throw new InvalidOperationException(message);
     }
 
     private static void AssertThrows<TException>(Action action, string message)

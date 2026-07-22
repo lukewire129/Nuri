@@ -3,7 +3,7 @@ using Nuri.UI.Controls;
 using Nuri.UI.Dsl;
 using Nuri.UI.Values;
 
-namespace Nuri.DevTools;
+namespace Nuri.Diagnostics.Internal;
 
 internal sealed class RuntimeInspectorComponent(
     Action<string?>? highlightRequested = null,

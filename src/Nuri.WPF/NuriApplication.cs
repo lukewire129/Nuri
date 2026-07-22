@@ -91,6 +91,14 @@ namespace Nuri.WPF
 
         public static ApplicationRoot Attach(Window window, IElement rootElement)
         {
+            return Attach(window, rootElement, includeInDiagnostics: true);
+        }
+
+        public static ApplicationRoot Attach(
+            Window window,
+            IElement rootElement,
+            bool includeInDiagnostics)
+        {
             if (window == null)
                 throw new ArgumentNullException(nameof(window));
 
@@ -99,7 +107,7 @@ namespace Nuri.WPF
 
             EnsureHotReloadAttached();
 
-            var root = ApplicationRoot.Initialize(rootElement, window);
+            var root = ApplicationRoot.Initialize(rootElement, window, includeInDiagnostics);
             Register(root);
             window.Closed += (_, __) =>
             {

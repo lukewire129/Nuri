@@ -1,42 +1,45 @@
 using System.Runtime.CompilerServices;
 using Nuri.Runtime.Diagnostics;
 
-namespace Nuri.DevTools;
+namespace Nuri.Diagnostics.Internal;
 
-public static class NuriDevToolsExtensions
+internal static class DevToolsRuntime
 {
     private const string LateConfigurationMessage =
-        "UseDebug was configured after the application started. Initial diagnostics may be incomplete. Configure UseDebug before Show() or Run().";
+        "UseAttachDevTools was configured after the application started. Initial diagnostics may be incomplete. Configure UseAttachDevTools before Show() or Run().";
+    private static readonly object SyncRoot = new();
     private static readonly ConditionalWeakTable<object, LateWarningState> LateWarnings = new();
+    private static bool _consoleCaptured;
 
-    public static THost UseDebug<THost>(this THost host)
-        where THost : INuriDebugHost
+    public static void Configure(INuriDebugHost host, DebugKey key, Action openInspector)
     {
-        return UseDebug(host, DebugKey.F12);
-    }
-
-    public static THost UseDebug<THost>(this THost host, DebugKey key)
-        where THost : INuriDebugHost
-    {
-        if (host is null)
-            throw new ArgumentNullException(nameof(host));
+        ArgumentNullException.ThrowIfNull(host);
+        ArgumentNullException.ThrowIfNull(openInspector);
 
         if (key < DebugKey.F1 || key > DebugKey.F12)
             throw new ArgumentOutOfRangeException(nameof(key), key, "DebugKey must be between F1 and F12.");
-
         if (host.IsClosed)
             throw new ObjectDisposedException(host.GetType().FullName);
 
         var configuredLate = host.HasStarted;
-        NuriDevTools.Enable();
-        host.SetDebugShortcut(
-            key,
-            () => NuriDevTools.OpenInspector(host.HighlightComponent, host.CaptureSnapshot));
+        Enable();
+        host.SetDebugShortcut(key, openInspector);
 
         if (configuredLate)
             WarnAboutLateConfiguration(host);
+    }
 
-        return host;
+    public static void Enable()
+    {
+        NuriDiagnostics.Enable();
+        lock (SyncRoot)
+        {
+            if (_consoleCaptured)
+                return;
+
+            Console.SetOut(new DiagnosticsConsoleWriter(Console.Out));
+            _consoleCaptured = true;
+        }
     }
 
     private static void WarnAboutLateConfiguration(INuriDebugHost host)
