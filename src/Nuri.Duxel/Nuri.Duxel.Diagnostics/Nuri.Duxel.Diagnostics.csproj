@@ -32,7 +32,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Nuri.Duxel.Windows\Nuri.Duxel.Windows.csproj" AdditionalProperties="Version=$(PackageVersion)" />
+    <ProjectReference Include="..\Nuri.Duxel.Windows\Nuri.Duxel.Windows.csproj" />
   </ItemGroup>
 
 </Project>

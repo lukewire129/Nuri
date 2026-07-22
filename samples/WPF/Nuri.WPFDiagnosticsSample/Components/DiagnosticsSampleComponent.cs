@@ -3,9 +3,9 @@ using Nuri.UI.Controls;
 using Nuri.UI.Dsl;
 using Nuri.UI.Values;
 
-namespace Nuri.DevToolsSample.Components;
+namespace Nuri.WPFDiagnosticsSample.Components;
 
-public sealed class DevToolsSampleComponent : Component
+public sealed class DiagnosticsSampleComponent : Component
 {
     public override IElement Render()
     {
@@ -13,7 +13,7 @@ public sealed class DevToolsSampleComponent : Component
 
         return Grid(Rows(Auto, Star, Auto),
                 Div(
-                        Text("WPF Runtime DevTools Sample").FontSize(24).FontWeight(FontWeightValue.Bold),
+                        Text("WPF Runtime Diagnostics Sample").FontSize(24).FontWeight(FontWeightValue.Bold),
                         Text("This WPF application is the inspected target. Press F12 to open Nuri DevTools.")
                             .FontColor("#475569")
                             .Margin(top: 6))

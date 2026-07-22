@@ -32,7 +32,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Nuri.WPF\Nuri.WPF.csproj" AdditionalProperties="Version=$(PackageVersion)" />
+    <ProjectReference Include="..\Nuri.WPF\Nuri.WPF.csproj" />
   </ItemGroup>
 
 </Project>

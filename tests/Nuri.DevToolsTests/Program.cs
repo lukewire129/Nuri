@@ -21,6 +21,7 @@ internal static class Program
         ComponentTreeUsesVirtualizedRows();
         DiagnosticListsUseVirtualizedRows();
         ConsoleSurfaceUsesStarHeight();
+        InspectorSurfaceConstrainsScrollableContent();
         Console.WriteLine("Nuri.DevToolsTests passed.");
     }
 
@@ -180,6 +181,19 @@ internal static class Program
         var rows = (IReadOnlyList<LengthValue>)console.Properties["RowDefinitions"];
         AssertEqual(1, rows.Count, "The Console surface Grid should contain one row.");
         AssertEqual(LengthUnit.Star, rows[0].Unit, "The Console surface should occupy a Star row.");
+    }
+
+    private static void InspectorSurfaceConstrainsScrollableContent()
+    {
+        var content = new Text("Scrollable content");
+        var surface = (Div)RuntimeInspectorComponent.BuildSurface("Tree", content);
+
+        AssertEqual(DivTypes.Grid, surface.Kind, "A DevTools surface should use Grid layout on WPF.");
+        var rows = (IReadOnlyList<LengthValue>)surface.Properties["RowDefinitions"];
+        AssertEqual(2, rows.Count, "A DevTools surface should contain heading and content rows.");
+        AssertEqual(LengthUnit.Auto, rows[0].Unit, "The surface heading should use its natural height.");
+        AssertEqual(LengthUnit.Star, rows[1].Unit, "The surface content should receive the constrained remaining height.");
+        AssertEqual(1, content.Properties["Grid.Row"], "Scrollable content should occupy the Star row.");
     }
 
     private static void AssertEqual<T>(T expected, T actual, string message)

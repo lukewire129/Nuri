@@ -126,18 +126,18 @@ internal sealed class RuntimeInspectorComponent(
             selectComponent);
 
         return Grid(
-                Surface(
+                BuildSurface(
                         "Component tree",
                         BuildVirtualizedTree(treeRows),
                         $"{treeRows.Count:N0} visible"
                 )
                     .Column(0),
                 Grid(
-                        Surface(
+                        BuildSurface(
                                 "Component inspector",
                                 BuildDetails(selectedComponent, detailTab, setDetailTab, snapshot))
                             .Row(0),
-                        Surface("Runtime events", BuildRuntimeLogs(snapshot))
+                        BuildSurface("Runtime events", BuildRuntimeLogs(snapshot))
                             .Row(1))
                     .Rows(Stars(2), Star)
                     .RowSpacing(10)
@@ -392,7 +392,7 @@ internal sealed class RuntimeInspectorComponent(
     internal static IElement BuildConsole(RuntimeSnapshot snapshot)
     {
         return Grid(
-                Surface(
+                BuildSurface(
                         "Console output",
                         BuildConsoleLogs(snapshot))
                     .Row(0))
@@ -449,7 +449,7 @@ internal sealed class RuntimeInspectorComponent(
             .CornerRadius(6);
     }
 
-    private static Div Surface(string title, IElement content, string? caption = null)
+    internal static IElement BuildSurface(string title, IElement content, string? caption = null)
     {
         var heading = Grid(
                 Text(title).FontSize(15).FontColor("#26364A").Column(0),
@@ -457,11 +457,12 @@ internal sealed class RuntimeInspectorComponent(
             .Columns(Star, Auto)
             .Rows(Auto);
 
-        return Div(
-                heading,
-                content)
+        return Grid(
+                heading.Row(0),
+                content.Row(1))
+            .Rows(Auto, Star)
             .Padding(12)
-            .Spacing(10)
+            .RowSpacing(10)
             .Background(Colors.White)
             .Brush(Colors.Black)
             .Thickness(0.3)

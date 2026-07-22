@@ -1,9 +1,9 @@
 using System.Windows;
-using Nuri.DevToolsSample.Components;
 using Nuri.WPF;
 using Nuri.WPF.Diagnostics;
+using Nuri.WPFDiagnosticsSample.Components;
 
-namespace Nuri.DevToolsSample;
+namespace Nuri.WPFDiagnosticsSample;
 
 internal static class Program
 {
@@ -12,8 +12,8 @@ internal static class Program
     {
         var application = new Application();
 
-        var app = NuriApplication.Create<DevToolsSampleComponent>(
-            "Nuri WPF DevTools Sample",
+        var app = NuriApplication.Create<DiagnosticsSampleComponent>(
+            "Nuri WPF Diagnostics Sample",
             width: 940,
             height: 620);
 
