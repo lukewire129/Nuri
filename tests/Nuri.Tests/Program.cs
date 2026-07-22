@@ -1284,7 +1284,8 @@ internal static class Program
 
         public override IElement Render()
         {
-            return Div();
+            return
+                Div();
         }
     }
 
@@ -1406,7 +1407,8 @@ internal static class Program
 
         public override IElement Render()
         {
-            return Div();
+            return
+                Div();
         }
     }
 
@@ -1419,7 +1421,8 @@ internal static class Program
 
         public override IElement Render()
         {
-            return Div();
+            return
+                Div();
         }
     }
 
@@ -1450,7 +1453,8 @@ internal static class Program
 
         public override IElement Render()
         {
-            return Div();
+            return
+                Div();
         }
     }
 
