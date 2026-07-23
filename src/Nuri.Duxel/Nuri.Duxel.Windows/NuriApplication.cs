@@ -153,6 +153,68 @@ public static class NuriApplication
             debugShortcut: null);
     }
 
+    public static DuxelModelessWindow ShowModeless(
+        Func<Action, IElement> rootFactory,
+        string title = "Nuri Duxel",
+        int width = 800,
+        int height = 600,
+        bool vsync = true,
+        UiTheme? theme = null,
+        bool useDuxelTitleBar = false,
+        bool integrateSystemChrome = false,
+        bool includeInDiagnostics = true,
+        IntPtr ownerWindowHandle = default,
+        Action? closed = null)
+    {
+        ArgumentNullException.ThrowIfNull(rootFactory);
+
+        NuriDuxelWindowHost? host = null;
+        try
+        {
+            return DuxelWindowsApp.ShowModeless(
+                session =>
+                {
+                    var rootElement = rootFactory(session.Exit);
+                    host = new NuriDuxelWindowHost(
+                        session,
+                        rootElement,
+                        title,
+                        width,
+                        height,
+                        vsync,
+                        theme,
+                        themeController: null,
+                        useDuxelTitleBar,
+                        integrateSystemChrome,
+                        includeInDiagnostics,
+                        screenCreated: null,
+                        windowCreated: null,
+                        contentScaleProvider: null,
+                        performance: null,
+                        debugKey: null,
+                        debugShortcut: null,
+                        ownerWindowHandle);
+                    return host.Options;
+                },
+                () =>
+                {
+                    try
+                    {
+                        host?.Dispose();
+                    }
+                    finally
+                    {
+                        closed?.Invoke();
+                    }
+                });
+        }
+        catch
+        {
+            host?.Dispose();
+            throw;
+        }
+    }
+
     internal static void RunCore(
         IElement rootElement,
         string title,
@@ -173,132 +235,26 @@ public static class NuriApplication
     {
         ArgumentNullException.ThrowIfNull(rootElement);
 
-        const float duxelTitleBarHeight = 48f;
         var session = new DuxelAppSession();
-        var inputEvents = new DuxelInputEventQueue();
-        using var windowVisibilityGate = new FirstFrameWindowVisibilityGate();
-        using var inputBridge = new WindowsInputEventBridge(
-            inputEvents,
-            session.RequestFrame,
-            contentScaleProvider,
-            performance?.ResizeMessageReceived,
-            debugKey,
-            debugShortcut);
-        Action<UiTheme>? observeTheme = themeController is null
-            ? null
-            : themeController.ObserveTheme;
-        UiVector2? GetContentAreaSize()
-        {
-            var size = inputBridge.ClientAreaSize;
-            return useDuxelTitleBar && size is { } clientSize
-                ? new UiVector2(clientSize.X, MathF.Max(0f, clientSize.Y - duxelTitleBarHeight))
-                : size;
-        }
-
-        using var screen = new NuriDuxelScreen(
+        using var host = new NuriDuxelWindowHost(
+            session,
             rootElement,
-            session.RequestFrame,
             title,
-            inputEvents,
-            GetContentAreaSize,
-            observeTheme,
+            width,
+            height,
+            vsync,
+            theme,
+            themeController,
+            useDuxelTitleBar,
+            integrateSystemChrome,
             includeInDiagnostics,
+            screenCreated,
+            windowCreated,
             contentScaleProvider,
-            performance?.FrameCompleted,
-            windowVisibilityGate.Release);
-        screenCreated?.Invoke(screen);
-        var options = DuxelApp.Options(screen, title, width, height, vsync);
-        options = options with
-        {
-            Renderer = options.Renderer with
-            {
-                Profile = DuxelPerformanceProfile.Render,
-                TextRendering = DuxelTextRenderingMode.DirectText
-            }
-        };
-        if (theme is { } selectedTheme)
-        {
-            options = options with { Theme = selectedTheme };
-        }
-
-        if (performance is not null)
-        {
-            if (performance.DuxelLogEveryNFrames < 0)
-            {
-                throw new ArgumentOutOfRangeException(
-                    nameof(performance),
-                    "DuxelLogEveryNFrames must be zero or greater.");
-            }
-
-            var existingLog = options.Debug.Log;
-            Action<string>? combinedLog = existingLog is null
-                ? performance.DuxelLog
-                : performance.DuxelLog is null
-                    ? existingLog
-                    : message =>
-                    {
-                        existingLog(message);
-                        performance.DuxelLog(message);
-                    };
-            options = options with
-            {
-                Debug = options.Debug with
-                {
-                    Log = combinedLog,
-                    LogStartupTimings = options.Debug.LogStartupTimings
-                        || performance.LogDuxelStartupTimings,
-                    LogEveryNFrames = performance.DuxelLogEveryNFrames
-                }
-            };
-        }
-
-        var existingAnimationProvider = options.Frame.IsAnimationActiveProvider;
-        var existingWindowCreated = options.Window.WindowCreated;
-        options = options with
-        {
-            Frame = options.Frame with
-            {
-                IsAnimationActiveProvider = () =>
-                    screen.HasActiveAnimations
-                    || screen.HasActiveScrollMotion
-                    || inputEvents.HasPending
-                    || (existingAnimationProvider?.Invoke() ?? false)
-            },
-            Window = options.Window with
-            {
-                UseDuxelTitleBar = useDuxelTitleBar,
-                DuxelTitleBarHeight = duxelTitleBarHeight,
-                IntegrateSystemChrome = integrateSystemChrome,
-                WindowCreated = windowHandle =>
-                {
-                    existingWindowCreated?.Invoke(windowHandle);
-                    inputBridge.Attach(windowHandle);
-                    windowCreated?.Invoke(windowHandle);
-                    windowVisibilityGate.Attach(windowHandle);
-                }
-            }
-        };
-        void OnHotReload(Type[]? _) => screen.RequestFullRebuild();
-        Action<UiTheme>? requestTheme = null;
-
-        if (themeController is not null)
-        {
-            requestTheme = screen.RequestTheme;
-            themeController.Attach(requestTheme);
-        }
-
-        HotReloadService.UpdateApplicationEvent += OnHotReload;
-        try
-        {
-            DuxelWindowsApp.Run(options, session);
-        }
-        finally
-        {
-            HotReloadService.UpdateApplicationEvent -= OnHotReload;
-            if (requestTheme is not null)
-            {
-                themeController!.Detach(requestTheme);
-            }
-        }
+            performance,
+            debugKey,
+            debugShortcut,
+            ownerWindowHandle: default);
+        DuxelWindowsApp.Run(host.Options, session);
     }
 }
