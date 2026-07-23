@@ -52,6 +52,7 @@ internal static class Program
         NestedNavigationComponentsKeepIndependentState();
         RouterKeysSelectedRouteHost();
         NamedColorsUseWpfCompatibleValues();
+        TextOverflowDslUsesNeutralValues();
         LayoutDistributionDslUsesNeutralProperties();
         GridLengthDslTreatsNumbersAsPixels();
         GridLengthDslParsesStringDefinitions();
@@ -75,6 +76,26 @@ internal static class Program
         var element = Component.Div().Background(Colors.CornflowerBlue);
         var background = (BrushValue.Solid)element.Properties[PropertyKeys.Background];
         AssertEqual(Colors.CornflowerBlue, background.Color, "Named colors should flow through the neutral background DSL.");
+    }
+
+    private static void TextOverflowDslUsesNeutralValues()
+    {
+        var clipped = Component.Text("clip");
+        var ellipsized = Component.Text("ellipsis").TextOverflow(TextOverflowValue.Ellipsis);
+        var wrapped = Component.Text("wrap").TextOverflow(TextOverflowValue.Wrap);
+
+        AssertEqual(
+            false,
+            clipped.Properties.ContainsKey(PropertyKeys.TextOverflow),
+            "Text should use renderer-owned Clip behavior when no overflow property is configured.");
+        AssertEqual(
+            TextOverflowValue.Ellipsis,
+            ellipsized.Properties[PropertyKeys.TextOverflow],
+            "Ellipsis should remain a platform-neutral Text property.");
+        AssertEqual(
+            TextOverflowValue.Wrap,
+            wrapped.Properties[PropertyKeys.TextOverflow],
+            "Wrap should remain a platform-neutral Text property.");
     }
 
     private static void VirtualizedItemsStayLazyAndProduceKeyedChanges()

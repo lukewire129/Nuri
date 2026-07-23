@@ -37,4 +37,8 @@ namespace Nuri.UI.Dsl
     public interface ISelect : IVisual
     {
     }
+
+    public interface IText : IVisual
+    {
+    }
 }

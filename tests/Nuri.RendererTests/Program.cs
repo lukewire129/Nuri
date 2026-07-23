@@ -48,6 +48,7 @@ internal static class Program
     private static void Main()
     {
         WpfNamedColorsMatchCorePalette();
+        TextOverflowMappingsRemainConsistent();
         RunSuite(() => new WpfDriver());
         WpfRepeatedEffectLifecycleRemainsStable();
         WpfDisposedRootIgnoresQueuedInvalidations();
@@ -116,6 +117,55 @@ internal static class Program
                 nuriColor,
                 $"Core color '{pair.Key}' should match the WPF ARGB value.");
         }
+    }
+
+    private static void TextOverflowMappingsRemainConsistent()
+    {
+        static VirtualEntry CreateEntry(TextOverflowValue? overflow)
+        {
+            var text = Component.Text("A long text value");
+            if (overflow is TextOverflowValue configured)
+                text.TextOverflow(configured);
+
+            return text.ToVirtualEntry().WithIdentity("text-overflow-test", null);
+        }
+
+        var current = CreateEntry(TextOverflowValue.Ellipsis);
+        var wpf = (WpfTextBlock)WpfVirtualEntryRenderer.Build(current);
+        var avalonia = (AvaloniaTextBlock)Avalonia.AvaloniaVirtualEntryRenderer.Build(current);
+        AssertEqual(System.Windows.TextWrapping.NoWrap, wpf.TextWrapping, "WPF: Ellipsis should keep Text on one line.");
+        AssertEqual(System.Windows.TextTrimming.CharacterEllipsis, wpf.TextTrimming, "WPF: Ellipsis should use character trimming.");
+        AssertEqual(global::Avalonia.Media.TextWrapping.NoWrap, avalonia.TextWrapping, "Avalonia: Ellipsis should keep Text on one line.");
+        AssertEqual(global::Avalonia.Media.TextTrimming.CharacterEllipsis, avalonia.TextTrimming, "Avalonia: Ellipsis should use character trimming.");
+
+        var wrapped = CreateEntry(TextOverflowValue.Wrap);
+        var wrapOperations = VirtualTreeDiff.Diff(current, wrapped);
+        WpfVirtualEntryRenderer.ApplyDiff(wpf, wrapOperations);
+        Avalonia.AvaloniaVirtualEntryRenderer.ApplyDiff(avalonia, wrapOperations);
+        current = wrapped;
+        AssertEqual(System.Windows.TextWrapping.Wrap, wpf.TextWrapping, "WPF: Wrap should enable line wrapping.");
+        AssertEqual(System.Windows.TextTrimming.None, wpf.TextTrimming, "WPF: Wrap should disable trimming.");
+        AssertEqual(global::Avalonia.Media.TextWrapping.Wrap, avalonia.TextWrapping, "Avalonia: Wrap should enable line wrapping.");
+        AssertEqual(global::Avalonia.Media.TextTrimming.None, avalonia.TextTrimming, "Avalonia: Wrap should disable trimming.");
+
+        var clipped = CreateEntry(TextOverflowValue.Clip);
+        var clipOperations = VirtualTreeDiff.Diff(current, clipped);
+        WpfVirtualEntryRenderer.ApplyDiff(wpf, clipOperations);
+        Avalonia.AvaloniaVirtualEntryRenderer.ApplyDiff(avalonia, clipOperations);
+        current = clipped;
+        AssertEqual(System.Windows.TextWrapping.NoWrap, wpf.TextWrapping, "WPF: Clip should keep Text on one line.");
+        AssertEqual(System.Windows.TextTrimming.None, wpf.TextTrimming, "WPF: Clip should disable trimming.");
+        AssertEqual(global::Avalonia.Media.TextWrapping.NoWrap, avalonia.TextWrapping, "Avalonia: Clip should keep Text on one line.");
+        AssertEqual(global::Avalonia.Media.TextTrimming.None, avalonia.TextTrimming, "Avalonia: Clip should disable trimming.");
+
+        var defaults = CreateEntry(null);
+        var removeOperations = VirtualTreeDiff.Diff(current, defaults);
+        WpfVirtualEntryRenderer.ApplyDiff(wpf, removeOperations);
+        Avalonia.AvaloniaVirtualEntryRenderer.ApplyDiff(avalonia, removeOperations);
+        AssertEqual(System.Windows.TextWrapping.NoWrap, wpf.TextWrapping, "WPF: removing TextOverflow should restore Clip defaults.");
+        AssertEqual(System.Windows.TextTrimming.None, wpf.TextTrimming, "WPF: removing TextOverflow should remove trimming.");
+        AssertEqual(global::Avalonia.Media.TextWrapping.NoWrap, avalonia.TextWrapping, "Avalonia: removing TextOverflow should restore Clip defaults.");
+        AssertEqual(global::Avalonia.Media.TextTrimming.None, avalonia.TextTrimming, "Avalonia: removing TextOverflow should remove trimming.");
     }
 
     private static void WpfRunBootstrapsStaAndClosesEveryWindowWithTheMainWindow()

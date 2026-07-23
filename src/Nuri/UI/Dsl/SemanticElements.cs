@@ -216,7 +216,7 @@ namespace Nuri.UI.Dsl
         }
     }
 
-    public sealed class Text : Visual
+    public sealed class Text : Visual, IText
     {
         public Text() : base(VirtualControlTypes.Text)
         {

@@ -15,6 +15,7 @@ namespace Nuri.Constants
         public const string RowSpacing = "RowSpacing";
         public const string Spacing = "Spacing";
         public const string Text = "Text";
+        public const string TextOverflow = "TextOverflow";
         public const string Title = "Title";
         public const string Width = "Width";
         public const string VirtualizedItemsSource = "VirtualizedItemsSource";

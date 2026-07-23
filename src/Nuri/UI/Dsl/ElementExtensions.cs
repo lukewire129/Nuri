@@ -163,6 +163,12 @@ namespace Nuri.UI.Dsl
             return node;
         }
 
+        public static T TextOverflow<T>(this T node, TextOverflowValue value) where T : IText
+        {
+            node.SetProperty(PropertyKeys.TextOverflow, value);
+            return node;
+        }
+
         public static T Cursor<T>(this T node, CursorValue cursor) where T : IElement
         {
             node.SetProperty("Cursor", cursor);

@@ -44,6 +44,8 @@ namespace Nuri.Avalonia
                     return TrySetCornerRadius(control, value);
                 case "Text":
                     return TrySetText(control, value);
+                case PropertyKeys.TextOverflow:
+                    return TrySetTextOverflow(control, value);
                 case "Content":
                     return TrySetContent(control, value);
                 case "FontSize":
@@ -122,6 +124,10 @@ namespace Nuri.Avalonia
                     return true;
                 case "Text" when control is TextBox textBox:
                     textBox.Text = string.Empty;
+                    return true;
+                case PropertyKeys.TextOverflow when control is TextBlock textOverflowBlock:
+                    textOverflowBlock.ClearValue(TextBlock.TextWrappingProperty);
+                    textOverflowBlock.ClearValue(TextBlock.TextTrimmingProperty);
                     return true;
                 default:
                     return false;
@@ -240,6 +246,30 @@ namespace Nuri.Avalonia
             }
 
             return false;
+        }
+
+        private static bool TrySetTextOverflow(Control control, object? value)
+        {
+            if (control is not TextBlock textBlock || value is not TextOverflowValue overflow)
+                return false;
+
+            switch (overflow.Kind)
+            {
+                case TextOverflowKind.Ellipsis:
+                    textBlock.TextWrapping = TextWrapping.NoWrap;
+                    textBlock.TextTrimming = TextTrimming.CharacterEllipsis;
+                    break;
+                case TextOverflowKind.Wrap:
+                    textBlock.TextWrapping = TextWrapping.Wrap;
+                    textBlock.TextTrimming = TextTrimming.None;
+                    break;
+                default:
+                    textBlock.TextWrapping = TextWrapping.NoWrap;
+                    textBlock.TextTrimming = TextTrimming.None;
+                    break;
+            }
+
+            return true;
         }
 
         private static bool TrySetText(Control control, object? value)

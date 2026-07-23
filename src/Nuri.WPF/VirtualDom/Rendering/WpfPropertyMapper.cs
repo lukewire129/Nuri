@@ -8,6 +8,7 @@ using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 using System.Windows.Controls.Primitives;
 using Nuri.UI.Virtualization;
+using Nuri.UI.Values;
 using WpfBorder = System.Windows.Controls.Border;
 using WpfContentControl = System.Windows.Controls.ContentControl;
 using WpfPanel = System.Windows.Controls.Panel;
@@ -88,6 +89,8 @@ namespace Nuri.WPF
                     return TrySetCornerRadius(element, value);
                 case PropertyKeys.Text:
                     return TrySetText(element, value);
+                case PropertyKeys.TextOverflow:
+                    return TrySetTextOverflow(element, value);
                 case PropertyKeys.IsChecked:
                     return TrySetIsChecked(element, value);
                 case "Content":
@@ -196,6 +199,8 @@ namespace Nuri.WPF
                     return TryClearCornerRadius(element);
                 case PropertyKeys.Text:
                     return TryClearText(element);
+                case PropertyKeys.TextOverflow:
+                    return TryClearTextOverflow(element);
                 case PropertyKeys.IsChecked:
                     return TryClearIsChecked(element);
                 case "Content":
@@ -289,6 +294,40 @@ namespace Nuri.WPF
             else
                 return false;
 
+            return true;
+        }
+
+        private static bool TrySetTextOverflow(FrameworkElement element, object? value)
+        {
+            if (element is not TextBlock textBlock || value is not TextOverflowValue overflow)
+                return false;
+
+            switch (overflow.Kind)
+            {
+                case TextOverflowKind.Ellipsis:
+                    textBlock.TextWrapping = TextWrapping.NoWrap;
+                    textBlock.TextTrimming = TextTrimming.CharacterEllipsis;
+                    break;
+                case TextOverflowKind.Wrap:
+                    textBlock.TextWrapping = TextWrapping.Wrap;
+                    textBlock.TextTrimming = TextTrimming.None;
+                    break;
+                default:
+                    textBlock.TextWrapping = TextWrapping.NoWrap;
+                    textBlock.TextTrimming = TextTrimming.None;
+                    break;
+            }
+
+            return true;
+        }
+
+        private static bool TryClearTextOverflow(FrameworkElement element)
+        {
+            if (element is not TextBlock textBlock)
+                return false;
+
+            textBlock.ClearValue(TextBlock.TextWrappingProperty);
+            textBlock.ClearValue(TextBlock.TextTrimmingProperty);
             return true;
         }
 
