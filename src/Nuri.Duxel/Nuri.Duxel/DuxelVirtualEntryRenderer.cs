@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using Duxel.Core;
 using Nuri.Constants;
 using Nuri.Runtime.Diagnostics;
@@ -17,6 +19,7 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
     private const float MaximumScrollSpeedInSteps = 42f;
     private const float ScrollbarWidth = 12f;
     private const float ScrollbarInset = 2f;
+    private const float ScrollOverflowEpsilon = 0.5f;
     private readonly DuxelInputEventQueue? _inputEvents;
     private readonly Dictionary<string, ScrollRegionState> _scrollRegions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, long> _virtualizedItemsHosts = new(StringComparer.Ordinal);
@@ -212,7 +215,11 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
         }
 
         ui.SetCursorPos(cursor);
-        return new LayoutConstraint(width, height, constraint.TrailingSpacing);
+        return new LayoutConstraint(
+            width,
+            height,
+            constraint.TrailingSpacing,
+            constraint.HeightExpandsToContent);
     }
 
     private static float GetAlignmentOffset(
@@ -246,7 +253,7 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
                 RenderDiv(ui, entry, decorations, effectiveOpacity, constraint, ref hasActiveAnimations);
                 return;
             case VirtualControlTypes.Text:
-                RenderText(ui, entry);
+                RenderText(ui, entry, constraint);
                 return;
             case VirtualControlTypes.Input:
                 RenderInput(ui, entry, effectiveOpacity, constraint);
@@ -434,11 +441,7 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
         var cursor = ui.GetCursorPos();
         var screenStart = ui.GetCursorScreenPos();
         var bounds = new UiRect(screenStart.X, screenStart.Y, size.X, size.Y);
-        var contentBounds = new UiRect(
-            bounds.X + 2f,
-            bounds.Y + 2f,
-            MathF.Max(0f, bounds.Width - 4f),
-            MathF.Max(0f, bounds.Height - 4f));
+        var contentBounds = bounds;
         var contentStartY = contentBounds.Y - state.Offset;
         var contentEndY = contentStartY;
 
@@ -467,7 +470,8 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
 
         var contentHeight = MathF.Max(0f, contentEndY - contentStartY);
         var visibleHeight = MathF.Max(0f, contentBounds.Height);
-        state.MaxOffset = MathF.Max(0f, contentHeight - visibleHeight);
+        var overflow = contentHeight - visibleHeight;
+        state.MaxOffset = overflow > ScrollOverflowEpsilon ? overflow : 0f;
         state.Offset = Math.Clamp(state.Offset, 0f, state.MaxOffset);
         state.Bounds = bounds;
         state.Order = ++_scrollOrder;
@@ -1026,6 +1030,18 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
                         ?? (entry.Children.Count > 0
                             ? entry.Children.Max(child => EstimateEntryHeight(ui, child))
                             : 0f);
+                    if (TryRenderGrowingRowChildren(
+                        ui,
+                        entry,
+                        decorations,
+                        effectiveOpacity,
+                        contentConstraint,
+                        rowHeight,
+                        ref hasActiveAnimations))
+                    {
+                        break;
+                    }
+
                     var rowStartY = ui.GetCursorPosY();
                     ui.BeginRow();
                     try
@@ -1045,6 +1061,15 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
                         ui.SetCursorPos(cursor with { Y = rowStartY + rowHeight });
                     }
 
+                    break;
+                case DivTypes.Block:
+                    RenderChildren(
+                        ui,
+                        entry,
+                        decorations,
+                        effectiveOpacity,
+                        contentConstraint,
+                        ref hasActiveAnimations);
                     break;
                 case DivTypes.Grid:
                     RenderGrid(
@@ -1135,6 +1160,12 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
             }
 
             var rowBottom = minimumRowBottom;
+            var expandsToContent = row < rowDefinitions.Count
+                ? rowDefinitions[row].Unit == LengthUnit.Auto
+                : constraint.Height is null;
+            var cellHeight = rowHeights[row] > 0f
+                ? rowHeights[row]
+                : (float?)null;
             var currentX = gridStart.X;
             for (var column = 0; column < columnCount; column++)
             {
@@ -1162,7 +1193,8 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
                         effectiveOpacity,
                         new LayoutConstraint(
                             MathF.Max(1f, cellWidth),
-                            rowHeights[row] > 0f ? rowHeights[row] : null),
+                            cellHeight,
+                            HeightExpandsToContent: expandsToContent),
                         ref hasActiveAnimations);
                     rowBottom = MathF.Max(rowBottom, ui.GetCursorPosY());
                 }
@@ -1170,9 +1202,6 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
                 currentX += columnWidths[column] + spacing.X;
             }
 
-            var expandsToContent = row < rowDefinitions.Count
-                ? rowDefinitions[row].Unit == LengthUnit.Auto
-                : constraint.Height is null;
             currentY = expandsToContent ? rowBottom : minimumRowBottom;
             if (expandsToContent && constraint.Height is not null && row + 1 < rowCount)
             {
@@ -1416,9 +1445,7 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
             : PropertyKeys.Spacing;
         var spacingValue = TryGetSingle(entry, spacingProperty, out var configuredSpacing)
             ? configuredSpacing
-            : string.Equals(entry.Kind, DivTypes.Grid, StringComparison.Ordinal)
-                ? 0f
-                : ui.GetItemSpacing().Y;
+            : 0f;
         float contentHeight;
         if (string.Equals(entry.Kind, DivTypes.Row, StringComparison.Ordinal))
         {
@@ -1686,9 +1713,249 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
         }
     }
 
-    private static void RenderText(UiImmediateContext ui, VirtualEntry entry)
+    private static void RenderText(
+        UiImmediateContext ui,
+        VirtualEntry entry,
+        LayoutConstraint constraint)
     {
-        ui.Text(GetString(entry, PropertyKeys.Text));
+        var text = GetString(entry, PropertyKeys.Text);
+        var naturalSize = ui.CalcTextSize(text);
+        var requestedSize = GetSize(entry);
+        var width = requestedSize.X > 0f
+            ? requestedSize.X
+            : constraint.Width ?? naturalSize.X;
+        var overflow = GetTextOverflow(entry);
+        var renderedText = overflow.Kind switch
+        {
+            TextOverflowKind.Ellipsis => EllipsizeText(ui, text, width),
+            TextOverflowKind.Wrap => WrapText(ui, text, width),
+            _ => text
+        };
+        var renderedSize = string.Equals(renderedText, text, StringComparison.Ordinal)
+            ? naturalSize
+            : ui.CalcTextSize(renderedText);
+        var layoutHeight = requestedSize.Y > 0f
+            ? requestedSize.Y
+            : renderedSize.Y;
+        var clipHeight = requestedSize.Y > 0f
+            ? requestedSize.Y
+            : constraint.HeightExpandsToContent
+                ? renderedSize.Y
+                : constraint.Height ?? renderedSize.Y;
+        var cursor = ui.GetCursorScreenPos();
+        var bounds = new UiRect(
+            cursor.X,
+            cursor.Y,
+            MathF.Max(0f, width),
+            MathF.Max(0f, clipHeight));
+
+        ui.DrawTextAligned(
+            bounds,
+            renderedText,
+            ui.GetColorU32(UiStyleColor.Text),
+            clipToContainer: true);
+        ui.Dummy(new UiVector2(
+            MathF.Max(0f, width),
+            MathF.Max(0f, layoutHeight)));
+    }
+
+    private static string EllipsizeText(
+        UiImmediateContext ui,
+        string text,
+        float maxWidth)
+    {
+        const string ellipsis = "\u2026";
+        if (string.IsNullOrEmpty(text)
+            || maxWidth <= 0f
+            || ui.CalcTextSize(text).X <= maxWidth)
+        {
+            return maxWidth > 0f ? text : string.Empty;
+        }
+
+        if (ui.CalcTextSize(ellipsis).X > maxWidth)
+        {
+            return string.Empty;
+        }
+
+        var textElements = StringInfo.ParseCombiningCharacters(text);
+        var low = 0;
+        var high = textElements.Length;
+        while (low < high)
+        {
+            var middle = low + ((high - low + 1) / 2);
+            var charEnd = middle < textElements.Length
+                ? textElements[middle]
+                : text.Length;
+            var candidate = string.Concat(text.AsSpan(0, charEnd), ellipsis.AsSpan());
+            if (ui.CalcTextSize(candidate).X <= maxWidth)
+            {
+                low = middle;
+            }
+            else
+            {
+                high = middle - 1;
+            }
+        }
+
+        var prefixEnd = low < textElements.Length
+            ? textElements[low]
+            : text.Length;
+        return string.Concat(text.AsSpan(0, prefixEnd), ellipsis.AsSpan());
+    }
+
+    private static string WrapText(
+        UiImmediateContext ui,
+        string text,
+        float maxWidth)
+    {
+        if (string.IsNullOrEmpty(text)
+            || maxWidth <= 0f
+            || ui.CalcTextSize(text).X <= maxWidth)
+        {
+            return text;
+        }
+
+        var textElements = StringInfo.ParseCombiningCharacters(text);
+        var builder = new StringBuilder(text.Length + 16);
+        var lineStart = 0;
+        while (lineStart < textElements.Length)
+        {
+            if (IsLineBreak(text, textElements[lineStart]))
+            {
+                builder.Append('\n');
+                lineStart = SkipLineBreak(text, textElements, lineStart);
+                continue;
+            }
+
+            var paragraphEnd = lineStart;
+            while (paragraphEnd < textElements.Length
+                && !IsLineBreak(text, textElements[paragraphEnd]))
+            {
+                paragraphEnd++;
+            }
+
+            if (MeasureTextRange(ui, text, textElements, lineStart, paragraphEnd) <= maxWidth)
+            {
+                AppendTextRange(builder, text, textElements, lineStart, paragraphEnd);
+                lineStart = paragraphEnd;
+                continue;
+            }
+
+            var fittingEnd = FindFittingTextEnd(
+                ui,
+                text,
+                textElements,
+                lineStart,
+                paragraphEnd,
+                maxWidth);
+            if (fittingEnd <= lineStart)
+            {
+                fittingEnd = lineStart + 1;
+            }
+
+            var breakEnd = fittingEnd;
+            var nextLineStart = fittingEnd;
+            for (var index = fittingEnd - 1; index > lineStart; index--)
+            {
+                var charIndex = textElements[index];
+                if (!char.IsWhiteSpace(text, charIndex)
+                    || IsLineBreak(text, charIndex))
+                {
+                    continue;
+                }
+
+                breakEnd = index;
+                nextLineStart = index + 1;
+                break;
+            }
+
+            AppendTextRange(builder, text, textElements, lineStart, breakEnd);
+            builder.Append('\n');
+            lineStart = nextLineStart;
+            while (lineStart < paragraphEnd
+                && char.IsWhiteSpace(text, textElements[lineStart])
+                && !IsLineBreak(text, textElements[lineStart]))
+            {
+                lineStart++;
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    private static int FindFittingTextEnd(
+        UiImmediateContext ui,
+        string text,
+        int[] textElements,
+        int start,
+        int end,
+        float maxWidth)
+    {
+        var low = start;
+        var high = end;
+        while (low < high)
+        {
+            var middle = low + ((high - low + 1) / 2);
+            if (MeasureTextRange(ui, text, textElements, start, middle) <= maxWidth)
+            {
+                low = middle;
+            }
+            else
+            {
+                high = middle - 1;
+            }
+        }
+
+        return low;
+    }
+
+    private static float MeasureTextRange(
+        UiImmediateContext ui,
+        string text,
+        int[] textElements,
+        int start,
+        int end)
+    {
+        var charStart = textElements[start];
+        var charEnd = end < textElements.Length
+            ? textElements[end]
+            : text.Length;
+        return ui.CalcTextSize(text.Substring(charStart, charEnd - charStart)).X;
+    }
+
+    private static void AppendTextRange(
+        StringBuilder builder,
+        string text,
+        int[] textElements,
+        int start,
+        int end)
+    {
+        var charStart = textElements[start];
+        var charEnd = end < textElements.Length
+            ? textElements[end]
+            : text.Length;
+        builder.Append(text, charStart, charEnd - charStart);
+    }
+
+    private static bool IsLineBreak(string text, int charIndex)
+    {
+        return text[charIndex] is '\r' or '\n';
+    }
+
+    private static int SkipLineBreak(
+        string text,
+        int[] textElements,
+        int index)
+    {
+        var next = index + 1;
+        if (text[textElements[index]] == '\r'
+            && next < textElements.Length
+            && text[textElements[next]] == '\n')
+        {
+            next++;
+        }
+
+        return next;
     }
 
     private static void RenderButton(
@@ -1872,17 +2139,11 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
 
     private static bool PushSpacing(UiImmediateContext ui, VirtualEntry entry)
     {
-        var spacing = ui.GetItemSpacing();
-        var horizontal = spacing.X;
-        var vertical = spacing.Y;
-        var hasOverride = false;
+        var horizontal = 0f;
+        var vertical = 0f;
 
         if (string.Equals(entry.Kind, DivTypes.Grid, StringComparison.Ordinal))
         {
-            horizontal = 0f;
-            vertical = 0f;
-            hasOverride = true;
-
             if (TryGetSingle(entry, PropertyKeys.ColumnSpacing, out var columnSpacing))
             {
                 horizontal = columnSpacing;
@@ -1903,16 +2164,10 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
             {
                 vertical = linearSpacing;
             }
-
-            hasOverride = true;
         }
 
-        if (hasOverride)
-        {
-            ui.PushStyleVar(UiStyleVar.ItemSpacing, new UiVector2(horizontal, vertical));
-        }
-
-        return hasOverride;
+        ui.PushStyleVar(UiStyleVar.ItemSpacing, new UiVector2(horizontal, vertical));
+        return true;
     }
 
     private static void ApplyTopPadding(UiImmediateContext ui, double padding)
@@ -1954,6 +2209,131 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
         }
     }
 
+    private bool TryRenderGrowingRowChildren(
+        UiImmediateContext ui,
+        VirtualEntry entry,
+        List<PanelDecoration>? decorations,
+        float effectiveOpacity,
+        LayoutConstraint constraint,
+        float rowHeight,
+        ref bool hasActiveAnimations)
+    {
+        if (constraint.Width is not float availableWidth)
+        {
+            return false;
+        }
+
+        var totalGrow = 0f;
+        var fixedWidth = ui.GetItemSpacing().X * Math.Max(0, entry.Children.Count - 1);
+        foreach (var child in entry.Children)
+        {
+            var grow = GetGrow(child);
+            totalGrow += grow;
+            if (grow <= 0f)
+            {
+                fixedWidth += EstimateEntryWidth(ui, child);
+            }
+        }
+
+        if (totalGrow <= 0f)
+        {
+            return false;
+        }
+
+        var growWidth = MathF.Max(0f, availableWidth - fixedWidth);
+        var spacing = ui.GetItemSpacing().X;
+        var rowStart = ui.GetCursorPos();
+        var currentX = rowStart.X;
+        for (var index = 0; index < entry.Children.Count; index++)
+        {
+            var child = entry.Children[index];
+            var grow = GetGrow(child);
+            var childWidth = grow > 0f
+                ? growWidth * grow / totalGrow
+                : EstimateEntryWidth(ui, child);
+            ui.SetCursorPos(new UiVector2(currentX, rowStart.Y));
+            RenderEntry(
+                ui,
+                child,
+                decorations,
+                effectiveOpacity,
+                new LayoutConstraint(
+                    grow > 0f ? childWidth : null,
+                    rowHeight),
+                ref hasActiveAnimations);
+            currentX += childWidth;
+            if (index < entry.Children.Count - 1)
+            {
+                currentX += spacing;
+            }
+        }
+
+        ui.SetCursorPos(new UiVector2(rowStart.X, rowStart.Y + rowHeight));
+        return true;
+    }
+
+    private bool TryRenderGrowingVerticalChildren(
+        UiImmediateContext ui,
+        VirtualEntry entry,
+        List<PanelDecoration>? decorations,
+        float effectiveOpacity,
+        LayoutConstraint constraint,
+        ref bool hasActiveAnimations)
+    {
+        if (constraint.Height is not float availableHeight)
+        {
+            return false;
+        }
+
+        var spacing = ui.GetItemSpacing().Y;
+        var totalGrow = 0f;
+        var fixedHeight = spacing * Math.Max(0, entry.Children.Count - 1);
+        foreach (var child in entry.Children)
+        {
+            var grow = GetGrow(child);
+            totalGrow += grow;
+            if (grow <= 0f)
+            {
+                fixedHeight += EstimateEntryHeight(ui, child);
+            }
+        }
+
+        if (totalGrow <= 0f)
+        {
+            return false;
+        }
+
+        var growHeight = MathF.Max(0f, availableHeight - fixedHeight);
+        var start = ui.GetCursorPos();
+        var currentY = start.Y;
+        for (var index = 0; index < entry.Children.Count; index++)
+        {
+            var child = entry.Children[index];
+            var grow = GetGrow(child);
+            var childHeight = grow > 0f
+                ? growHeight * grow / totalGrow
+                : EstimateEntryHeight(ui, child);
+            ui.SetCursorPos(new UiVector2(start.X, currentY));
+            RenderEntry(
+                ui,
+                child,
+                decorations,
+                effectiveOpacity,
+                new LayoutConstraint(
+                    constraint.Width,
+                    grow > 0f ? childHeight : null),
+                ref hasActiveAnimations);
+            currentY += childHeight;
+            if (index < entry.Children.Count - 1)
+            {
+                currentY += spacing;
+            }
+        }
+
+        ui.SetCursorPos(new UiVector2(start.X, start.Y + availableHeight));
+        return true;
+    }
+
     private void RenderVerticalChildren(
         UiImmediateContext ui,
         VirtualEntry entry,
@@ -1962,6 +2342,17 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
         LayoutConstraint constraint,
         ref bool hasActiveAnimations)
     {
+        if (TryRenderGrowingVerticalChildren(
+            ui,
+            entry,
+            decorations,
+            effectiveOpacity,
+            constraint,
+            ref hasActiveAnimations))
+        {
+            return;
+        }
+
         var contentBottom = constraint.Height is float height
             ? ui.GetCursorPosY() + height
             : (float?)null;
@@ -2004,6 +2395,13 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
         }
     }
 
+    private static float GetGrow(VirtualEntry entry)
+    {
+        return TryGetSingle(entry, PropertyKeys.Grow, out var grow)
+            ? MathF.Max(0f, grow)
+            : 0f;
+    }
+
     private static bool IsFlexibleVerticalChild(VirtualEntry entry)
     {
         if (TryGetSingle(entry, PropertyKeys.Height, out var explicitHeight) && explicitHeight > 0f)
@@ -2022,7 +2420,8 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
             return false;
         }
 
-        if (string.Equals(entry.Kind, DivTypes.Scroll, StringComparison.Ordinal))
+        if (string.Equals(entry.Kind, DivTypes.Block, StringComparison.Ordinal)
+            || string.Equals(entry.Kind, DivTypes.Scroll, StringComparison.Ordinal))
         {
             return true;
         }
@@ -2576,6 +2975,14 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
         return new UiVector2(MathF.Max(0f, width), MathF.Max(0f, height));
     }
 
+    private static TextOverflowValue GetTextOverflow(VirtualEntry entry)
+    {
+        return entry.Properties.TryGetValue(PropertyKeys.TextOverflow, out var value)
+            && value is TextOverflowValue configured
+                ? configured
+                : TextOverflowValue.Clip;
+    }
+
     private static bool TryGetVirtualizedItemsSource(
         VirtualEntry entry,
         out IVirtualizedItemsSource source)
@@ -2835,7 +3242,8 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
     private readonly record struct LayoutConstraint(
         float? Width,
         float? Height,
-        float TrailingSpacing = 0f)
+        float TrailingSpacing = 0f,
+        bool HeightExpandsToContent = false)
     {
         public static LayoutConstraint Unconstrained => new(null, null);
 
@@ -2848,7 +3256,8 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
                 Height is float height
                     ? MathF.Max(0f, height - ToFloat(thickness.Top + thickness.Bottom))
                     : null,
-                TrailingSpacing);
+                TrailingSpacing,
+                HeightExpandsToContent);
         }
 
         public LayoutConstraint WithExplicitSize(UiVector2 size)
@@ -2856,7 +3265,8 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
             return new LayoutConstraint(
                 size.X > 0f ? size.X : Width,
                 size.Y > 0f ? size.Y : Height,
-                TrailingSpacing);
+                TrailingSpacing,
+                size.Y > 0f ? false : HeightExpandsToContent);
         }
     }
 

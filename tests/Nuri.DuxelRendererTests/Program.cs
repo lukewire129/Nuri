@@ -35,17 +35,22 @@ internal static class Program
             ("grid applies horizontal and vertical element alignment", GridAppliesElementAlignment),
             ("row applies child vertical alignment", RowAppliesChildVerticalAlignment),
             ("column applies child horizontal alignment", ColumnAppliesChildHorizontalAlignment),
+            ("grow children fill linear layout remainder", GrowChildrenFillLinearLayoutRemainder),
             ("button content alignment is supported without diagnostics", ButtonContentAlignmentIsSupported),
             ("auto grid columns measure nested div content", AutoGridColumnsMeasureNestedDivContent),
             ("decorated grid preserves bottom padding before its sibling", DecoratedGridPreservesBottomPaddingBeforeSibling),
             ("header grid preserves visible bottom padding", HeaderGridPreservesVisibleBottomPadding),
+            ("text overflow clips ellipsizes and wraps within bounds", TextOverflowModesStayWithinBounds),
             ("scroll projects one spaced Column child", ScrollProjectsOneSpacedColumnChild),
+            ("unspecified scroll content spacing equals explicit zero", UnspecifiedScrollSpacingEqualsExplicitZero),
+            ("scroll overflow starts beyond the viewport", ScrollOverflowStartsBeyondViewport),
             ("scroll clips deferred panel decorations", ScrollClipsDeferredPanelDecorations),
             ("nested panel backgrounds preserve painter order", NestedPanelBackgroundsPreservePainterOrder),
             ("scrollbar respects viewport corners", ScrollbarRespectsViewportCorners),
             ("fixed grid tracks do not expand to overflowing content", FixedGridTracksDoNotExpand),
             ("implicit grid row fills its arranged height", ImplicitGridRowFillsArrangedHeight),
             ("measured auto row reduces remaining star height", MeasuredAutoRowReducesRemainingStarHeight),
+            ("router scroll fills its remaining star row", RouterScrollFillsRemainingStarRow),
             ("dirty state requests and projects a frame", DirtyStateRequestsAndProjectsFrame),
             ("frame request projects without rebuilding components", FrameRequestProjectsWithoutRebuildingComponents),
             ("full rebuild requests and projects a frame", FullRebuildRequestsAndProjectsFrame),
@@ -504,6 +509,109 @@ internal static class Program
         }
     }
 
+    private static void GrowChildrenFillLinearLayoutRemainder()
+    {
+        var vertical = RenderGrowRects(new VerticalGrowProbeComponent(), "vertical-grow-test")
+            .OrderBy(rect => rect.Y)
+            .ToArray();
+        AssertEqual(3, vertical.Length, "The vertical Grow probe must draw all three child slots.");
+        AssertEqual(20f, vertical[0].Height, "The fixed vertical header must keep its desired height.");
+        AssertEqual(70f, vertical[1].Height, "The vertical Grow child must consume the remaining height.");
+        AssertEqual(90f, vertical[2].Y, "The vertical footer must be placed at the bottom of the assigned bounds.");
+        AssertEqual(10f, vertical[2].Height, "The fixed vertical footer must keep its desired height.");
+
+        var horizontal = RenderGrowRects(new HorizontalGrowProbeComponent(), "horizontal-grow-test")
+            .OrderBy(rect => rect.X)
+            .ToArray();
+        AssertEqual(3, horizontal.Length, "The horizontal Grow probe must draw all three child slots.");
+        AssertEqual(20f, horizontal[0].Width, "The fixed horizontal leading child must keep its desired width.");
+        AssertEqual(70f, horizontal[1].Width, "The horizontal Grow child must consume the remaining width.");
+        AssertEqual(90f, horizontal[2].X, "The trailing horizontal child must be placed at the end of the assigned bounds.");
+        AssertEqual(10f, horizontal[2].Width, "The fixed horizontal trailing child must keep its desired width.");
+
+        var weighted = RenderGrowRects(new WeightedGrowProbeComponent(), "weighted-grow-test")
+            .OrderBy(rect => rect.X)
+            .ToArray();
+        AssertEqual(2, weighted.Length, "The weighted Grow probe must draw both child slots.");
+        AssertEqual(30f, weighted[0].Width, "Grow weight 1 must receive one third of the remaining width.");
+        AssertEqual(60f, weighted[1].Width, "Grow weight 2 must receive two thirds of the remaining width.");
+    }
+
+    private static UiRect[] RenderGrowRects(Component component, string rootId)
+    {
+        using var context = CreateContext();
+        using var screen = new NuriDuxelScreen(component, () => { }, rootId);
+        var drawData = RenderFrameWithDrawData(context, screen, FrameInfo);
+        try
+        {
+            return drawData.DrawLists
+                .SelectMany(drawList => drawList.RectFilledPrimitives?.ToArray()
+                    ?? Array.Empty<UiRectFilledPrimitive>())
+                .Select(primitive => primitive.Rect)
+                .ToArray();
+        }
+        finally
+        {
+            drawData.ReleasePooled();
+        }
+    }
+
+    private static void TextOverflowModesStayWithinBounds()
+    {
+        var clipped = RenderTextOverflowCommand(null, 44f, "0123456789", "text-clip-test");
+        var ellipsized = RenderTextOverflowCommand(
+            TextOverflowValue.Ellipsis,
+            44f,
+            "0123456789",
+            "text-ellipsis-test");
+        var wrapped = RenderTextOverflowCommand(
+            TextOverflowValue.Wrap,
+            24f,
+            "one two",
+            "text-wrap-test");
+
+        AssertEqual(
+            44f,
+            clipped.ClipRect.Width,
+            "Default Text overflow must clip drawing to its assigned width.");
+        AssertTrue(
+            ellipsized.ElementCount < clipped.ElementCount,
+            "Ellipsis overflow must replace the clipped tail instead of drawing every partially visible glyph.");
+        AssertTrue(
+            wrapped.Bounds.Height > clipped.Bounds.Height,
+            "Wrap overflow must project additional lines within the assigned width.");
+        AssertTrue(
+            wrapped.Bounds.Width <= 24.01f,
+            "Wrapped text glyphs must remain inside the assigned width.");
+    }
+
+    private static UiDrawCommand RenderTextOverflowCommand(
+        TextOverflowValue? overflow,
+        float width,
+        string text,
+        string rootId)
+    {
+        using var context = CreateContext();
+        using var screen = new NuriDuxelScreen(
+            new TextOverflowProbeComponent(overflow, width, text),
+            () => { },
+            rootId);
+        var drawData = RenderFrameWithDrawData(context, screen, FrameInfo);
+        try
+        {
+            return drawData.DrawLists
+                .SelectMany(drawList => drawList.Commands)
+                .Single(command =>
+                    command.Kind == UiDrawCommandKind.Triangles
+                    && command.HasBounds
+                    && command.ElementCount > 0);
+        }
+        finally
+        {
+            drawData.ReleasePooled();
+        }
+    }
+
     private static void ScrollProjectsOneSpacedColumnChild()
     {
         var withoutSpacing = RenderScrollMaxOffset(0, "scroll-spacing-zero-test");
@@ -515,12 +623,46 @@ internal static class Program
             "Spacing on the Scroll's single Column child must contribute exactly once.");
     }
 
-    private static float RenderScrollMaxOffset(double spacing, string rootId)
+    private static void UnspecifiedScrollSpacingEqualsExplicitZero()
+    {
+        var unspecified = RenderScrollMaxOffset(null, "scroll-spacing-unspecified-test");
+        var explicitZero = RenderScrollMaxOffset(0, "scroll-spacing-explicit-zero-test");
+
+        AssertEqual(
+            explicitZero,
+            unspecified,
+            "A Nuri Column without Spacing must use the same zero spacing as WPF.");
+    }
+
+    private static void ScrollOverflowStartsBeyondViewport()
+    {
+        var exactFit = RenderExactFitScrollMaxOffset(40, "scroll-exact-fit-test");
+        var overflow = RenderExactFitScrollMaxOffset(41, "scroll-one-pixel-overflow-test");
+
+        AssertEqual(0f, exactFit, "Content equal to the Scroll viewport must not overflow.");
+        AssertEqual(1f, overflow, "Content one pixel taller than the Scroll viewport must overflow by one pixel.");
+    }
+
+    private static float RenderScrollMaxOffset(double? spacing, string rootId)
     {
         using var context = CreateContext();
         var input = new DuxelInputEventQueue();
         using var screen = new NuriDuxelScreen(
             new ScrollSpacingComponent(spacing),
+            () => { },
+            rootId,
+            input);
+
+        RenderFrame(context, screen);
+        return input.GetScrollRegions().Single().MaxOffset;
+    }
+
+    private static float RenderExactFitScrollMaxOffset(double contentHeight, string rootId)
+    {
+        using var context = CreateContext();
+        var input = new DuxelInputEventQueue();
+        using var screen = new NuriDuxelScreen(
+            new ExactFitScrollComponent(contentHeight),
             () => { },
             rootId,
             input);
@@ -558,11 +700,7 @@ internal static class Program
             AssertTrue(
                 MathF.Abs(region.Offset - region.MaxOffset) <= 1f,
                 "The decorated Scroll test must inspect the maximum offset.");
-            var contentBounds = new UiRect(
-                region.Bounds.X + 2f,
-                region.Bounds.Y + 2f,
-                MathF.Max(0f, region.Bounds.Width - 4f),
-                MathF.Max(0f, region.Bounds.Height - 4f));
+            var contentBounds = region.Bounds;
             var decorations = drawData.DrawLists
                 .SelectMany(drawList => drawList.Commands)
                 .Where(command => command.Kind == UiDrawCommandKind.RectFilledPrimitives
@@ -711,6 +849,25 @@ internal static class Program
             200f,
             footer.Bounds.Y + footer.Bounds.Height,
             "A measured Auto row must take space back from a following Star row instead of extending the Grid.");
+    }
+
+    private static void RouterScrollFillsRemainingStarRow()
+    {
+        using var context = CreateContext();
+        var input = new DuxelInputEventQueue();
+        using var screen = new NuriDuxelScreen(
+            new RouterScrollLayoutComponent(),
+            () => { },
+            "router-scroll-layout-test",
+            input);
+
+        RenderFrame(context, screen);
+
+        var region = input.GetScrollRegions().Single();
+        AssertEqual(
+            160f,
+            region.Bounds.Height,
+            "A routed Scroll page must fill the remaining Star row instead of using an unconstrained fallback height.");
     }
 
     private static float RenderGridBottom(Component component, string rootId)
@@ -1803,17 +1960,82 @@ internal static class Program
         }
     }
 
-    private sealed class ScrollSpacingComponent(double spacing) : Component
+    private sealed class ScrollSpacingComponent(double? spacing) : Component
+    {
+        public override IElement Render()
+        {
+            var content = Div(
+                Button("first").Size(80, 30),
+                Button("second").Size(80, 30));
+            if (spacing is double configuredSpacing)
+                content.Spacing(configuredSpacing);
+
+            return Div(
+                    DivTypes.Scroll,
+                    content)
+                .Height(40);
+        }
+    }
+
+    private sealed class ExactFitScrollComponent(double contentHeight) : Component
     {
         public override IElement Render()
         {
             return Div(
                     DivTypes.Scroll,
-                    Div(
-                            Button("first").Size(80, 30),
-                            Button("second").Size(80, 30))
-                        .Spacing(spacing))
-                .Height(40);
+                    Div(Button("content").Size(80, contentHeight)))
+                .Size(200, 40);
+        }
+    }
+
+    private sealed class VerticalGrowProbeComponent : Component
+    {
+        public override IElement Render()
+        {
+            return Div(
+                    Div().Height(20).Background("#111111"),
+                    Div().Grow().Background("#222222"),
+                    Div().Height(10).Background("#333333"))
+                .Size(100, 100);
+        }
+    }
+
+    private sealed class HorizontalGrowProbeComponent : Component
+    {
+        public override IElement Render()
+        {
+            return Div(
+                    DivTypes.Row,
+                    Div().Width(20).Background("#111111"),
+                    Div().Grow().Background("#222222"),
+                    Div().Width(10).Background("#333333"))
+                .Size(100, 40);
+        }
+    }
+
+    private sealed class WeightedGrowProbeComponent : Component
+    {
+        public override IElement Render()
+        {
+            return Div(
+                    DivTypes.Row,
+                    Div().Grow().Background("#111111"),
+                    Div().Grow(2).Background("#222222"))
+                .Size(90, 40);
+        }
+    }
+
+    private sealed class TextOverflowProbeComponent(
+        TextOverflowValue? overflow,
+        float width,
+        string text) : Component
+    {
+        public override IElement Render()
+        {
+            var element = Text(text).Width(width);
+            return overflow is TextOverflowValue configured
+                ? element.TextOverflow(configured)
+                : element;
         }
     }
 
@@ -1837,6 +2059,24 @@ internal static class Program
                     Div(DivTypes.Scroll, Text("content")).Column(0))
                 .Columns(Pixels(100))
                 .Size(100, 200);
+        }
+    }
+
+    private sealed class RouterScrollLayoutComponent : Component
+    {
+        public override IElement Render()
+        {
+            return Grid(
+                    Text("header").Height(40).Row(0),
+                    Div(
+                            Router(
+                                "page",
+                                Route(
+                                    "page",
+                                    () => Div(DivTypes.Scroll, Div().Height(320)))))
+                        .Row(1))
+                .Rows(Pixels(40), Star)
+                .Size(200, 200);
         }
     }
 
