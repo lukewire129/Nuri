@@ -11,14 +11,26 @@ public sealed class StoreSampleComponent : Component
     {
         Console.WriteLine("[Render] App");
 
-        return Grid(Rows(Auto, Star, Auto),
-                new HeaderComponent().Row(0),
+        return
+            Grid(
+                Rows(Auto, Star, Auto),
+                new HeaderComponent().Row(
+                    0
+                ),
                 Grid(
-                        new SidebarComponent().Column(0),
-                        new LargeListComponent().Column(1))
-                    .Columns(Pixels(220), Star)
-                    .Row(1),
-                new FooterComponent().Row(2))
+                    new SidebarComponent().Column(
+                        0
+                    ),
+                    new LargeListComponent().Column(
+                        1
+                    )
+                )
+                .Columns(Pixels(220), Star)
+                .Row(1),
+                new FooterComponent().Row(
+                    2
+                )
+            )
             .Padding(22)
             .Background("#f4f6f8");
     }
@@ -53,16 +65,34 @@ internal sealed class HeaderComponent : Component
 {
     public override IElement Render()
     {
-        Console.WriteLine("[Render] Header");
+        Console.WriteLine("[Render] Header!");
 
-        return Grid(
-                Text("Store partial rerender").FontSize(24).FontWeight(FontWeightValue.Bold).VCenter().Column(0),
-                new UserBadgeComponent().Column(1),
-                new AdminPanelComponent().Column(2),
-                new LoginCounterComponent().Column(3),
-                Button("Name", StoreSampleComponent.ChangeUser).Height(36).Column(4),
-                Button("Role", StoreSampleComponent.ChangeRole).Height(36).Column(5),
-                Button("Login", StoreSampleComponent.IncrementLoginCount).Height(36).Column(6))
+        return
+            Grid(
+                Text("Store partial rerender")
+                    .FontSize(24)
+                    .FontWeight(FontWeightValue.Bold)
+                    .VCenter()
+                    .Column(0),
+                new UserBadgeComponent().Column(
+                    1
+                ),
+                new AdminPanelComponent().Column(
+                    2
+                ),
+                new LoginCounterComponent().Column(
+                    3
+                ),
+                Button("Name", StoreSampleComponent.ChangeUser)
+                    .Height(36)
+                    .Column(4),
+                Button("Role", StoreSampleComponent.ChangeRole)
+                    .Height(36)
+                    .Column(5),
+                Button("Login!!!", StoreSampleComponent.IncrementLoginCount)
+                    .Height(36)
+                    .Column(6)
+            )
             .Columns(Star, Pixels(130), Pixels(130), Pixels(130), Pixels(70), Pixels(70), Pixels(78))
             .Padding(16)
             .Background("#ffffff")
@@ -80,7 +110,11 @@ internal sealed class UserBadgeComponent : Component
         Console.WriteLine("[Render] UserBadge");
         var userName = useStore(UserStore.State, state => state.Name);
 
-        return Div(Text("Badge: " + userName).Center())
+        return
+            Div(
+                Text("Badge: " + userName)
+                    .Center()
+            )
             .Height(36)
             .Background("#e7f5ff")
             .Brush("#74c0fc")
@@ -96,7 +130,11 @@ internal sealed class AdminPanelComponent : Component
         Console.WriteLine("[Render] AdminPanel");
         var role = useStore(UserStore.State, state => state.Role);
 
-        return Div(Text("Role: " + role).Center())
+        return
+            Div(
+                Text("Role: " + role)
+                    .Center()
+            )
             .Height(36)
             .Background("#f3f0ff")
             .Brush("#b197fc")
@@ -112,7 +150,11 @@ internal sealed class LoginCounterComponent : Component
         Console.WriteLine("[Render] LoginCounter");
         var loginCount = useStore(UserStore.State, state => state.LoginCount);
 
-        return Div(Text("Logins: " + loginCount).Center())
+        return
+            Div(
+                Text("Logins: " + loginCount)
+                    .Center()
+            )
             .Height(36)
             .Background("#ebfbee")
             .Brush("#8ce99a")
@@ -127,10 +169,18 @@ internal sealed class SidebarComponent : Component
     {
         Console.WriteLine("[Render] Sidebar");
 
-        return Div(
-                Text("Sidebar").FontSize(18).FontWeight(FontWeightValue.Bold).Margin(bottom: 12),
-                Button("Static action").Height(34).Margin(bottom: 8),
-                Button("Another action").Height(34))
+        return
+            Div(
+                Text("Sidebar")
+                    .FontSize(18)
+                    .FontWeight(FontWeightValue.Bold)
+                    .Margin(bottom: 12),
+                Button("Static action")
+                    .Height(34)
+                    .Margin(bottom: 8),
+                Button("Another action")
+                    .Height(34)
+            )
             .Padding(16)
             .Background("#ffffff")
             .Brush("#d8dee8")
@@ -156,7 +206,13 @@ internal sealed class LargeListComponent : Component
                 .CornerRadius(6))
             .ToArray();
 
-        return Div(DivTypes.Scroll, Div(rows))
+        return
+            Div(
+                DivTypes.Scroll,
+                Div(
+                    rows
+                )
+            )
             .Padding(16)
             .Background("#ffffff")
             .Brush("#d8dee8")
@@ -171,9 +227,15 @@ internal sealed class FooterComponent : Component
     {
         Console.WriteLine("[Render] Footer");
 
-        return Grid(
-                Text("Footer").VCenter().Column(0),
-                new UserStatusComponent().Column(1))
+        return
+            Grid(
+                Text("Footer")
+                    .VCenter()
+                    .Column(0),
+                new UserStatusComponent().Column(
+                    1
+                )
+            )
             .Columns(Star, Pixels(220))
             .Padding(16)
             .Background("#ffffff")
@@ -190,7 +252,11 @@ internal sealed class UserStatusComponent : Component
     {
         Console.WriteLine("[Render] UserStatus");
 
-        return Div(Text("Status: static").Center())
+        return
+            Div(
+                Text("Status: static")
+                    .Center()
+            )
             .Height(34)
             .Background("#fff4e6")
             .Brush("#ffc078")

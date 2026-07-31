@@ -33,6 +33,7 @@ internal static class Program
             ("grid has no implicit track spacing", GridHasNoImplicitTrackSpacing),
             ("auto grid padding centers an equal-height row and button", AutoGridPaddingCentersEqualHeightControls),
             ("grid applies horizontal and vertical element alignment", GridAppliesElementAlignment),
+            ("resize rearranges panels without scaling fixed children", ResizeRearrangesPanelsWithoutScalingFixedChildren),
             ("row applies child vertical alignment", RowAppliesChildVerticalAlignment),
             ("column applies child horizontal alignment", ColumnAppliesChildHorizontalAlignment),
             ("grow children fill linear layout remainder", GrowChildrenFillLinearLayoutRemainder),
@@ -284,6 +285,62 @@ internal static class Program
         AssertEqual(origin.Y + 40f, buttons[1].Rect.Y, "VCenter must center a 20px child in its 100px Grid cell.");
         AssertEqual(origin.X + 280f, buttons[2].Rect.X, "End must right-align a 20px child in its 100px Grid cell.");
         AssertEqual(origin.Y + 80f, buttons[2].Rect.Y, "Bottom must bottom-align a 20px child in its 100px Grid cell.");
+    }
+
+    private static void ResizeRearrangesPanelsWithoutScalingFixedChildren()
+    {
+        using var context = CreateContext();
+        using var screen = new NuriDuxelScreen(
+            new FixedLeafResizeComponent(),
+            () => { },
+            "fixed-leaf-resize-test");
+
+        var initial = RenderFixedResizeButton(
+            context,
+            screen,
+            new UiFrameInfo(1f / 60f, new UiVector2(400, 200), new UiVector2(1, 1)));
+        var resized = RenderFixedResizeButton(
+            context,
+            screen,
+            new UiFrameInfo(1f / 60f, new UiVector2(800, 200), new UiVector2(1, 1)));
+
+        AssertTrue(
+            initial.Width > 20f && initial.Height > 10f,
+            "The natural Button probe must produce a non-empty intrinsic size.");
+        AssertEqual(initial.Width, resized.Width, "A wider viewport must not scale the fixed Button width.");
+        AssertEqual(initial.Height, resized.Height, "A wider viewport must not scale the fixed Button height.");
+        AssertEqual(
+            initial.X + 200f,
+            resized.X,
+            "The Star Grid track must rearrange its centered fixed child when the viewport grows.");
+    }
+
+    private static UiRect RenderFixedResizeButton(
+        UiContext context,
+        UiScreen screen,
+        UiFrameInfo frameInfo)
+    {
+        var drawData = RenderFrameWithDrawData(context, screen, frameInfo);
+        try
+        {
+            var fills = drawData.DrawLists
+                .SelectMany(drawList => drawList.RectFilledPrimitives?.ToArray()
+                    ?? Array.Empty<UiRectFilledPrimitive>())
+                .ToArray();
+            var button = fills.SingleOrDefault(primitive =>
+                primitive.Rect.Width > 40f
+                && primitive.Rect.Width < 100f
+                && primitive.Rect.Height > 10f
+                && primitive.Rect.Height < 40f);
+            AssertTrue(
+                button.Rect.Width > 0f,
+                $"The natural Button fill must be present. Fills: {string.Join(" | ", fills.Select(primitive => primitive.Rect))}");
+            return button.Rect;
+        }
+        finally
+        {
+            drawData.ReleasePooled();
+        }
     }
 
     private static void AutoGridPaddingCentersEqualHeightControls()
@@ -1840,6 +1897,19 @@ internal static class Program
                 .Columns(Pixels(100), Pixels(100), Pixels(100))
                 .Rows(Pixels(100))
                 .Size(300, 100);
+        }
+    }
+
+    private sealed class FixedLeafResizeComponent : Component
+    {
+        public override IElement Render()
+        {
+            return Grid(
+                    Div().Size(20, 20).Start().VCenter().Column(0).Background("#EF4444"),
+                    Button("fixed").Center().Column(1),
+                    Div().Size(20, 20).End().VCenter().Column(2).Background("#3B82F6"))
+                .Columns(Pixels(100), Star, Pixels(100))
+                .Rows(Star);
         }
     }
 

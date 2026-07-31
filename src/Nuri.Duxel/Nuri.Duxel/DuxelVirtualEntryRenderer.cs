@@ -26,6 +26,11 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
     private readonly Dictionary<string, VirtualizedExtentIndex> _virtualizedExtentIndexes = new(StringComparer.Ordinal);
     private readonly List<DuxelInputEvent> _deferredInputEvents = new();
     private readonly Stack<UiRect> _panelClipRects = new();
+    private readonly Dictionary<VirtualEntry, LayoutMeasurement> _layoutMeasurements =
+        new(ReferenceEqualityComparer.Instance);
+    private VirtualEntry? _measurementRoot;
+    private float _measurementContentScale;
+    private int _layoutMeasurementsInvalidated = 1;
     private long _frameNumber;
     private int _scrollOrder;
     private double _lastFrameTime;
@@ -45,6 +50,11 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
 
     public IReadOnlyList<DuxelInputEvent> LastInputEvents { get; private set; } = [];
 
+    internal void InvalidateLayout()
+    {
+        Interlocked.Exchange(ref _layoutMeasurementsInvalidated, 1);
+    }
+
     public void Render(UiImmediateContext ui, VirtualEntry entry)
     {
         ArgumentNullException.ThrowIfNull(ui);
@@ -58,6 +68,7 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
         ArgumentNullException.ThrowIfNull(ui);
         ArgumentNullException.ThrowIfNull(entry);
 
+        PrepareLayoutMeasurements(ui, entry);
         BeginInputFrame(ui);
         AdvanceScrollPhysics(GetFrameDelta(ui));
         _frameNumber++;
@@ -112,6 +123,21 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
             PublishScrollRegions();
             CleanupVirtualizedItemsDiagnostics();
         }
+    }
+
+    private void PrepareLayoutMeasurements(UiImmediateContext ui, VirtualEntry entry)
+    {
+        var contentScale = ui.ContentScale;
+        if (Interlocked.Exchange(ref _layoutMeasurementsInvalidated, 0) == 0
+            && ReferenceEquals(_measurementRoot, entry)
+            && MathF.Abs(_measurementContentScale - contentScale) <= 0.001f)
+        {
+            return;
+        }
+
+        _layoutMeasurements.Clear();
+        _measurementRoot = entry;
+        _measurementContentScale = contentScale;
     }
 
     private void RenderEntry(
@@ -181,7 +207,7 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
         }
     }
 
-    private static LayoutConstraint ArrangeEntry(
+    private LayoutConstraint ArrangeEntry(
         UiImmediateContext ui,
         VirtualEntry entry,
         LayoutConstraint constraint)
@@ -1218,7 +1244,7 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
         ui.SetCursorPos(new UiVector2(gridStart.X, currentY));
     }
 
-    private static float[] ResolveColumnWidths(
+    private float[] ResolveColumnWidths(
         UiImmediateContext ui,
         IReadOnlyList<LengthValue> definitions,
         IReadOnlyList<GridCell> cells,
@@ -1283,7 +1309,7 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
         return widths;
     }
 
-    private static float[] ResolveRowHeights(
+    private float[] ResolveRowHeights(
         UiImmediateContext ui,
         IReadOnlyList<LengthValue> definitions,
         IReadOnlyList<GridCell> cells,
@@ -1405,7 +1431,22 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
         }
     }
 
-    private static float EstimateEntryHeight(UiImmediateContext ui, VirtualEntry entry)
+    private float EstimateEntryHeight(UiImmediateContext ui, VirtualEntry entry)
+    {
+        if (_layoutMeasurements.TryGetValue(entry, out var measurement)
+            && measurement.HasHeight)
+        {
+            return measurement.Height;
+        }
+
+        var height = EstimateEntryHeightCore(ui, entry);
+        measurement.Height = height;
+        measurement.HasHeight = true;
+        _layoutMeasurements[entry] = measurement;
+        return height;
+    }
+
+    private float EstimateEntryHeightCore(UiImmediateContext ui, VirtualEntry entry)
     {
         var margin = GetThickness(entry, "Margin");
         var marginHeight = ToFloat(margin.Top + margin.Bottom);
@@ -1470,7 +1511,22 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
         return MathF.Max(1f, contentHeight + paddingHeightValue + marginHeight);
     }
 
-    private static float EstimateEntryWidth(UiImmediateContext ui, VirtualEntry entry)
+    private float EstimateEntryWidth(UiImmediateContext ui, VirtualEntry entry)
+    {
+        if (_layoutMeasurements.TryGetValue(entry, out var measurement)
+            && measurement.HasWidth)
+        {
+            return measurement.Width;
+        }
+
+        var width = EstimateEntryWidthCore(ui, entry);
+        measurement.Width = width;
+        measurement.HasWidth = true;
+        _layoutMeasurements[entry] = measurement;
+        return width;
+    }
+
+    private float EstimateEntryWidthCore(UiImmediateContext ui, VirtualEntry entry)
     {
         var margin = GetThickness(entry, "Margin");
         var marginWidth = ToFloat(margin.Left + margin.Right);
@@ -1514,7 +1570,7 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
         {
             var spacing = TryGetSingle(entry, PropertyKeys.Spacing, out var configuredSpacing)
                 ? configuredSpacing
-                : ui.GetItemSpacing().X;
+                : 0f;
             contentWidth = entry.Children.Sum(child => EstimateEntryWidth(ui, child));
             contentWidth += spacing * Math.Max(0, entry.Children.Count - 1);
         }
@@ -1530,7 +1586,7 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
         return MathF.Max(1f, contentWidth + paddingWidth + marginWidth);
     }
 
-    private static float EstimateGridContentWidth(UiImmediateContext ui, VirtualEntry entry)
+    private float EstimateGridContentWidth(UiImmediateContext ui, VirtualEntry entry)
     {
         var definitions = GetColumnDefinitions(entry);
         var columnCount = Math.Max(1, definitions.Count);
@@ -2707,6 +2763,8 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
 
         _virtualizedItemsHosts.Clear();
         _virtualizedExtentIndexes.Clear();
+        _layoutMeasurements.Clear();
+        _measurementRoot = null;
         _scrollRegions.Clear();
         _deferredInputEvents.Clear();
         _panelClipRects.Clear();
@@ -3238,6 +3296,14 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
     }
 
     private readonly record struct EntryStyleScope(bool FontSizePushed, int ColorCount, int StyleVarCount);
+
+    private struct LayoutMeasurement
+    {
+        public float Width;
+        public float Height;
+        public bool HasWidth;
+        public bool HasHeight;
+    }
 
     private readonly record struct LayoutConstraint(
         float? Width,

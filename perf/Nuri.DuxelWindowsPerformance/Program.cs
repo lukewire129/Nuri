@@ -11,11 +11,16 @@ using Nuri.VirtualDom;
 internal static class Program
 {
     private const uint WindowClose = 0x0010;
+    private const uint WindowSizing = 0x0214;
+    private const uint WindowEnterSizeMove = 0x0231;
+    private const uint WindowExitSizeMove = 0x0232;
+    private const nuint SizingBottomRight = 8;
     private const uint NoMove = 0x0002;
     private const uint NoZOrder = 0x0004;
     private const uint NoActivate = 0x0010;
     private static readonly ConcurrentQueue<NuriDuxelFrameTiming> NuriFrames = new();
     private static readonly ConcurrentQueue<double> ScreenFrames = new();
+    private static readonly ManualResetEventSlim NuriFirstFrameReady = new(false);
     private static int _resizeMessageCount;
 
     private static int Main(string[] args)
@@ -87,7 +92,8 @@ internal static class Program
                         handle,
                         resizeSteps,
                         exitDelayMs,
-                        () => PostMessage(handle, WindowClose, 0, 0));
+                        () => PostMessage(handle, WindowClose, 0, 0),
+                        waitForNuriFirstFrame: false);
                 }
             }
         };
@@ -108,10 +114,18 @@ internal static class Program
                 handle,
                 resizeSteps,
                 exitDelayMs,
-                () => PostMessage(handle, WindowClose, 0, 0)),
+                () => PostMessage(handle, WindowClose, 0, 0),
+                waitForNuriFirstFrame: true),
             performance: new NuriDuxelPerformanceOptions
             {
-                FrameCompleted = NuriFrames.Enqueue,
+                FrameCompleted = frame =>
+                {
+                    NuriFrames.Enqueue(frame);
+                    if (frame.IsInitialFrame)
+                    {
+                        NuriFirstFrameReady.Set();
+                    }
+                },
                 ResizeMessageReceived = _ => Interlocked.Increment(ref _resizeMessageCount),
                 DuxelLog = message => Console.WriteLine($"duxel\t{message}"),
                 LogDuxelStartupTimings = true,
@@ -119,23 +133,69 @@ internal static class Program
             });
     }
 
-    private static void StartResizeDriver(nint windowHandle, int steps, int exitDelayMs, Action exit)
+    private static void StartResizeDriver(
+        nint windowHandle,
+        int steps,
+        int exitDelayMs,
+        Action exit,
+        bool waitForNuriFirstFrame)
     {
         _ = Task.Run(() =>
         {
-            Thread.Sleep(750);
-            for (var index = 0; index < steps; index++)
+            if (waitForNuriFirstFrame)
             {
-                var large = (index & 1) == 0;
-                _ = SetWindowPos(
-                    windowHandle,
-                    0,
-                    0,
-                    0,
-                    large ? 1120 : 700,
-                    large ? 720 : 480,
-                    NoMove | NoZOrder | NoActivate);
-                Thread.Sleep(16);
+                _ = NuriFirstFrameReady.Wait(TimeSpan.FromSeconds(15));
+            }
+            else
+            {
+                Thread.Sleep(750);
+            }
+
+            var sizingRectPointer = Marshal.AllocHGlobal(Marshal.SizeOf<Rect>());
+            try
+            {
+                _ = SendMessage(windowHandle, WindowEnterSizeMove, 0, 0);
+                for (var index = 0; index < steps; index++)
+                {
+                    var large = (index & 1) == 0;
+                    if (!GetWindowRect(windowHandle, out var currentRect))
+                    {
+                        break;
+                    }
+
+                    var proposedRect = currentRect with
+                    {
+                        Right = currentRect.Left + (large ? 1120 : 700),
+                        Bottom = currentRect.Top + (large ? 720 : 480)
+                    };
+                    Marshal.StructureToPtr(proposedRect, sizingRectPointer, false);
+                    _ = SendMessage(
+                        windowHandle,
+                        WindowSizing,
+                        SizingBottomRight,
+                        sizingRectPointer);
+                    var acceptedRect = Marshal.PtrToStructure<Rect>(sizingRectPointer);
+                    if (acceptedRect != proposedRect)
+                    {
+                        throw new InvalidOperationException(
+                            "The Nuri WM_SIZING bridge must preserve the original proposed bounds for Windows.");
+                    }
+
+                    _ = SetWindowPos(
+                        windowHandle,
+                        0,
+                        acceptedRect.Left,
+                        acceptedRect.Top,
+                        acceptedRect.Right - acceptedRect.Left,
+                        acceptedRect.Bottom - acceptedRect.Top,
+                        NoMove | NoZOrder | NoActivate);
+                    Thread.Sleep(16);
+                }
+            }
+            finally
+            {
+                _ = SendMessage(windowHandle, WindowExitSizeMove, 0, 0);
+                Marshal.FreeHGlobal(sizingRectPointer);
             }
 
             Thread.Sleep(exitDelayMs);
@@ -285,6 +345,9 @@ internal static class Program
         }
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private record struct Rect(int Left, int Top, int Right, int Bottom);
+
     [DllImport("user32.dll")]
     private static extern bool SetWindowPos(
         nint windowHandle,
@@ -301,4 +364,14 @@ internal static class Program
         uint message,
         nuint wParam,
         nint lParam);
+
+    [DllImport("user32.dll")]
+    private static extern nint SendMessage(
+        nint windowHandle,
+        uint message,
+        nuint wParam,
+        nint lParam);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(nint windowHandle, out Rect rect);
 }

@@ -127,6 +127,7 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
         if (pendingTheme is not null)
         {
             ui.RequestTheme(pendingTheme.Theme);
+            _renderer.InvalidateLayout();
         }
 
         var runtimeStarted = timingEnabled ? Stopwatch.GetTimestamp() : 0L;
@@ -192,6 +193,11 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
         var viewportHeight = measuredSize is { Y: > 0f }
             ? measuredSize.Value.Y
             : viewport.WorkSize.Y;
+        if (pendingCommit is not null)
+        {
+            _renderer.InvalidateLayout();
+        }
+
         var projectionStarted = timingEnabled ? Stopwatch.GetTimestamp() : 0L;
         _renderer.Render(
             ui,
@@ -441,6 +447,7 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
             return false;
         }
 
+        _renderer.InvalidateLayout();
         _runtime.CommitVirtualEntry(_runtime.CurrentVirtualEntry);
         if (_includeInDiagnostics)
         {

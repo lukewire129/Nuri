@@ -53,6 +53,11 @@ internal sealed class NuriDuxelWindowHost : IDisposable
 
         UiVector2? GetContentAreaSize()
         {
+            if (contentScaleProvider is null)
+            {
+                return null;
+            }
+
             var size = _inputBridge.ClientAreaSize;
             return useDuxelTitleBar && size is { } clientSize
                 ? new UiVector2(clientSize.X, MathF.Max(0f, clientSize.Y - DuxelTitleBarHeight))
@@ -133,7 +138,7 @@ internal sealed class NuriDuxelWindowHost : IDisposable
                         _screen.HasActiveAnimations
                         || _screen.HasActiveScrollMotion
                         || inputEvents.HasPending
-                        || (existingAnimationProvider?.Invoke() ?? false)
+                        || (existingAnimationProvider?.Invoke() ?? false),
                 },
                 Window = options.Window with
                 {

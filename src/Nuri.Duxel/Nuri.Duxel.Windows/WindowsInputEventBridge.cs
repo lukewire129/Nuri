@@ -12,10 +12,7 @@ internal sealed class WindowsInputEventBridge : IDisposable
     private const uint WmSetFocus = 0x0007;
     private const uint WmKillFocus = 0x0008;
     private const uint WmSize = 0x0005;
-    private const uint WmCancelMode = 0x001F;
-    private const uint WmSetCursor = 0x0020;
-    private const uint WmCaptureChanged = 0x0215;
-    private const uint WmNcLeftButtonDown = 0x00A1;
+    private const uint WmSizing = 0x0214;
     private const uint WmNcDestroy = 0x0082;
     private const uint WmKeyDown = 0x0100;
     private const uint WmKeyUp = 0x0101;
@@ -31,22 +28,6 @@ internal sealed class WindowsInputEventBridge : IDisposable
     private const uint WmMiddleButtonUp = 0x0208;
     private const uint WmMouseWheel = 0x020A;
     private const uint WmMouseHorizontalWheel = 0x020E;
-    private const int HitLeft = 10;
-    private const int HitRight = 11;
-    private const int HitTop = 12;
-    private const int HitTopLeft = 13;
-    private const int HitTopRight = 14;
-    private const int HitBottom = 15;
-    private const int HitBottomLeft = 16;
-    private const int HitBottomRight = 17;
-    private const int SystemMetricMinimumTrackWidth = 34;
-    private const int SystemMetricMinimumTrackHeight = 35;
-    private const uint SetWindowPositionNoZOrder = 0x0004;
-    private const uint SetWindowPositionNoActivate = 0x0010;
-    private const int CursorSizeNorthSouth = 32645;
-    private const int CursorSizeWestEast = 32644;
-    private const int CursorSizeNorthwestSoutheast = 32642;
-    private const int CursorSizeNortheastSouthwest = 32643;
     private static long _nextSubclassId;
 
     private readonly DuxelInputEventQueue _events;
@@ -61,10 +42,8 @@ internal sealed class WindowsInputEventBridge : IDisposable
     private float _clientWidth;
     private float _clientHeight;
     private bool _installed;
+    private int _disposed;
     private bool _pointerCaptured;
-    private int _resizeHitTest;
-    private Point _resizeStartCursor;
-    private Rect _resizeStartWindow;
 
     public WindowsInputEventBridge(
         DuxelInputEventQueue events,
@@ -119,16 +98,19 @@ internal sealed class WindowsInputEventBridge : IDisposable
 
     public void Dispose()
     {
-        if (!_installed)
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
         {
             return;
         }
 
-        _ = RemoveWindowSubclass(_windowHandle, _windowProc, _subclassId);
-        _installed = false;
-        _windowHandle = 0;
-        Volatile.Write(ref _clientWidth, 0f);
-        Volatile.Write(ref _clientHeight, 0f);
+        if (_installed)
+        {
+            _ = RemoveWindowSubclass(_windowHandle, _windowProc, _subclassId);
+            _installed = false;
+            _windowHandle = 0;
+            Volatile.Write(ref _clientWidth, 0f);
+            Volatile.Write(ref _clientHeight, 0f);
+        }
     }
 
     private nint WindowProc(
@@ -144,34 +126,8 @@ internal sealed class WindowsInputEventBridge : IDisposable
         var timestamp = Stopwatch.GetTimestamp();
         var captured = false;
 
-        if (_resizeHitTest != 0)
-        {
-            switch (message)
-            {
-                case WmMouseMove:
-                    ResizeWindow(windowHandle);
-                    return 0;
-                case WmLeftButtonUp:
-                    EndWindowResize(releaseCapture: true);
-                    return 0;
-                case WmSetCursor:
-                    SetResizeCursor(_resizeHitTest);
-                    return 1;
-                case WmCancelMode:
-                case WmCaptureChanged:
-                    EndWindowResize(releaseCapture: false);
-                    break;
-            }
-        }
-
         switch (message)
         {
-            case WmNcLeftButtonDown:
-                if (BeginWindowResize(windowHandle, unchecked((int)wParam)))
-                {
-                    return 0;
-                }
-                break;
             case WmMouseMove:
                 captured = _pointerCaptured;
                 Enqueue(
@@ -271,17 +227,25 @@ internal sealed class WindowsInputEventBridge : IDisposable
             case WmKillFocus:
                 Enqueue(timestamp, DuxelInputEventKind.FocusLost);
                 break;
+            case WmSizing:
+                UpdateProposedClientSize(windowHandle, lParam);
+                // Preserve preview sizing, then forward WM_SIZING so Duxel 0.2.12 can
+                // present the matching frame before Windows applies the bounds. Consuming
+                // it here makes Windows stretch the old frame, which appears as zooming.
+                break;
             case WmSize:
                 var clientSize = ClientSize(windowHandle, lParam);
                 UpdateClientSize(clientSize);
                 _resizeMessageObserver?.Invoke(new NuriDuxelResizeMessage(timestamp, clientSize));
-                Enqueue(
+                _events.Enqueue(
                     timestamp,
                     DuxelInputEventKind.Resize,
                     delta: clientSize);
+                // DefSubclassProc forwards WM_SIZE to Duxel next. Duxel first publishes
+                // the new platform size and then requests the frame; requesting here
+                // would let the render thread present one frame with the previous size.
                 break;
             case WmNcDestroy:
-                EndWindowResize(releaseCapture: false);
                 _ = RemoveWindowSubclass(windowHandle, _windowProc, _subclassId);
                 _installed = false;
                 _windowHandle = 0;
@@ -296,128 +260,6 @@ internal sealed class WindowsInputEventBridge : IDisposable
         return _debugKey is { } key
             && _debugShortcut is not null
             && virtualKey == unchecked((nuint)(0x70 + (int)key - 1));
-    }
-
-    private bool BeginWindowResize(nint windowHandle, int hitTest)
-    {
-        if (!IsResizeHitTest(hitTest)
-            || IsZoomed(windowHandle)
-            || !GetWindowRect(windowHandle, out _resizeStartWindow)
-            || !GetCursorPos(out _resizeStartCursor))
-        {
-            return false;
-        }
-
-        _resizeHitTest = hitTest;
-        _ = SetCapture(windowHandle);
-        SetResizeCursor(hitTest);
-        return true;
-    }
-
-    private void ResizeWindow(nint windowHandle)
-    {
-        if (!GetCursorPos(out var cursor))
-        {
-            return;
-        }
-
-        var deltaX = cursor.X - _resizeStartCursor.X;
-        var deltaY = cursor.Y - _resizeStartCursor.Y;
-        var left = _resizeStartWindow.Left;
-        var top = _resizeStartWindow.Top;
-        var right = _resizeStartWindow.Right;
-        var bottom = _resizeStartWindow.Bottom;
-
-        if (_resizeHitTest is HitLeft or HitTopLeft or HitBottomLeft)
-        {
-            left += deltaX;
-        }
-        else if (_resizeHitTest is HitRight or HitTopRight or HitBottomRight)
-        {
-            right += deltaX;
-        }
-
-        if (_resizeHitTest is HitTop or HitTopLeft or HitTopRight)
-        {
-            top += deltaY;
-        }
-        else if (_resizeHitTest is HitBottom or HitBottomLeft or HitBottomRight)
-        {
-            bottom += deltaY;
-        }
-
-        var dpi = GetDpiForWindow(windowHandle);
-        var effectiveDpi = dpi > 0 ? dpi : 96u;
-        var minimumWidth = GetSystemMetricsForDpi(SystemMetricMinimumTrackWidth, effectiveDpi);
-        var minimumHeight = GetSystemMetricsForDpi(SystemMetricMinimumTrackHeight, effectiveDpi);
-        if (right - left < minimumWidth)
-        {
-            if (_resizeHitTest is HitLeft or HitTopLeft or HitBottomLeft)
-            {
-                left = right - minimumWidth;
-            }
-            else
-            {
-                right = left + minimumWidth;
-            }
-        }
-
-        if (bottom - top < minimumHeight)
-        {
-            if (_resizeHitTest is HitTop or HitTopLeft or HitTopRight)
-            {
-                top = bottom - minimumHeight;
-            }
-            else
-            {
-                bottom = top + minimumHeight;
-            }
-        }
-
-        _ = SetWindowPos(
-            windowHandle,
-            0,
-            left,
-            top,
-            right - left,
-            bottom - top,
-            SetWindowPositionNoZOrder | SetWindowPositionNoActivate);
-        SetResizeCursor(_resizeHitTest);
-    }
-
-    private void EndWindowResize(bool releaseCapture)
-    {
-        if (_resizeHitTest == 0)
-        {
-            return;
-        }
-
-        _resizeHitTest = 0;
-        if (releaseCapture)
-        {
-            _ = ReleaseCapture();
-        }
-    }
-
-    private static bool IsResizeHitTest(int hitTest)
-    {
-        return hitTest is >= HitLeft and <= HitBottomRight;
-    }
-
-    private static void SetResizeCursor(int hitTest)
-    {
-        var cursorId = hitTest switch
-        {
-            HitLeft or HitRight => CursorSizeWestEast,
-            HitTop or HitBottom => CursorSizeNorthSouth,
-            HitTopLeft or HitBottomRight => CursorSizeNorthwestSoutheast,
-            HitTopRight or HitBottomLeft => CursorSizeNortheastSouthwest,
-            _ => 0
-        };
-        if (cursorId != 0)
-        {
-            _ = SetCursor(LoadCursor(0, cursorId));
-        }
     }
 
     private void Enqueue(
@@ -474,6 +316,31 @@ internal sealed class WindowsInputEventBridge : IDisposable
             MathF.Max(0f, rect.Right - rect.Left) / scale,
             MathF.Max(0f, rect.Bottom - rect.Top) / scale));
     }
+
+    private void UpdateProposedClientSize(nint windowHandle, nint sizingRectPointer)
+    {
+        if (sizingRectPointer == 0
+            || !GetWindowRect(windowHandle, out var currentWindowRect)
+            || !GetClientRect(windowHandle, out var currentClientRect))
+        {
+            return;
+        }
+
+        var sizingRect = Marshal.PtrToStructure<Rect>(sizingRectPointer);
+        var nonClientWidth = Math.Max(
+            0,
+            currentWindowRect.Right - currentWindowRect.Left
+                - (currentClientRect.Right - currentClientRect.Left));
+        var nonClientHeight = Math.Max(
+            0,
+            currentWindowRect.Bottom - currentWindowRect.Top
+                - (currentClientRect.Bottom - currentClientRect.Top));
+        var scale = EffectiveContentScale(windowHandle);
+        UpdateClientSize(new UiVector2(
+            Math.Max(0, sizingRect.Right - sizingRect.Left - nonClientWidth) / scale,
+            Math.Max(0, sizingRect.Bottom - sizingRect.Top - nonClientHeight) / scale));
+    }
+
 
     private void UpdateClientSize(UiVector2 size)
     {
@@ -563,34 +430,6 @@ internal sealed class WindowsInputEventBridge : IDisposable
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetClientRect(nint windowHandle, out Rect rect);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool GetCursorPos(out Point point);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool IsZoomed(nint windowHandle);
-
-    [DllImport("user32.dll")]
-    private static extern int GetSystemMetricsForDpi(int index, uint dpi);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool SetWindowPos(
-        nint windowHandle,
-        nint insertAfter,
-        int x,
-        int y,
-        int width,
-        int height,
-        uint flags);
-
-    [DllImport("user32.dll", EntryPoint = "LoadCursorW")]
-    private static extern nint LoadCursor(nint instance, int cursorName);
-
-    [DllImport("user32.dll")]
-    private static extern nint SetCursor(nint cursor);
 
     [DllImport("user32.dll")]
     private static extern nint SetCapture(nint windowHandle);

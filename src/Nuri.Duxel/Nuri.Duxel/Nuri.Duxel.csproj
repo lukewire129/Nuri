@@ -23,7 +23,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Duxel.App" Version="0.2.11-preview" />
+    <PackageReference Include="Duxel.App" Version="0.2.12-preview" />
   </ItemGroup>
 
   <ItemGroup>
