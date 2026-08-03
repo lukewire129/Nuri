@@ -363,5 +363,8 @@ MigrationBackup/
 /src/Nuri.VSCodePreview/preview-host/
 /src/Nuri.VSCodePreview/duxel-preview-host/
 
+# Local release artifacts
+/_outs/
+
 # Fody - auto-generated XML schema
 FodyWeavers.xsd

@@ -146,7 +146,7 @@ Write-Host "[2/5] Packaging VS Code Nuri Preview..." -ForegroundColor Cyan
 Remove-Item -LiteralPath $vsCodeVsixPath -Force -ErrorAction SilentlyContinue
 Push-Location $vsCodePreviewPath
 try {
-    & $npxPath --yes "@vscode/vsce" package --out $vsCodeVsixPath
+    & $npxPath --yes "@vscode/vsce" package --skip-license --out $vsCodeVsixPath
     if ($LASTEXITCODE -ne 0) {
         throw "VS Code extension packaging failed with exit code $LASTEXITCODE."
     }
