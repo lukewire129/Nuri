@@ -2,7 +2,7 @@
   "name": "nuri-preview",
   "displayName": "Nuri Preview",
   "description": "Live WPF and Duxel preview panel for Nuri components",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "lukewire129",
   "engines": {
     "vscode": "^1.85.0"
