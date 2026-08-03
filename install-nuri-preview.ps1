@@ -10,6 +10,8 @@ $ErrorActionPreference = "Stop"
 $repositoryRoot = $PSScriptRoot
 $previewProjectPath = Join-Path $repositoryRoot "src\Nuri.VisualStudioPreview\Nuri.VisualStudioPreview.csproj"
 $vsixPath = Join-Path $repositoryRoot "src\Nuri.VisualStudioPreview\bin\$Configuration\net472\Nuri.VisualStudioPreview.vsix"
+$vsCodePreviewPath = Join-Path $repositoryRoot "src\Nuri.VSCodePreview"
+$vsCodeVsixPath = Join-Path ([System.IO.Path]::GetTempPath()) "Nuri.VSCodePreview.vsix"
 $vsixInstallerPath = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\resources\app\ServiceHub\Services\Microsoft.VisualStudio.Setup.Service\VsixInstaller\VSIXInstaller.exe"
 $vswherePath = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
 
@@ -51,6 +53,28 @@ function Get-VisualStudioInstances {
         }
 }
 
+function Get-ApplicationPath {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Name,
+
+        [string[]]$FallbackPaths = @()
+    )
+
+    $command = Get-Command $Name -CommandType Application -ErrorAction SilentlyContinue
+    if ($null -ne $command) {
+        return $command.Source
+    }
+
+    foreach ($path in $FallbackPaths) {
+        if (Test-Path -LiteralPath $path) {
+            return $path
+        }
+    }
+
+    throw "$Name was not found. Install it or add it to PATH."
+}
+
 function Test-NuriPreviewInstalled {
     param(
         [Parameter(Mandatory)]
@@ -86,7 +110,13 @@ if ($instances.Count -eq 0) {
     throw "No Visual Studio instance with devenv.exe was found."
 }
 
-Write-Host "[1/3] Building Nuri Preview ($Configuration)..." -ForegroundColor Cyan
+$npxPath = Get-ApplicationPath -Name "npx.cmd"
+$codePath = Get-ApplicationPath -Name "code.cmd" -FallbackPaths @(
+    (Join-Path $env:LOCALAPPDATA "Programs\Microsoft VS Code\bin\code.cmd"),
+    (Join-Path $env:ProgramFiles "Microsoft VS Code\bin\code.cmd")
+)
+
+Write-Host "[1/5] Building Visual Studio Nuri Preview ($Configuration)..." -ForegroundColor Cyan
 Push-Location $repositoryRoot
 try {
     & dotnet build $previewProjectPath `
@@ -112,7 +142,24 @@ if (-not (Test-Path -LiteralPath $vsixInstallerPath)) {
     throw "VSIXInstaller.exe was not found: $vsixInstallerPath"
 }
 
-Write-Host "[2/3] Removing an existing Nuri Preview installation when present..." -ForegroundColor Cyan
+Write-Host "[2/5] Packaging VS Code Nuri Preview..." -ForegroundColor Cyan
+Remove-Item -LiteralPath $vsCodeVsixPath -Force -ErrorAction SilentlyContinue
+Push-Location $vsCodePreviewPath
+try {
+    & $npxPath --yes "@vscode/vsce" package --out $vsCodeVsixPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "VS Code extension packaging failed with exit code $LASTEXITCODE."
+    }
+}
+finally {
+    Pop-Location
+}
+
+if (-not (Test-Path -LiteralPath $vsCodeVsixPath)) {
+    throw "The package completed, but the VS Code VSIX was not found: $vsCodeVsixPath"
+}
+
+Write-Host "[3/5] Removing an existing Visual Studio Nuri Preview installation when present..." -ForegroundColor Cyan
 foreach ($instance in $instances) {
     if (-not (Test-NuriPreviewInstalled -Instance $instance)) {
         continue
@@ -132,7 +179,7 @@ foreach ($instance in $instances) {
 
 Assert-ProcessIsNotRunning -Name "VSIXInstaller" -Message "The previous VSIX uninstall has not finished. Wait for it to exit and retry."
 
-Write-Host "[3/3] Installing the new VSIX..." -ForegroundColor Cyan
+Write-Host "[4/5] Installing the Visual Studio VSIX..." -ForegroundColor Cyan
 foreach ($instance in $instances) {
     Write-Host "  $($instance.DisplayName)"
     $installArguments = @(
@@ -146,4 +193,15 @@ foreach ($instance in $instances) {
     }
 }
 
-Write-Host "Nuri Preview installation completed. Start Visual Studio to load the updated extension." -ForegroundColor Green
+Write-Host "[5/5] Installing the VS Code VSIX..." -ForegroundColor Cyan
+try {
+    & $codePath --install-extension $vsCodeVsixPath --force
+    if ($LASTEXITCODE -ne 0) {
+        throw "VS Code extension installation failed with exit code $LASTEXITCODE."
+    }
+}
+finally {
+    Remove-Item -LiteralPath $vsCodeVsixPath -Force -ErrorAction SilentlyContinue
+}
+
+Write-Host "Nuri Preview installation completed. Restart or reload Visual Studio and VS Code to load the updated extensions." -ForegroundColor Green
