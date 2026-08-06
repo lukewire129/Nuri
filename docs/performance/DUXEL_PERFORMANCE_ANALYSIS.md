@@ -8,11 +8,13 @@ Use two harnesses to separate Nuri CPU work from the Duxel Windows/Vulkan path.
 dotnet run --project "perf\Nuri.DuxelPerformance\Nuri.DuxelPerformance.csproj" -c Release -- --label current --size 1000
 ```
 
-The first table retains the existing projection and patch-count scenarios. The first-frame table compares raw Duxel widget emission, projection of a prebuilt `VirtualEntry`, and a full Nuri component frame. All three stop at `GetDrawData`; they exclude Vulkan submission and present.
+The first table covers initial projection, keyed reorder, Todo initial/reorder, editor viewport initial projection, and an editor single-line edit. The first-frame table compares raw Duxel widget emission, projection of a prebuilt `VirtualEntry`, and a full Nuri component frame. All three stop at `GetDrawData`; they exclude Vulkan submission and present.
 
 ## Windows resize trace
 
 Run each mode with the same size, resize count, VSync setting, display, DPI, and GPU:
+
+The direct `raw` and `projection` modes currently retain Duxel's default text-rendering mode, while the hosted `nuri` mode selects `DirectText`. Treat text-heavy cross-mode results as diagnostic phase comparisons rather than equivalent text-backend benchmarks unless the harness settings are aligned.
 
 ```powershell
 dotnet run --project "perf\Nuri.DuxelWindowsPerformance\Nuri.DuxelWindowsPerformance.csproj" -c Release -- --mode raw --size 1000 --resize-steps 60 --vsync true

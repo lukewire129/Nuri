@@ -9,7 +9,7 @@ The broader implementation direction and measured performance baseline are defin
 Nuri has three related but distinct identities:
 
 - Runtime ancestry records the in-memory parent relationship used by subtree cleanup, diagnostics, and dirty-component coalescing.
-- `Component.Id` identifies hook state and component invalidation. It remains public for compatibility, but code must not parse it to discover ancestry.
+- `Component.Id` is the compatibility and diagnostics identifier associated with a runtime node and is used for component invalidation. Hook state is owned by the runtime node itself. Code must not parse the ID to discover ancestry.
 - `VirtualEntry.Id` identifies renderer patch targets. Keyed reconciliation may retain or rewrite this ID independently of a newly created component object.
 
 Do not merge these responsibilities. Renderer patch identity must not decide hook ownership, and lifecycle code must not infer parents from ID delimiters.

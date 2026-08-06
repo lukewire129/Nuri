@@ -5,7 +5,7 @@ Todo/notes sample for validating local state flow, controlled input, keyed list 
 Run it with:
 
 ```powershell
-dotnet run --project "samples\Nuri.TodoNotesSample\Nuri.TodoNotesSample.csproj" -c Release
+dotnet run --project "samples\WPF\Nuri.TodoNotesSample\Nuri.TodoNotesSample.csproj" -c Release
 ```
 
 Behavior:

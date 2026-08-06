@@ -7,7 +7,7 @@ Avalonia is retained as a regression baseline. The next UI backend development p
 Run it with:
 
 ```powershell
-dotnet watch --project "samples\Nuri.AvaloniaHotReloadSample\Nuri.AvaloniaHotReloadSample.csproj" run -c Debug
+dotnet watch --project "samples\Avalonia\Nuri.AvaloniaHotReloadSample\Nuri.AvaloniaHotReloadSample.csproj" run -c Debug
 ```
 
 Things to try while it is running:

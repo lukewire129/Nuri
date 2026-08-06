@@ -8,12 +8,13 @@ Visual Studio extension은 C# editor save command handler를 등록하고 `.cs` 
 Block body를 사용하는 `override IElement Render()` method에만 formatting을 적용합니다.
 Statement나 fluent call의 순서를 바꾸지 않으며 일반 C# method는 formatting하지 않습니다.
 Return expression에 comment나 preprocessor directive가 있으면 변경하지 않습니다.
+Top-level expression이 invocation인 완전하고 diagnostics가 없는 return statement만 구조적으로 formatting합니다. 편집 중인 불완전한 expression은 변경하지 않습니다.
 
 ## 규칙
 
 - `return` keyword를 별도 줄에 둡니다.
 - 반환하는 Nuri expression을 공백 4칸 들여씁니다.
-- `Div(...)`, `Grid(...)` 같은 container factory의 child argument를 한 줄에 하나씩 펼칩니다.
+- 인식하는 container factory `Column`, `Div`, `Grid`, `Panel`, `Row`, `Scroll`, `Stack`의 child argument를 한 줄에 하나씩 펼칩니다. 다른 factory는 formatter coverage에 명시적으로 추가될 때까지 보수적인 invocation formatting을 유지합니다.
 - Event가 lambda여도 `Button("Save", Save)`처럼 control content와 primary event를 함께 유지합니다.
 - Container fluent call은 container의 닫는 괄호와 같은 깊이에 둡니다.
 - Control fluent call은 receiver보다 공백 4칸 들여씁니다.

@@ -33,10 +33,11 @@ Nuri lifecycle은 virtual tree render, diff, patch, commit, effect flush 순서�
 - hook state dispose 시 effect cleanup을 실행합니다.
 - WPF subtree를 제거하거나 교체하기 전에 commit된 native event handler를 재귀적으로 해제합니다. WPF root dispose에도 같은 규칙을 적용하므로 unmount된 native control 참조를 보관해도 이전 virtual callback을 호출할 수 없습니다.
 - WPF application root를 dispose하면 대기 중인 component invalidation을 비웁니다. 이미 Dispatcher에 게시된 callback도 dispose 이후 render하거나 effect를 다시 mount해서는 안 됩니다.
+- Duxel root를 dispose하면 예약된 frame 작업을 취소하고 invalidation 및 pending rebuild, replacement, theme request를 비우며 renderer diagnostics와 runtime subtree를 dispose하고 root 등록을 해제합니다. Modeless Duxel window는 다른 window를 중지하지 않고 자체 hot reload, theme, input 및 visibility resource도 해제합니다.
 - `NuriApplication.Run<TComponent>`는 `[STAThread]`가 없는 entry point에서도 호출할 수 있습니다. WPF application이 없고 호출자가 STA가 아니면 `Run`은 전용 foreground STA thread를 만들고 그곳에서 WPF application과 Dispatcher를 실행하며, 종료될 때까지 호출자를 대기시키고 동기 startup 실패를 호출자에게 다시 throw합니다. WPF application이 다른 thread에 이미 있으면 해당 application의 Dispatcher로 전달합니다. STA가 아닌 thread에서 이미 생성된 application은 복구할 수 없습니다. `Show<TComponent>`와 `Attach`는 thread-affine WPF 객체를 반환하므로 호출자가 여전히 소유 WPF STA thread를 사용해야 합니다.
 - `NuriApplication.Run<TComponent>`는 WPF에 `ShutdownMode.OnMainWindowClose`를 설정합니다. 해당 main window를 닫으면 application이 종료되고 남아 있는 모든 window가 닫히며, 각 등록 root는 `Closed` handler를 통해 dispose됩니다. `Show<TComponent>`만 호출하는 경우에는 application의 shutdown policy를 변경하지 않습니다.
 - 비동기 작업이 보관한 `useState` setter와 `useReducer` dispatcher는 소유 runtime node가 dispose된 이후 no-op이 됩니다. 나중에 동일한 문자열 ID를 재사용하는 replacement component를 invalidate해서는 안 됩니다.
-- `DisposeHookState`는 component subtree의 effect, memo, pending effect 및 state entry를 제거합니다.
+- `DisposeHookState`는 component subtree의 effect, memo, pending effect, state 및 Store hook entry를 제거합니다. Store subscription을 dispose하고 diagnostics 및 runtime-ancestry record도 제거합니다.
 - subtree membership은 ID 문자열 파싱이 아니라 메모리 runtime ancestry를 사용합니다.
 - component key 변경은 이전 논리 component의 unmount와 replacement mount입니다.
 

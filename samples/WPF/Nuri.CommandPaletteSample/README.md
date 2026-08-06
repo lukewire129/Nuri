@@ -5,7 +5,7 @@ Small Command Palette sample for validating Nuri state updates, controlled `Text
 Run it with:
 
 ```powershell
-dotnet run --project "samples\Nuri.CommandPaletteSample\Nuri.CommandPaletteSample.csproj" -c Release
+dotnet run --project "samples\WPF\Nuri.CommandPaletteSample\Nuri.CommandPaletteSample.csproj" -c Release
 ```
 
 Behavior:
@@ -21,7 +21,7 @@ The sample intentionally keeps all behavior in `CommandPaletteComponent` so the 
 
 Core:
 
-- `OnKeyDown` currently exposes only a minimal `KeyboardKey` enum for this sample (`Up`, `Down`, `Enter`, `Escape`, `Unknown`). It does not yet model modifiers, text input, repeat state, or handled/prevent-default semantics.
+- `OnKeyDown` currently exposes a small navigation/editing `KeyboardKey` enum (`Up`, `Down`, `Left`, `Right`, `Enter`, `Escape`, `Tab`, `Space`, `Backspace`, `Delete`, `Unknown`). It does not yet model modifiers, text input, repeat state, or handled/prevent-default semantics.
 - `AutoFocus()` is represented as a neutral property, but Core does not define lifecycle timing semantics beyond carrying the property in the virtual tree.
 
 WPF adapter:

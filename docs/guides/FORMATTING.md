@@ -8,12 +8,13 @@ The Visual Studio extension registers a C# editor save command handler and runs 
 Formatting applies only to block-bodied `override IElement Render()` methods.
 It does not reorder statements or fluent calls, and it does not format ordinary C# methods.
 A return expression containing comments or preprocessor directives is left unchanged.
+Only complete, diagnostic-free return statements whose top-level expression is an invocation are structurally formatted. Incomplete expressions being edited are left unchanged.
 
 ## Rules
 
 - Put the `return` keyword on its own line.
 - Indent the returned Nuri expression by four spaces.
-- Expand child arguments of container factories such as `Div(...)` and `Grid(...)` one per line.
+- Expand child arguments of the recognized container factories `Column`, `Div`, `Grid`, `Panel`, `Row`, `Scroll`, and `Stack` one per line. Other factories retain conservative invocation formatting until explicitly added to formatter coverage.
 - Keep control content and its primary event together, such as `Button("Save", Save)`, even when the event is a lambda.
 - Put container fluent calls at the same indentation as the container's closing parenthesis.
 - Indent control fluent calls by four spaces under their receiver.

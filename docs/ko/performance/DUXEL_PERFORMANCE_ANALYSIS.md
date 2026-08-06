@@ -8,11 +8,13 @@ Nuri CPU 작업과 Duxel Windows/Vulkan 경로를 분리하려면 두 하네스�
 dotnet run --project "perf\Nuri.DuxelPerformance\Nuri.DuxelPerformance.csproj" -c Release -- --label current --size 1000
 ```
 
-첫 번째 표는 기존 투영 및 패치 수 시나리오를 유지한다. 첫 프레임 표는 순수 Duxel 위젯 명령 생성, 미리 만든 `VirtualEntry` 투영, 전체 Nuri 컴포넌트 프레임을 비교한다. 세 경로 모두 `GetDrawData`에서 측정을 끝내며 Vulkan 제출과 present는 포함하지 않는다.
+첫 번째 표는 initial projection, keyed reorder, Todo initial/reorder, editor viewport initial projection 및 editor single-line edit를 다룬다. 첫 프레임 표는 순수 Duxel 위젯 명령 생성, 미리 만든 `VirtualEntry` 투영, 전체 Nuri 컴포넌트 프레임을 비교한다. 세 경로 모두 `GetDrawData`에서 측정을 끝내며 Vulkan 제출과 present는 포함하지 않는다.
 
 ## Windows 리사이즈 추적
 
 같은 크기, 리사이즈 횟수, VSync 설정, 디스플레이, DPI, GPU 조건에서 각 모드를 실행한다.
+
+Direct `raw` 및 `projection` mode는 현재 Duxel의 기본 text-rendering mode를 유지하지만 hosted `nuri` mode는 `DirectText`를 선택합니다. Harness 설정을 맞추기 전에는 text가 많은 cross-mode 결과를 동등한 text-backend benchmark가 아니라 진단용 phase 비교로 취급합니다.
 
 ```powershell
 dotnet run --project "perf\Nuri.DuxelWindowsPerformance\Nuri.DuxelWindowsPerformance.csproj" -c Release -- --mode raw --size 1000 --resize-steps 60 --vsync true

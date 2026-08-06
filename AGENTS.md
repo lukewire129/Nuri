@@ -2,14 +2,18 @@
 
 These instructions apply to AI agents working in this repository, including OpenCode and Codex.
 
+This file defines how to work safely in Nuri. It is not an implementation inventory, changelog, or session handoff. Use `docs/README.md` as the map to durable project documentation and inspect the current source before making claims about implementation status.
+
 ## Required Reading Before Work
 
-- English documents under `docs/` are the implementation source of truth for agents.
+- Read `docs/README.md` to select the reference documents relevant to the change.
+- English reference documents under `docs/` are the implementation source of truth.
 - Before changing runtime, hooks, keys, lifecycle, reconciliation, invalidation, or performance code, read:
-  1. `docs/RUNTIME_ARCHITECTURE.md`
-  2. `docs/RUNTIME_IDENTITY.md`
-  3. `docs/LIFECYCLE.md`
-- When resuming work without reliable context, read `docs/SESSION_HANDOFF.md` first, then the relevant reference documents above.
+  1. `docs/architecture/RUNTIME_ARCHITECTURE.md`
+  2. `docs/architecture/RUNTIME_IDENTITY.md`
+  3. `docs/architecture/LIFECYCLE.md`
+- Read `docs/renderers/README.md` before changing renderer ownership, materialization, scheduling, or parity behavior.
+- `docs/operations/SESSION_HANDOFF.md` is optional recovery context, not required reading or a source of truth. Verify it against current source and reference documents before relying on it.
 - Korean translations for the project owner are under `docs/ko/`. Do not use a translation to override or reinterpret the English source of truth.
 
 ## Project Direction
@@ -70,18 +74,19 @@ For performance sanity checks:
 
 ```powershell
 dotnet run --project "perf\Nuri.Performance\Nuri.Performance.csproj" -c Release -- --label after
-dotnet run --project "perf\Nuri.WPFPerformance\Nuri.WPFPerformance.csproj" -c Release -- --label after
+dotnet run --project "perf\Nuri.WPFPerformance\Nuri.WpfPerformance.csproj" -c Release -- --label after
 ```
 
 ## Documentation Policy
 
 - Do not create broad documentation unless it prevents repeated rediscovery.
-- Use `docs/SESSION_HANDOFF.md` only to recover lost session context.
+- Use `docs/README.md` to keep document roles, locations, and reading paths discoverable.
 - Prefer focused samples over long explanatory docs.
-- When resuming without context, read `docs/SESSION_HANDOFF.md` first, then inspect only relevant source files.
+- Before finishing each meaningful implementation session, review every related reference document for stale or missing statements; do not update only the first document that mentions the feature.
 - Durable English reference documents must have a matching Korean translation under `docs/ko/`.
-- Update the English source and its Korean translation in the same change. Keep code symbols, paths, commands, API names, and measured numbers identical.
-- `docs/SESSION_HANDOFF.md` is an operational recovery file and does not require a full Korean mirror; summarize durable decisions in the paired reference documents instead.
+- Keep the English and Korean documents in matching subdirectories and update both in the same change. Keep code symbols, paths, commands, API names, package versions, and measured numbers identical.
+- `docs/operations/` contains optional operational notes and does not require a full Korean mirror. Move durable decisions into paired reference documents.
+- Do not duplicate implementation inventories or long current-status lists in `AGENTS.md`; keep those facts in the appropriate reference document.
 
 ## Editing Rules
 
@@ -91,23 +96,10 @@ dotnet run --project "perf\Nuri.WPFPerformance\Nuri.WPFPerformance.csproj" -c Re
 - Avoid introducing new external packages without confirming package direction first.
 - Keep changes ASCII unless the edited file already uses non-ASCII or there is a clear reason.
 
-## Current Feature Priorities
+## Change Workflow
 
-1. Validate and refine existing Core-neutral event semantics across WPF and Duxel.
-   - The baseline already includes click, text/content/check changes, hover, mouse down/up, keyboard down/up, focus changes, and loaded/unloaded compatibility events.
-   - Prefer `useEffect(..., [])` and its cleanup for component mount/unmount behavior; do not expand loaded/unloaded as component lifecycle APIs.
-   - Add richer pointer or keyboard payloads only when samples require modifiers, repeat state, handled semantics, coordinates, or device information.
-   - Keep Avalonia as an existing regression baseline, not the next backend expansion target.
-2. Complete platform-neutral animation support.
-   - Keep `AnimationValue` renderer-neutral.
-   - Expand supported properties and Duxel materialization based on sample needs.
-   - Diagnose unsupported animation properties where actionable.
-3. Strengthen renderer-level lifecycle/effect validation.
-   - Verify effect flush after WPF native commit and Duxel frame projection, plus deterministic cleanup across subtree removal, key replacement, and repeated moves.
-4. Improve WPF/Duxel semantic parity.
-   - Close property, event, animation, lifecycle, and host-behavior gaps without forcing retained-control mechanics onto Duxel or moving framework types into Core.
-5. Add diagnostics only where useful.
-   - Render count and duplicate-key diagnostics already exist.
-   - Prioritize patch count and unsupported property/event warnings when they help real samples.
-6. Use the next samples to expose concrete gaps.
-   - Prioritize Duxel-focused Explorer Tree, Animated Dashboard, Stress, and Multi-Window scenarios as host capabilities allow.
+1. Inspect the current worktree and the relevant source before assuming the handoff or reference documentation is current.
+2. Read the references selected through `docs/README.md` and identify the contracts the change must preserve.
+3. Make the smallest vertical change that keeps Core platform-neutral and renderer ownership explicit.
+4. Run focused tests, then the required Release solution build after meaningful changes.
+5. Review related English and Korean documentation for behavior, capability, command, package-version, and measurement drift.
