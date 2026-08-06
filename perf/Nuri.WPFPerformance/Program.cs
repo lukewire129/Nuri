@@ -24,6 +24,8 @@ internal static class Program
             new Scenario("Keyed reorder", () => PerfTreeFactory.CreateReorderedTree(size), true),
             new Scenario("Todo screen initial build", () => PerfTreeFactory.CreateTodoTree(size, false), false),
             new Scenario("Todo screen keyed reorder", () => PerfTreeFactory.CreateTodoTree(size, true), true),
+            new Scenario("Absolute 1k initial build", () => PerfTreeFactory.CreateAbsoluteTree(1_000), false, 1_000),
+            new Scenario("Absolute 1k position update", () => PerfTreeFactory.CreateAbsoluteTree(1_000), true, 1_000),
             new Scenario("Virtualized 10k initial source", () => CreateVirtualizedTree(10_000), false, 10_000),
             new Scenario("Virtualized 10k selection update", () => CreateVirtualizedTree(10_000), true, 10_000),
         };

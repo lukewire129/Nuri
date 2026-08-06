@@ -88,13 +88,50 @@ namespace Nuri.WPF
                     wpfEventName = eventName;
                     handler = new MouseEventHandler((s, e) => Invoke(virtualEvent.Handler, eventName == EventKeys.MouseEnter));
                     return true;
-                case VirtualEventKind.MouseDown:
-                    wpfEventName = EventKeys.MouseLeftButtonDown;
-                    handler = new MouseButtonEventHandler((s, e) => Invoke(virtualEvent.Handler));
+                case VirtualEventKind.PointerDown:
+                    wpfEventName = virtualEvent.Routing == EventRouting.Tunnel
+                        ? EventKeys.PreviewMouseLeftButtonDown
+                        : EventKeys.MouseLeftButtonDown;
+                    handler = new MouseButtonEventHandler((s, e) =>
+                    {
+                        var element = s as FrameworkElement;
+                        if (virtualEvent.CapturePointer)
+                            element?.CaptureMouse();
+
+                        try
+                        {
+                            InvokePointer(virtualEvent.Handler, CreatePointerEvent(s, e));
+                        }
+                        catch
+                        {
+                            if (virtualEvent.CapturePointer)
+                                element?.ReleaseMouseCapture();
+                            throw;
+                        }
+                    });
                     return true;
-                case VirtualEventKind.MouseUp:
-                    wpfEventName = EventKeys.MouseLeftButtonUp;
-                    handler = new MouseButtonEventHandler((s, e) => Invoke(virtualEvent.Handler));
+                case VirtualEventKind.PointerMove:
+                    wpfEventName = virtualEvent.Routing == EventRouting.Tunnel
+                        ? EventKeys.PreviewMouseMove
+                        : EventKeys.MouseMove;
+                    handler = new MouseEventHandler((s, e) => InvokePointer(virtualEvent.Handler, CreatePointerEvent(s, e)));
+                    return true;
+                case VirtualEventKind.PointerUp:
+                    wpfEventName = virtualEvent.Routing == EventRouting.Tunnel
+                        ? EventKeys.PreviewMouseLeftButtonUp
+                        : EventKeys.MouseLeftButtonUp;
+                    handler = new MouseButtonEventHandler((s, e) =>
+                    {
+                        try
+                        {
+                            InvokePointer(virtualEvent.Handler, CreatePointerEvent(s, e));
+                        }
+                        finally
+                        {
+                            if (virtualEvent.CapturePointer && s is FrameworkElement element)
+                                element.ReleaseMouseCapture();
+                        }
+                    });
                     return true;
                 case VirtualEventKind.KeyDown:
                     wpfEventName = eventName == EventKeys.PreviewKeyDown ? EventKeys.PreviewKeyDown : EventKeys.KeyDown;
@@ -170,6 +207,22 @@ namespace Nuri.WPF
                 return KeyboardKey.Delete;
 
             return KeyboardKey.Unknown;
+        }
+
+        private static PointerEvent CreatePointerEvent(object? source, MouseEventArgs args)
+        {
+            var element = source as FrameworkElement;
+            var relativeTarget = element?.Parent as IInputElement ?? element;
+            var point = relativeTarget == null ? new System.Windows.Point() : args.GetPosition(relativeTarget);
+            return new PointerEvent(point.X, point.Y, args.LeftButton == MouseButtonState.Pressed);
+        }
+
+        private static void InvokePointer(Delegate handler, PointerEvent pointerEvent)
+        {
+            if (handler is Action action)
+                action();
+            else
+                Invoke(handler, pointerEvent);
         }
 
         private static void Invoke(Delegate handler, params object[] values)

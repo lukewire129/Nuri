@@ -5,6 +5,7 @@ using Nuri.Runtime.Diagnostics;
 using Nuri.Runtime.Lifecycle;
 using Nuri.UI;
 using Nuri.UI.Dsl;
+using Nuri.UI.Events;
 using Nuri.UI.Navigation;
 using Nuri.UI.Values;
 using Nuri.UI.Virtualization;
@@ -54,6 +55,8 @@ internal static class Program
         NamedColorsUseWpfCompatibleValues();
         TextOverflowDslUsesNeutralValues();
         LayoutDistributionDslUsesNeutralProperties();
+        AbsoluteLayoutDslUsesNeutralPositionProperties();
+        PointerEventDslCarriesCoordinates();
         GridLengthDslTreatsNumbersAsPixels();
         GridLengthDslParsesStringDefinitions();
         GridLengthDslRejectsInvalidStringDefinitions();
@@ -1107,6 +1110,112 @@ internal static class Program
                 .Rows("*,*")
                 .AutoFlow(),
             "AutoFlow should reject children that exceed an explicitly sized Grid.");
+    }
+
+    private static void AbsoluteLayoutDslUsesNeutralPositionProperties()
+    {
+        var child = Component.Text("node").Position(120, 80);
+        var surface = Component.Absolute(child);
+
+        AssertEqual(DivTypes.Absolute, surface.Kind, "Absolute should use the shared Absolute Div kind.");
+        AssertEqual(120d, child.Properties[PropertyKeys.PositionX], "Position should retain the neutral X coordinate.");
+        AssertEqual(80d, child.Properties[PropertyKeys.PositionY], "Position should retain the neutral Y coordinate.");
+
+        child.PositionX(240).PositionY(160);
+        AssertEqual(240d, child.Properties[PropertyKeys.PositionX], "PositionX should update the neutral X coordinate.");
+        AssertEqual(160d, child.Properties[PropertyKeys.PositionY], "PositionY should update the neutral Y coordinate.");
+    }
+
+    private static void PointerEventDslCarriesCoordinates()
+    {
+        var pointer = new PointerEvent(24, 36, true);
+        AssertEqual(24d, pointer.X, "PointerEvent should retain the X coordinate.");
+        AssertEqual(36d, pointer.Y, "PointerEvent should retain the Y coordinate.");
+        AssertEqual(true, pointer.IsPrimaryButtonPressed, "PointerEvent should retain the primary-button state.");
+
+        Action<PointerEvent> pointerDown = _ => { };
+        Action<PointerEvent> pointerMove = _ => { };
+        Action<PointerEvent> pointerUp = _ => { };
+        var element = Component.Div()
+            .OnPointerDown(pointerDown)
+            .OnPointerMove(pointerMove)
+            .OnPointerUp(pointerUp);
+        AssertEqual(3, element.VirtualEvents.Count, "Pointer events should remain in the virtual event map.");
+        AssertEqual(
+            EventRouting.Bubble,
+            element.VirtualEvents[EventKeys.MouseLeftButtonDown].Routing,
+            "Pointer events should use Bubble routing by default.");
+        var tunnelElement = Component.Div().OnPointerDown(pointerDown, EventRouting.Tunnel);
+        AssertEqual(
+            EventRouting.Tunnel,
+            tunnelElement.VirtualEvents[EventKeys.MouseLeftButtonDown].Routing,
+            "Pointer events should retain an explicit Tunnel routing choice.");
+        AssertEqual(
+            false,
+            element.VirtualEvents[EventKeys.MouseLeftButtonDown].Equals(tunnelElement.VirtualEvents[EventKeys.MouseLeftButtonDown]),
+            "Changing pointer routing should replace the virtual event descriptor.");
+
+        var mouseElement = Component.Div()
+            .OnMouseDown(() => { })
+            .OnMouseUp(() => { });
+        AssertEqual(
+            EventRouting.Bubble,
+            mouseElement.VirtualEvents[EventKeys.MouseLeftButtonDown].Routing,
+            "MouseDown should use Bubble routing by default.");
+        AssertEqual(
+            VirtualEventKind.PointerDown,
+            mouseElement.VirtualEvents[EventKeys.MouseLeftButtonDown].Kind,
+            "MouseDown should normalize to the shared PointerDown event kind.");
+        AssertEqual(
+            EventRouting.Bubble,
+            mouseElement.VirtualEvents[EventKeys.MouseLeftButtonUp].Routing,
+            "MouseUp should use Bubble routing by default.");
+        AssertEqual(
+            VirtualEventKind.PointerUp,
+            mouseElement.VirtualEvents[EventKeys.MouseLeftButtonUp].Kind,
+            "MouseUp should normalize to the shared PointerUp event kind.");
+        var tunnelMouseElement = Component.Div()
+            .OnMouseDown(() => { }, EventRouting.Tunnel)
+            .OnMouseUp(() => { }, EventRouting.Tunnel);
+        AssertEqual(
+            EventRouting.Tunnel,
+            tunnelMouseElement.VirtualEvents[EventKeys.MouseLeftButtonDown].Routing,
+            "MouseDown should retain an explicit Tunnel routing choice.");
+        AssertEqual(
+            EventRouting.Tunnel,
+            tunnelMouseElement.VirtualEvents[EventKeys.MouseLeftButtonUp].Routing,
+            "MouseUp should retain an explicit Tunnel routing choice.");
+
+        var pointerEvents = new[]
+        {
+            KeyValuePair.Create<string, object?>(EventKeys.MouseLeftButtonDown, new VirtualEvent(VirtualEventKind.PointerDown, pointerDown)),
+            KeyValuePair.Create<string, object?>(EventKeys.MouseMove, new VirtualEvent(VirtualEventKind.PointerMove, pointerMove)),
+            KeyValuePair.Create<string, object?>(EventKeys.MouseLeftButtonUp, new VirtualEvent(VirtualEventKind.PointerUp, pointerUp))
+        };
+        VirtualEntry CreatePointerTree(double x, double y)
+        {
+            var child = new VirtualEntry(
+                VirtualControlTypes.Div,
+                key: "node",
+                properties: new[]
+                {
+                    KeyValuePair.Create<string, object?>(PropertyKeys.PositionX, x),
+                    KeyValuePair.Create<string, object?>(PropertyKeys.PositionY, y)
+                },
+                events: pointerEvents);
+            return new VirtualEntry(
+                    VirtualControlTypes.Div,
+                    kind: DivTypes.Absolute,
+                    children: new[] { child })
+                .WithIdentity("pointer-diff", null);
+        }
+
+        var oldTree = CreatePointerTree(10, 20);
+        var newTree = CreatePointerTree(30, 40);
+        var operations = VirtualTreeDiff.Diff(oldTree, newTree);
+        AssertEqual(2, operations.OfType<UpdatePropertyPatch>().Count(), "A drag frame should patch only the two position properties.");
+        AssertEqual(0, operations.OfType<AddEventPatch>().Count(), "Stable pointer handlers should not be reattached during a drag frame.");
+        AssertEqual(0, operations.OfType<RemoveEventPatch>().Count(), "Stable pointer handlers should not be detached during a drag frame.");
     }
 
     private static void GridLengthDslTreatsNumbersAsPixels()

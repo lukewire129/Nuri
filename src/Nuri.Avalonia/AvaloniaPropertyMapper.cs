@@ -30,6 +30,12 @@ namespace Nuri.Avalonia
                 case "Margin":
                     control.Margin = ToThickness(value);
                     return true;
+                case PropertyKeys.PositionX:
+                    Canvas.SetLeft(control, ToDouble(value));
+                    return true;
+                case PropertyKeys.PositionY:
+                    Canvas.SetTop(control, ToDouble(value));
+                    return true;
                 case "Padding":
                     return TrySetPadding(control, value);
                 case "Background":
@@ -105,6 +111,12 @@ namespace Nuri.Avalonia
                     return true;
                 case "Margin":
                     control.ClearValue(Layoutable.MarginProperty);
+                    return true;
+                case PropertyKeys.PositionX:
+                    control.ClearValue(Canvas.LeftProperty);
+                    return true;
+                case PropertyKeys.PositionY:
+                    control.ClearValue(Canvas.TopProperty);
                     return true;
                 case PropertyKeys.Spacing:
                     return TryClearSpacing(control);

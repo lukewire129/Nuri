@@ -76,6 +76,23 @@ namespace Nuri.UI.Dsl
             return node;
         }
 
+        public static T Position<T>(this T node, double x, double y) where T : IElement
+        {
+            return node.PositionX(x).PositionY(y);
+        }
+
+        public static T PositionX<T>(this T node, double x) where T : IElement
+        {
+            node.SetProperty(PropertyKeys.PositionX, x);
+            return node;
+        }
+
+        public static T PositionY<T>(this T node, double y) where T : IElement
+        {
+            node.SetProperty(PropertyKeys.PositionY, y);
+            return node;
+        }
+
         public static T Scale<T>(this T node, double value) where T : IElement
         {
             return node.Scale(value, value);
@@ -525,15 +542,60 @@ namespace Nuri.UI.Dsl
             return node;
         }
 
-        public static T OnMouseDown<T>(this T node, Action handler) where T : IElement
+        public static T OnMouseDown<T>(
+            this T node,
+            Action handler,
+            EventRouting routing = EventRouting.Bubble) where T : IElement
         {
-            node.AddVirtualEvent(EventKeys.MouseLeftButtonDown, new VirtualEvent(VirtualEventKind.MouseDown, handler));
+            node.AddVirtualEvent(
+                EventKeys.MouseLeftButtonDown,
+                new VirtualEvent(VirtualEventKind.PointerDown, handler, routing: routing));
             return node;
         }
 
-        public static T OnMouseUp<T>(this T node, Action handler) where T : IElement
+        public static T OnMouseUp<T>(
+            this T node,
+            Action handler,
+            EventRouting routing = EventRouting.Bubble) where T : IElement
         {
-            node.AddVirtualEvent(EventKeys.MouseLeftButtonUp, new VirtualEvent(VirtualEventKind.MouseUp, handler));
+            node.AddVirtualEvent(
+                EventKeys.MouseLeftButtonUp,
+                new VirtualEvent(VirtualEventKind.PointerUp, handler, routing: routing));
+            return node;
+        }
+
+        public static T OnPointerDown<T>(
+            this T node,
+            Action<PointerEvent> handler,
+            EventRouting routing = EventRouting.Bubble,
+            bool capturePointer = false) where T : IElement
+        {
+            node.AddVirtualEvent(
+                EventKeys.MouseLeftButtonDown,
+                new VirtualEvent(VirtualEventKind.PointerDown, handler, capturePointer, routing));
+            return node;
+        }
+
+        public static T OnPointerMove<T>(
+            this T node,
+            Action<PointerEvent> handler,
+            EventRouting routing = EventRouting.Bubble) where T : IElement
+        {
+            node.AddVirtualEvent(
+                EventKeys.MouseMove,
+                new VirtualEvent(VirtualEventKind.PointerMove, handler, routing: routing));
+            return node;
+        }
+
+        public static T OnPointerUp<T>(
+            this T node,
+            Action<PointerEvent> handler,
+            EventRouting routing = EventRouting.Bubble,
+            bool releasePointerCapture = false) where T : IElement
+        {
+            node.AddVirtualEvent(
+                EventKeys.MouseLeftButtonUp,
+                new VirtualEvent(VirtualEventKind.PointerUp, handler, releasePointerCapture, routing));
             return node;
         }
 

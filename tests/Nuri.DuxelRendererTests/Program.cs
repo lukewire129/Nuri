@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Duxel.Core;
 using Nuri.AnimatedDashboardSample.Components;
+using Nuri.Constants;
 using Nuri.Duxel;
 using Nuri.ExplorerTreeSample.Components;
 using Nuri.Runtime.Diagnostics;
@@ -38,6 +39,7 @@ internal static class Program
             ("column applies child horizontal alignment", ColumnAppliesChildHorizontalAlignment),
             ("grow children fill linear layout remainder", GrowChildrenFillLinearLayoutRemainder),
             ("button content alignment is supported without diagnostics", ButtonContentAlignmentIsSupported),
+            ("absolute layout emits unsupported diagnostics", AbsoluteLayoutEmitsUnsupportedDiagnostics),
             ("auto grid columns measure nested div content", AutoGridColumnsMeasureNestedDivContent),
             ("decorated grid preserves bottom padding before its sibling", DecoratedGridPreservesBottomPaddingBeforeSibling),
             ("header grid preserves visible bottom padding", HeaderGridPreservesVisibleBottomPadding),
@@ -435,6 +437,41 @@ internal static class Program
                     log.Kind != RuntimeLogKind.UnsupportedProperty
                     || !log.Message.Contains("Alignment", StringComparison.Ordinal)),
                 "Button horizontal and vertical content alignment must not emit unsupported diagnostics.");
+        }
+        finally
+        {
+            NuriDiagnostics.Disable();
+            NuriDiagnostics.ClearLogs();
+        }
+    }
+
+    private static void AbsoluteLayoutEmitsUnsupportedDiagnostics()
+    {
+        NuriDiagnostics.Enable();
+        NuriDiagnostics.ClearLogs();
+        try
+        {
+            using var context = CreateContext();
+            using var screen = new NuriDuxelScreen(
+                new AbsoluteLayoutProbeComponent(),
+                () => { },
+                "absolute-layout-diagnostics-test");
+
+            RenderFrame(context, screen);
+            var messages = NuriDiagnostics.GetSnapshot().RecentLogs
+                .Where(log => log.Kind == RuntimeLogKind.UnsupportedProperty)
+                .Select(log => log.Message)
+                .ToArray();
+
+            AssertTrue(
+                messages.Any(message => message.Contains("Layout:Absolute", StringComparison.Ordinal)),
+                "Duxel must diagnose the unsupported Absolute layout instead of silently treating it as a Column.");
+            AssertTrue(
+                messages.Any(message => message.Contains(PropertyKeys.PositionX, StringComparison.Ordinal)),
+                "Duxel must diagnose unsupported PositionX placement.");
+            AssertTrue(
+                messages.Any(message => message.Contains(PropertyKeys.PositionY, StringComparison.Ordinal)),
+                "Duxel must diagnose unsupported PositionY placement.");
         }
         finally
         {
@@ -2383,6 +2420,18 @@ internal static class Program
             return Div(Text(label))
                 .Padding(30)
                 .Background("#7c3aed");
+        }
+    }
+
+    private sealed class AbsoluteLayoutProbeComponent : Component
+    {
+        public override IElement Render()
+        {
+            return Absolute(
+                    Div(Text("node"))
+                        .Position(20, 30)
+                        .Size(120, 60))
+                .Size(400, 240);
         }
     }
 

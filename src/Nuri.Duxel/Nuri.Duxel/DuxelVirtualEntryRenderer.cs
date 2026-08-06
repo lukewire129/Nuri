@@ -2889,6 +2889,12 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
 
     private static void LogUnsupportedFeatures(VirtualEntry entry)
     {
+        if (entry.Type == VirtualControlTypes.Div
+            && string.Equals(entry.Kind, DivTypes.Absolute, StringComparison.Ordinal))
+        {
+            LogUnsupportedProperty(entry, "Layout:Absolute");
+        }
+
         foreach (var propertyName in UnsupportedPropertyNames)
         {
             if (entry.Properties.ContainsKey(propertyName))
@@ -3341,6 +3347,8 @@ public sealed class DuxelVirtualEntryRenderer : IDisposable
         "FontFamily",
         "FontWeight",
         "Grid.RowSpan",
+        PropertyKeys.PositionX,
+        PropertyKeys.PositionY,
         "Rotate",
         "ScaleX",
         "ScaleY",

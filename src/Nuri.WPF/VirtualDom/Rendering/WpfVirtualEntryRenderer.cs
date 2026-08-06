@@ -294,6 +294,9 @@ namespace Nuri.WPF
         {
             if (controlIndex.TryGetValue(entry.Id, out var element))
             {
+                if (element.IsMouseCaptured)
+                    element.ReleaseMouseCapture();
+
                 foreach (var evt in entry.Events)
                     RemoveEventHandler(element, evt);
 

@@ -7,6 +7,7 @@ using Nuri.Runtime;
 using Nuri.Runtime.Diagnostics;
 using Nuri.UI.Controls;
 using Nuri.UI.Dsl;
+using Nuri.UI.Events;
 using Nuri.UI.Values;
 using Nuri.VirtualDom;
 using Nuri.WPF;
@@ -37,6 +38,8 @@ using WpfButton = System.Windows.Controls.Button;
 using WpfCheckBox = System.Windows.Controls.CheckBox;
 using WpfContentControl = System.Windows.Controls.ContentControl;
 using WpfTextBox = System.Windows.Controls.TextBox;
+using WpfCanvas = System.Windows.Controls.Canvas;
+using WpfVisualTreeHelper = System.Windows.Media.VisualTreeHelper;
 
 namespace Nuri.RendererTests;
 
@@ -56,6 +59,8 @@ internal static class Program
         WpfInputEventSubscriptionsRemainStable();
         WpfUnsupportedPropertyDiagnosticsAreDeduplicated();
         WpfUnsupportedEventDiagnosticsAreDeduplicated();
+        WpfPointerRoutingIsSelectable();
+        WpfAbsoluteLayoutMaterializesCanvasPositions();
         WpfDiagnosticsTrackAppliedPatchBatches();
         WpfDiagnosticsCanExcludeInspectorRoot();
         WpfRootDisposalRemovesVirtualizedDiagnostics();
@@ -93,6 +98,111 @@ internal static class Program
         window.Close();
         NuriDiagnostics.ClearLogs();
         NuriDiagnostics.Disable();
+    }
+
+    private static void WpfAbsoluteLayoutMaterializesCanvasPositions()
+    {
+        var oldElement = Component.Absolute(
+            Component.Text("node").Key("node").Position(12, 24));
+        var oldEntry = oldElement.ToVirtualEntry().WithIdentity("absolute-test", null);
+        var root = WpfVirtualEntryRenderer.Build(oldEntry);
+        var canvas = (WpfCanvas)WpfVisualTreeHelper.GetChild(root, 0);
+        var child = (WpfFrameworkElement)canvas.Children[0];
+
+        AssertEqual(12d, WpfCanvas.GetLeft(child), "WPF: Absolute should map PositionX to Canvas.Left.");
+        AssertEqual(24d, WpfCanvas.GetTop(child), "WPF: Absolute should map PositionY to Canvas.Top.");
+
+        var newElement = Component.Absolute(
+            Component.Text("node").Key("node").Position(120, 240));
+        var newEntry = newElement.ToVirtualEntry().WithIdentity("absolute-test", null);
+        var operations = VirtualTreeDiff.Diff(oldEntry, newEntry);
+        WpfVirtualEntryRenderer.ApplyDiff(root, operations);
+
+        AssertSame(child, canvas.Children[0], "WPF: changing an absolute position should retain the native child.");
+        AssertEqual(120d, WpfCanvas.GetLeft(child), "WPF: PositionX patch should update Canvas.Left.");
+        AssertEqual(240d, WpfCanvas.GetTop(child), "WPF: PositionY patch should update Canvas.Top.");
+
+        if (root is IDisposable disposable)
+            disposable.Dispose();
+    }
+
+    private static void WpfPointerRoutingIsSelectable()
+    {
+        var bubbleCount = 0;
+        var bubble = WpfVirtualEntryRenderer.Build(
+            Component.Text("bubble")
+                .OnPointerDown(_ => bubbleCount++)
+                .ToVirtualEntry()
+                .WithIdentity("pointer-bubble", null));
+        bubble.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(
+            System.Windows.Input.Mouse.PrimaryDevice,
+            Environment.TickCount,
+            System.Windows.Input.MouseButton.Left)
+        {
+            RoutedEvent = System.Windows.UIElement.MouseLeftButtonDownEvent
+        });
+        AssertEqual(1, bubbleCount, "WPF: Bubble pointer routing should use the normal mouse event.");
+
+        var tunnelCount = 0;
+        var tunnel = WpfVirtualEntryRenderer.Build(
+            Component.Button("tunnel")
+                .OnPointerDown(_ => tunnelCount++, EventRouting.Tunnel)
+                .ToVirtualEntry()
+                .WithIdentity("pointer-tunnel", null));
+        tunnel.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(
+            System.Windows.Input.Mouse.PrimaryDevice,
+            Environment.TickCount,
+            System.Windows.Input.MouseButton.Left)
+        {
+            RoutedEvent = System.Windows.UIElement.PreviewMouseLeftButtonDownEvent
+        });
+        AssertEqual(1, tunnelCount, "WPF: Tunnel pointer routing should use the preview mouse event.");
+
+        var mouseBubbleCount = 0;
+        var mouseBubble = WpfVirtualEntryRenderer.Build(
+            Component.Text("mouse-bubble")
+                .OnMouseDown(() => mouseBubbleCount++)
+                .OnMouseUp(() => mouseBubbleCount++)
+                .ToVirtualEntry()
+                .WithIdentity("mouse-bubble", null));
+        mouseBubble.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(
+            System.Windows.Input.Mouse.PrimaryDevice,
+            Environment.TickCount,
+            System.Windows.Input.MouseButton.Left)
+        {
+            RoutedEvent = System.Windows.UIElement.MouseLeftButtonDownEvent
+        });
+        mouseBubble.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(
+            System.Windows.Input.Mouse.PrimaryDevice,
+            Environment.TickCount,
+            System.Windows.Input.MouseButton.Left)
+        {
+            RoutedEvent = System.Windows.UIElement.MouseLeftButtonUpEvent
+        });
+        AssertEqual(2, mouseBubbleCount, "WPF: Bubble mouse routing should use normal down and up events.");
+
+        var mouseTunnelCount = 0;
+        var mouseTunnel = WpfVirtualEntryRenderer.Build(
+            Component.Button("mouse-tunnel")
+                .OnMouseDown(() => mouseTunnelCount++, EventRouting.Tunnel)
+                .OnMouseUp(() => mouseTunnelCount++, EventRouting.Tunnel)
+                .ToVirtualEntry()
+                .WithIdentity("mouse-tunnel", null));
+        mouseTunnel.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(
+            System.Windows.Input.Mouse.PrimaryDevice,
+            Environment.TickCount,
+            System.Windows.Input.MouseButton.Left)
+        {
+            RoutedEvent = System.Windows.UIElement.PreviewMouseLeftButtonDownEvent
+        });
+        mouseTunnel.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(
+            System.Windows.Input.Mouse.PrimaryDevice,
+            Environment.TickCount,
+            System.Windows.Input.MouseButton.Left)
+        {
+            RoutedEvent = System.Windows.UIElement.PreviewMouseLeftButtonUpEvent
+        });
+        AssertEqual(2, mouseTunnelCount, "WPF: Tunnel mouse routing should use preview down and up events.");
     }
 
     private static void WpfNamedColorsMatchCorePalette()
@@ -276,8 +386,9 @@ internal static class Program
         var textBox = (WpfTextBox)controls[1];
         var checkBox = (WpfCheckBox)controls[2];
         var pointerSurface = (WpfTextBlock)controls[3];
+        var pointerButton = (WpfButton)controls[4];
 
-        RaiseWpfInputEvents(button, textBox, checkBox, pointerSurface, keyboardSource, "initial-input");
+        RaiseWpfInputEvents(button, textBox, checkBox, pointerSurface, pointerButton, keyboardSource, "initial-input");
         AssertSequence(ExpectedInputEventLog(1, "initial-input"), log, "WPF: supported input events should deliver their native payloads once.");
 
         log.Clear();
@@ -287,7 +398,8 @@ internal static class Program
         AssertSame(textBox, driver.RootChildren[1], "WPF: replacing event handlers should preserve the text input control.");
         AssertSame(checkBox, driver.RootChildren[2], "WPF: replacing event handlers should preserve the check control.");
         AssertSame(pointerSurface, driver.RootChildren[3], "WPF: replacing event handlers should preserve the pointer surface.");
-        RaiseWpfInputEvents(button, textBox, checkBox, pointerSurface, keyboardSource, "replacement-input");
+        AssertSame(pointerButton, driver.RootChildren[4], "WPF: replacing event handlers should preserve the pointer button.");
+        RaiseWpfInputEvents(button, textBox, checkBox, pointerSurface, pointerButton, keyboardSource, "replacement-input");
         AssertSequence(ExpectedInputEventLog(2, "replacement-input"), log, "WPF: handler replacement should remove every previous callback.");
 
         for (var generation = 3; generation <= 52; generation++)
@@ -297,13 +409,13 @@ internal static class Program
         }
 
         log.Clear();
-        RaiseWpfInputEvents(button, textBox, checkBox, pointerSurface, keyboardSource, "stress-input");
+        RaiseWpfInputEvents(button, textBox, checkBox, pointerSurface, pointerButton, keyboardSource, "stress-input");
         AssertSequence(ExpectedInputEventLog(52, "stress-input"), log, "WPF: repeated rebuilds should not accumulate event handlers.");
 
         component.ShowInputs = false;
         root.Rebuild();
         log.Clear();
-        RaiseWpfInputEvents(button, textBox, checkBox, pointerSurface, keyboardSource, "removed-input");
+        RaiseWpfInputEvents(button, textBox, checkBox, pointerSurface, pointerButton, keyboardSource, "removed-input");
         AssertEqual(0, log.Count, "WPF: removed subtrees should detach native event handlers.");
         root.Dispose();
 
@@ -316,8 +428,9 @@ internal static class Program
         var disposedTextBox = (WpfTextBox)disposeControls[1];
         var disposedCheckBox = (WpfCheckBox)disposeControls[2];
         var disposedPointerSurface = (WpfTextBlock)disposeControls[3];
+        var disposedPointerButton = (WpfButton)disposeControls[4];
         disposeRoot.Dispose();
-        RaiseWpfInputEvents(disposedButton, disposedTextBox, disposedCheckBox, disposedPointerSurface, keyboardSource, "disposed-input");
+        RaiseWpfInputEvents(disposedButton, disposedTextBox, disposedCheckBox, disposedPointerSurface, disposedPointerButton, keyboardSource, "disposed-input");
         AssertEqual(0, disposeLog.Count, "WPF: root disposal should detach native event handlers.");
     }
 
@@ -411,6 +524,7 @@ internal static class Program
         WpfTextBox textBox,
         WpfCheckBox checkBox,
         WpfTextBlock pointerSurface,
+        WpfButton pointerButton,
         System.Windows.PresentationSource keyboardSource,
         string textValue)
     {
@@ -434,6 +548,18 @@ internal static class Program
         pointerSurface.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, System.Windows.Input.MouseButton.Left)
         {
             RoutedEvent = System.Windows.UIElement.MouseLeftButtonUpEvent
+        });
+        pointerButton.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, System.Windows.Input.MouseButton.Left)
+        {
+            RoutedEvent = System.Windows.UIElement.PreviewMouseLeftButtonDownEvent
+        });
+        pointerButton.RaiseEvent(new System.Windows.Input.MouseEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount)
+        {
+            RoutedEvent = System.Windows.UIElement.PreviewMouseMoveEvent
+        });
+        pointerButton.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, Environment.TickCount, System.Windows.Input.MouseButton.Left)
+        {
+            RoutedEvent = System.Windows.UIElement.PreviewMouseLeftButtonUpEvent
         });
 
         textBox.RaiseEvent(new System.Windows.Input.KeyEventArgs(System.Windows.Input.Keyboard.PrimaryDevice, keyboardSource, Environment.TickCount, System.Windows.Input.Key.Escape)
@@ -460,6 +586,9 @@ internal static class Program
             $"hover:{generation}:False",
             $"mouse-down:{generation}",
             $"mouse-up:{generation}",
+            $"pointer-down:{generation}",
+            $"pointer-move:{generation}",
+            $"pointer-up:{generation}",
             $"key-down:{generation}:Escape",
             $"key-up:{generation}:Escape",
             $"focus:{generation}:True",
@@ -1844,7 +1973,12 @@ internal static class Program
                     .Key("event-pointer")
                     .OnHover(hovered => _log.Add($"hover:{generation}:{hovered}"))
                     .OnMouseDown(() => _log.Add($"mouse-down:{generation}"))
-                    .OnMouseUp(() => _log.Add($"mouse-up:{generation}")));
+                    .OnMouseUp(() => _log.Add($"mouse-up:{generation}")),
+                Button("pointer-button")
+                    .Key("event-pointer-button")
+                    .OnPointerDown(_ => _log.Add($"pointer-down:{generation}"), EventRouting.Tunnel)
+                    .OnPointerMove(_ => _log.Add($"pointer-move:{generation}"), EventRouting.Tunnel)
+                    .OnPointerUp(_ => _log.Add($"pointer-up:{generation}"), EventRouting.Tunnel));
         }
     }
 

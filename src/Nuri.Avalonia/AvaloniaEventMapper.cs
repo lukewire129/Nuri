@@ -55,18 +55,62 @@ namespace Nuri.Avalonia
                 return true;
             }
 
-            if (virtualEvent.Kind == VirtualEventKind.MouseDown)
+            if (virtualEvent.Kind == VirtualEventKind.PointerDown)
             {
-                EventHandler<PointerPressedEventArgs> pointerHandler = (_, __) => virtualEvent.Handler.DynamicInvoke();
-                control.PointerPressed += pointerHandler;
+                EventHandler<PointerPressedEventArgs> pointerHandler = (_, args) =>
+                {
+                    if (virtualEvent.CapturePointer)
+                        args.Pointer.Capture(control);
+
+                    try
+                    {
+                        InvokePointer(virtualEvent.Handler, CreatePointerEvent(control, args));
+                    }
+                    catch
+                    {
+                        if (virtualEvent.CapturePointer)
+                            args.Pointer.Capture(null);
+                        throw;
+                    }
+                };
+                control.AddHandler(
+                    InputElement.PointerPressedEvent,
+                    pointerHandler,
+                    ToRoutingStrategy(virtualEvent.Routing));
                 handler = pointerHandler;
                 return true;
             }
 
-            if (virtualEvent.Kind == VirtualEventKind.MouseUp)
+            if (virtualEvent.Kind == VirtualEventKind.PointerMove)
             {
-                EventHandler<PointerReleasedEventArgs> pointerHandler = (_, __) => virtualEvent.Handler.DynamicInvoke();
-                control.PointerReleased += pointerHandler;
+                EventHandler<PointerEventArgs> pointerHandler = (_, args) =>
+                    InvokePointer(virtualEvent.Handler, CreatePointerEvent(control, args));
+                control.AddHandler(
+                    InputElement.PointerMovedEvent,
+                    pointerHandler,
+                    ToRoutingStrategy(virtualEvent.Routing));
+                handler = pointerHandler;
+                return true;
+            }
+
+            if (virtualEvent.Kind == VirtualEventKind.PointerUp)
+            {
+                EventHandler<PointerReleasedEventArgs> pointerHandler = (_, args) =>
+                {
+                    try
+                    {
+                        InvokePointer(virtualEvent.Handler, CreatePointerEvent(control, args));
+                    }
+                    finally
+                    {
+                        if (virtualEvent.CapturePointer)
+                            args.Pointer.Capture(null);
+                    }
+                };
+                control.AddHandler(
+                    InputElement.PointerReleasedEvent,
+                    pointerHandler,
+                    ToRoutingStrategy(virtualEvent.Routing));
                 handler = pointerHandler;
                 return true;
             }
@@ -145,6 +189,8 @@ namespace Nuri.Avalonia
                     control.PointerEntered -= hoverHandler;
                 else if (eventName == EventKeys.MouseLeave)
                     control.PointerExited -= hoverHandler;
+                else if (eventName == EventKeys.MouseMove)
+                    control.PointerMoved -= hoverHandler;
 
                 return;
             }
@@ -206,6 +252,29 @@ namespace Nuri.Avalonia
                 return;
 
             virtualEvent.Handler.DynamicInvoke(key);
+        }
+
+        private static PointerEvent CreatePointerEvent(Control control, PointerEventArgs args)
+        {
+            var relativeTarget = control.Parent as Visual ?? control;
+            var point = args.GetPosition(relativeTarget);
+            var properties = args.GetCurrentPoint(control).Properties;
+            return new PointerEvent(point.X, point.Y, properties.IsLeftButtonPressed);
+        }
+
+        private static void InvokePointer(Delegate handler, PointerEvent pointerEvent)
+        {
+            if (handler is Action action)
+                action();
+            else
+                handler.DynamicInvoke(pointerEvent);
+        }
+
+        private static RoutingStrategies ToRoutingStrategy(EventRouting routing)
+        {
+            return routing == EventRouting.Tunnel
+                ? RoutingStrategies.Tunnel
+                : RoutingStrategies.Bubble;
         }
 
         private static KeyboardKey ToKeyboardKey(Key key)

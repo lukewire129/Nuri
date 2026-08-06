@@ -55,6 +55,11 @@ public abstract partial class Component
         return Div (DivTypes.Column, children);
     }
 
+    public static Div Absolute(params IElement[] children)
+    {
+        return new Div(DivTypes.Absolute, children);
+    }
+
     public static Div Grid(RowHeights rowHeights, params IElement[] children)
     {
         return Grid(children)

@@ -153,6 +153,9 @@ namespace Nuri.Avalonia
                     HorizontalScrollBarVisibility = global::Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled
                 };
 
+            if (kind == DivTypes.Absolute)
+                return new Canvas();
+
             return new StackPanel { Orientation = Orientation.Vertical };
         }
     }

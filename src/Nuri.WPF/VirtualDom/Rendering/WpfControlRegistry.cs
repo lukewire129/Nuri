@@ -248,6 +248,8 @@ namespace Nuri.WPF
                         VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                         HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
                     };
+                case DivTypes.Absolute:
+                    return new System.Windows.Controls.Canvas();
                 case DivTypes.Block:
                     return new System.Windows.Controls.Grid();
                 case DivTypes.Column:

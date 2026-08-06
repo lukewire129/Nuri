@@ -51,6 +51,12 @@ namespace Nuri.WPF
                 case "TranslateY":
                     WpfTransformMapper.GetTranslate(element).Y = ToDouble(value);
                     return true;
+                case PropertyKeys.PositionX:
+                    Canvas.SetLeft(element, ToDouble(value));
+                    return true;
+                case PropertyKeys.PositionY:
+                    Canvas.SetTop(element, ToDouble(value));
+                    return true;
                 case PropertyKeys.Name:
                     element.Name = (string)value!;
                     return true;
@@ -160,6 +166,12 @@ namespace Nuri.WPF
                     return true;
                 case "TranslateY":
                     WpfTransformMapper.GetTranslate(element).ClearValue(TranslateTransform.YProperty);
+                    return true;
+                case PropertyKeys.PositionX:
+                    element.ClearValue(Canvas.LeftProperty);
+                    return true;
+                case PropertyKeys.PositionY:
+                    element.ClearValue(Canvas.TopProperty);
                     return true;
                 case PropertyKeys.Name:
                     element.ClearValue(FrameworkElement.NameProperty);
