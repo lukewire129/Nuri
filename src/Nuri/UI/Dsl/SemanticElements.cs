@@ -21,11 +21,11 @@ namespace Nuri.UI.Dsl
 
         public override void AddChildren(IElement[] children)
         {
-            if (Kind == DivTypes.Scroll)
+            if (Kind == DivTypes.Scroll || Kind == DivTypes.Viewport)
             {
                 var addedChildren = children.Count(child => child != null);
                 if (Children.Count + addedChildren > 1)
-                    throw new System.InvalidOperationException("Scroll Div supports at most one child. Wrap multiple elements in a Column Div.");
+                    throw new System.InvalidOperationException($"{Kind} Div supports at most one child. Wrap multiple elements in a single content Div.");
             }
 
             base.AddChildren(children);

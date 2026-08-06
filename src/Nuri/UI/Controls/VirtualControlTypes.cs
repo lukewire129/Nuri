@@ -20,6 +20,7 @@ namespace Nuri.UI.Controls
         public const string Row = "Row";
         public const string Scroll = "Scroll";
         public const string Absolute = "Absolute";
+        public const string Viewport = "Viewport";
         public const string Wrap = "Wrap";
     }
 

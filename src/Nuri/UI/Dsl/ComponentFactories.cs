@@ -60,6 +60,11 @@ public abstract partial class Component
         return new Div(DivTypes.Absolute, children);
     }
 
+    public static Div Viewport(IElement content)
+    {
+        return new Div(DivTypes.Viewport, content);
+    }
+
     public static Div Grid(RowHeights rowHeights, params IElement[] children)
     {
         return Grid(children)

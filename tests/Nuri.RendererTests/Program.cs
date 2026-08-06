@@ -32,6 +32,7 @@ using WpfSolidColorBrush = System.Windows.Media.SolidColorBrush;
 using WpfThickness = System.Windows.Thickness;
 using WpfTransformGroup = System.Windows.Media.TransformGroup;
 using WpfTranslateTransform = System.Windows.Media.TranslateTransform;
+using WpfMatrixTransform = System.Windows.Media.MatrixTransform;
 using WpfListBox = System.Windows.Controls.ListBox;
 using WpfListBoxItem = System.Windows.Controls.ListBoxItem;
 using WpfButton = System.Windows.Controls.Button;
@@ -60,7 +61,9 @@ internal static class Program
         WpfUnsupportedPropertyDiagnosticsAreDeduplicated();
         WpfUnsupportedEventDiagnosticsAreDeduplicated();
         WpfPointerRoutingIsSelectable();
+        WpfSecondaryPointerAndWheelAreMaterialized();
         WpfAbsoluteLayoutMaterializesCanvasPositions();
+        WpfViewportMaterializesControlledCamera();
         WpfDiagnosticsTrackAppliedPatchBatches();
         WpfDiagnosticsCanExcludeInspectorRoot();
         WpfRootDisposalRemovesVirtualizedDiagnostics();
@@ -121,6 +124,61 @@ internal static class Program
         AssertSame(child, canvas.Children[0], "WPF: changing an absolute position should retain the native child.");
         AssertEqual(120d, WpfCanvas.GetLeft(child), "WPF: PositionX patch should update Canvas.Left.");
         AssertEqual(240d, WpfCanvas.GetTop(child), "WPF: PositionY patch should update Canvas.Top.");
+
+        if (root is IDisposable disposable)
+            disposable.Dispose();
+    }
+
+    private static void WpfViewportMaterializesControlledCamera()
+    {
+        static Nuri.VirtualDom.VirtualEntry CreateEntry(double? x, double? y, double? zoom)
+        {
+            var viewport = Component.Viewport(
+                    Component.Absolute(Component.Text("node").Position(30, 40))
+                        .Key("surface")
+                        .Size(600, 400))
+                .Size(300, 200);
+            if (x.HasValue)
+                viewport.ViewportOffsetX(x.Value);
+            if (y.HasValue)
+                viewport.ViewportOffsetY(y.Value);
+            if (zoom.HasValue)
+                viewport.ViewportZoom(zoom.Value);
+
+            return viewport.ToVirtualEntry().WithIdentity("viewport-test", null);
+        }
+
+        var oldEntry = CreateEntry(10, 20, 2);
+        var root = WpfVirtualEntryRenderer.Build(oldEntry);
+        var host = (WpfCanvas)WpfVisualTreeHelper.GetChild(root, 0);
+        var content = (WpfFrameworkElement)host.Children[0];
+        root.Measure(new System.Windows.Size(300, 200));
+        root.Arrange(new System.Windows.Rect(0, 0, 300, 200));
+
+        AssertEqual(true, root.ClipToBounds, "WPF: Viewport should clip transformed content to its fixed shell.");
+        var initialMatrix = ((WpfMatrixTransform)host.RenderTransform).Matrix;
+        AssertEqual(2d, initialMatrix.M11, "WPF: ViewportZoom should scale content on X.");
+        AssertEqual(2d, initialMatrix.M22, "WPF: ViewportZoom should scale content on Y.");
+        AssertEqual(-20d, initialMatrix.OffsetX, "WPF: ViewportOffsetX should move the content-space origin.");
+        AssertEqual(-40d, initialMatrix.OffsetY, "WPF: ViewportOffsetY should move the content-space origin.");
+        var viewportPoint = content.TranslatePoint(new System.Windows.Point(30, 40), root);
+        AssertEqual(40d, viewportPoint.X, "WPF: content X coordinates should project through the Viewport camera.");
+        AssertEqual(40d, viewportPoint.Y, "WPF: content Y coordinates should project through the Viewport camera.");
+
+        var updatedEntry = CreateEntry(30, 40, 1.5);
+        WpfVirtualEntryRenderer.ApplyDiff(root, VirtualTreeDiff.Diff(oldEntry, updatedEntry));
+        AssertSame(content, host.Children[0], "WPF: camera patches should retain the native content root.");
+        var updatedMatrix = ((WpfMatrixTransform)host.RenderTransform).Matrix;
+        AssertEqual(1.5d, updatedMatrix.M11, "WPF: a zoom patch should update the camera scale.");
+        AssertEqual(-45d, updatedMatrix.OffsetX, "WPF: an X offset patch should update the camera translation.");
+        AssertEqual(-60d, updatedMatrix.OffsetY, "WPF: a Y offset patch should update the camera translation.");
+
+        var defaultEntry = CreateEntry(null, null, null);
+        WpfVirtualEntryRenderer.ApplyDiff(root, VirtualTreeDiff.Diff(updatedEntry, defaultEntry));
+        var resetMatrix = ((WpfMatrixTransform)host.RenderTransform).Matrix;
+        AssertEqual(1d, resetMatrix.M11, "WPF: removing ViewportZoom should restore unit scale.");
+        AssertEqual(0d, resetMatrix.OffsetX, "WPF: removing ViewportOffsetX should restore the content origin.");
+        AssertEqual(0d, resetMatrix.OffsetY, "WPF: removing ViewportOffsetY should restore the content origin.");
 
         if (root is IDisposable disposable)
             disposable.Dispose();
@@ -203,6 +261,56 @@ internal static class Program
             RoutedEvent = System.Windows.UIElement.PreviewMouseLeftButtonUpEvent
         });
         AssertEqual(2, mouseTunnelCount, "WPF: Tunnel mouse routing should use preview down and up events.");
+    }
+
+    private static void WpfSecondaryPointerAndWheelAreMaterialized()
+    {
+        PointerEvent? receivedPointer = null;
+        var secondary = WpfVirtualEntryRenderer.Build(
+            Component.Div()
+                .OnPointerDown(
+                    pointer =>
+                    {
+                        receivedPointer = pointer;
+                        pointer.Handled = true;
+                    },
+                    PointerButton.Secondary,
+                    EventRouting.Tunnel)
+                .ToVirtualEntry()
+                .WithIdentity("pointer-secondary", null));
+        var secondaryArgs = new System.Windows.Input.MouseButtonEventArgs(
+            System.Windows.Input.Mouse.PrimaryDevice,
+            Environment.TickCount,
+            System.Windows.Input.MouseButton.Right)
+        {
+            RoutedEvent = System.Windows.UIElement.PreviewMouseRightButtonDownEvent
+        };
+        secondary.RaiseEvent(secondaryArgs);
+        AssertEqual(PointerButton.Secondary, receivedPointer?.ChangedButton, "WPF: secondary pointer routing should report the changed button.");
+        AssertEqual(true, secondaryArgs.Handled, "WPF: PointerEvent.Handled should consume the native secondary-button event.");
+
+        PointerWheelEvent? receivedWheel = null;
+        var wheel = WpfVirtualEntryRenderer.Build(
+            Component.Div()
+                .OnPointerWheel(
+                    pointer =>
+                    {
+                        receivedWheel = pointer;
+                        pointer.Handled = true;
+                    },
+                    EventRouting.Tunnel)
+                .ToVirtualEntry()
+                .WithIdentity("pointer-wheel", null));
+        var wheelArgs = new System.Windows.Input.MouseWheelEventArgs(
+            System.Windows.Input.Mouse.PrimaryDevice,
+            Environment.TickCount,
+            120)
+        {
+            RoutedEvent = System.Windows.UIElement.PreviewMouseWheelEvent
+        };
+        wheel.RaiseEvent(wheelArgs);
+        AssertEqual(120d, receivedWheel?.DeltaY, "WPF: PointerWheel should retain native vertical delta.");
+        AssertEqual(true, wheelArgs.Handled, "WPF: PointerWheelEvent.Handled should consume the native wheel event.");
     }
 
     private static void WpfNamedColorsMatchCorePalette()

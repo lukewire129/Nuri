@@ -89,9 +89,7 @@ namespace Nuri.WPF
                     handler = new MouseEventHandler((s, e) => Invoke(virtualEvent.Handler, eventName == EventKeys.MouseEnter));
                     return true;
                 case VirtualEventKind.PointerDown:
-                    wpfEventName = virtualEvent.Routing == EventRouting.Tunnel
-                        ? EventKeys.PreviewMouseLeftButtonDown
-                        : EventKeys.MouseLeftButtonDown;
+                    wpfEventName = GetMouseButtonEventName(virtualEvent, isDown: true);
                     handler = new MouseButtonEventHandler((s, e) =>
                     {
                         var element = s as FrameworkElement;
@@ -100,7 +98,9 @@ namespace Nuri.WPF
 
                         try
                         {
-                            InvokePointer(virtualEvent.Handler, CreatePointerEvent(s, e));
+                            var pointerEvent = CreatePointerEvent(s, e);
+                            InvokePointer(virtualEvent.Handler, pointerEvent);
+                            e.Handled |= pointerEvent.Handled;
                         }
                         catch
                         {
@@ -114,23 +114,39 @@ namespace Nuri.WPF
                     wpfEventName = virtualEvent.Routing == EventRouting.Tunnel
                         ? EventKeys.PreviewMouseMove
                         : EventKeys.MouseMove;
-                    handler = new MouseEventHandler((s, e) => InvokePointer(virtualEvent.Handler, CreatePointerEvent(s, e)));
+                    handler = new MouseEventHandler((s, e) =>
+                    {
+                        var pointerEvent = CreatePointerEvent(s, e);
+                        InvokePointer(virtualEvent.Handler, pointerEvent);
+                        e.Handled |= pointerEvent.Handled;
+                    });
                     return true;
                 case VirtualEventKind.PointerUp:
-                    wpfEventName = virtualEvent.Routing == EventRouting.Tunnel
-                        ? EventKeys.PreviewMouseLeftButtonUp
-                        : EventKeys.MouseLeftButtonUp;
+                    wpfEventName = GetMouseButtonEventName(virtualEvent, isDown: false);
                     handler = new MouseButtonEventHandler((s, e) =>
                     {
                         try
                         {
-                            InvokePointer(virtualEvent.Handler, CreatePointerEvent(s, e));
+                            var pointerEvent = CreatePointerEvent(s, e);
+                            InvokePointer(virtualEvent.Handler, pointerEvent);
+                            e.Handled |= pointerEvent.Handled;
                         }
                         finally
                         {
                             if (virtualEvent.CapturePointer && s is FrameworkElement element)
                                 element.ReleaseMouseCapture();
                         }
+                    });
+                    return true;
+                case VirtualEventKind.PointerWheel:
+                    wpfEventName = virtualEvent.Routing == EventRouting.Tunnel
+                        ? EventKeys.PreviewMouseWheel
+                        : EventKeys.MouseWheel;
+                    handler = new MouseWheelEventHandler((s, e) =>
+                    {
+                        var pointerEvent = CreatePointerWheelEvent(s, e);
+                        InvokePointer(virtualEvent.Handler, pointerEvent);
+                        e.Handled |= pointerEvent.Handled;
                     });
                     return true;
                 case VirtualEventKind.KeyDown:
@@ -209,12 +225,86 @@ namespace Nuri.WPF
             return KeyboardKey.Unknown;
         }
 
+        private static string GetMouseButtonEventName(VirtualEvent virtualEvent, bool isDown)
+        {
+            if (virtualEvent.Button == PointerButton.Secondary)
+            {
+                if (virtualEvent.Routing == EventRouting.Tunnel)
+                    return isDown ? EventKeys.PreviewMouseRightButtonDown : EventKeys.PreviewMouseRightButtonUp;
+
+                return isDown ? EventKeys.MouseRightButtonDown : EventKeys.MouseRightButtonUp;
+            }
+
+            if (virtualEvent.Routing == EventRouting.Tunnel)
+                return isDown ? EventKeys.PreviewMouseLeftButtonDown : EventKeys.PreviewMouseLeftButtonUp;
+
+            return isDown ? EventKeys.MouseLeftButtonDown : EventKeys.MouseLeftButtonUp;
+        }
+
         private static PointerEvent CreatePointerEvent(object? source, MouseEventArgs args)
         {
             var element = source as FrameworkElement;
             var relativeTarget = element?.Parent as IInputElement ?? element;
             var point = relativeTarget == null ? new System.Windows.Point() : args.GetPosition(relativeTarget);
-            return new PointerEvent(point.X, point.Y, args.LeftButton == MouseButtonState.Pressed);
+            var localPoint = element == null ? point : args.GetPosition(element);
+            return new PointerEvent(
+                point.X,
+                point.Y,
+                GetPointerButtons(args),
+                GetModifiers(),
+                args is MouseButtonEventArgs buttonArgs ? GetPointerButton(buttonArgs.ChangedButton) : null,
+                localPoint.X,
+                localPoint.Y);
+        }
+
+        private static PointerWheelEvent CreatePointerWheelEvent(object? source, MouseWheelEventArgs args)
+        {
+            var pointerEvent = CreatePointerEvent(source, args);
+            return new PointerWheelEvent(
+                pointerEvent.X,
+                pointerEvent.Y,
+                0,
+                args.Delta,
+                pointerEvent.Buttons,
+                pointerEvent.Modifiers,
+                pointerEvent.LocalX,
+                pointerEvent.LocalY);
+        }
+
+        private static PointerButtons GetPointerButtons(MouseEventArgs args)
+        {
+            var buttons = PointerButtons.None;
+            if (args.LeftButton == MouseButtonState.Pressed)
+                buttons |= PointerButtons.Primary;
+            if (args.RightButton == MouseButtonState.Pressed)
+                buttons |= PointerButtons.Secondary;
+            if (args.MiddleButton == MouseButtonState.Pressed)
+                buttons |= PointerButtons.Middle;
+            return buttons;
+        }
+
+        private static PointerButton? GetPointerButton(MouseButton button)
+        {
+            return button switch
+            {
+                MouseButton.Left => PointerButton.Primary,
+                MouseButton.Right => PointerButton.Secondary,
+                _ => null
+            };
+        }
+
+        private static KeyModifiers GetModifiers()
+        {
+            var modifiers = KeyModifiers.None;
+            if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
+                modifiers |= KeyModifiers.Control;
+            if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0)
+                modifiers |= KeyModifiers.Shift;
+            if ((Keyboard.Modifiers & ModifierKeys.Alt) != 0)
+                modifiers |= KeyModifiers.Alt;
+            if ((Keyboard.Modifiers & ModifierKeys.Windows) != 0)
+                modifiers |= KeyModifiers.Meta;
+            return modifiers;
         }
 
         private static void InvokePointer(Delegate handler, PointerEvent pointerEvent)

@@ -56,6 +56,7 @@ internal static class Program
         TextOverflowDslUsesNeutralValues();
         LayoutDistributionDslUsesNeutralProperties();
         AbsoluteLayoutDslUsesNeutralPositionProperties();
+        ViewportDslUsesNeutralCameraProperties();
         PointerEventDslCarriesCoordinates();
         GridLengthDslTreatsNumbersAsPixels();
         GridLengthDslParsesStringDefinitions();
@@ -1126,12 +1127,90 @@ internal static class Program
         AssertEqual(160d, child.Properties[PropertyKeys.PositionY], "PositionY should update the neutral Y coordinate.");
     }
 
+    private static void ViewportDslUsesNeutralCameraProperties()
+    {
+        var content = Component.Absolute(Component.Text("node").Position(120, 80));
+        var viewport = Component.Viewport(content)
+            .ViewportOffset(40, 20)
+            .ViewportZoom(1.5);
+
+        AssertEqual(DivTypes.Viewport, viewport.Kind, "Viewport should use the shared Viewport Div kind.");
+        AssertEqual(true, ReferenceEquals(content, viewport.Children.Single()), "Viewport should retain its single content root.");
+        AssertEqual(40d, viewport.Properties[PropertyKeys.ViewportOffsetX], "ViewportOffset should retain the neutral X coordinate.");
+        AssertEqual(20d, viewport.Properties[PropertyKeys.ViewportOffsetY], "ViewportOffset should retain the neutral Y coordinate.");
+        AssertEqual(1.5d, viewport.Properties[PropertyKeys.ViewportZoom], "ViewportZoom should retain the neutral scale.");
+
+        AssertThrows<InvalidOperationException>(
+            () => Component.Div(DivTypes.Viewport, Component.Text("a"), Component.Text("b")),
+            "Viewport should require one content root.");
+        AssertThrows<InvalidOperationException>(
+            () => Component.Div().ViewportOffset(1, 2),
+            "Viewport camera properties should reject other layouts.");
+        AssertThrows<ArgumentOutOfRangeException>(
+            () => Component.Viewport(content).ViewportZoom(0),
+            "Viewport zoom should reject zero.");
+        AssertThrows<ArgumentOutOfRangeException>(
+            () => Component.Viewport(content).ViewportOffset(double.NaN, 0),
+            "Viewport offsets should reject non-finite values.");
+
+        VirtualEntry CreateViewportTree(double x, double y, double zoom)
+        {
+            var node = new VirtualEntry(VirtualControlTypes.Text, key: "node");
+            var surface = new VirtualEntry(
+                VirtualControlTypes.Div,
+                kind: DivTypes.Absolute,
+                key: "surface",
+                children: new[] { node });
+            return new VirtualEntry(
+                    VirtualControlTypes.Div,
+                    kind: DivTypes.Viewport,
+                    properties: new[]
+                    {
+                        KeyValuePair.Create<string, object?>(PropertyKeys.ViewportOffsetX, x),
+                        KeyValuePair.Create<string, object?>(PropertyKeys.ViewportOffsetY, y),
+                        KeyValuePair.Create<string, object?>(PropertyKeys.ViewportZoom, zoom)
+                    },
+                    children: new[] { surface })
+                .WithIdentity("viewport-diff", null);
+        }
+
+        var oldTree = CreateViewportTree(0, 0, 1);
+        var newTree = CreateViewportTree(40, 20, 1.5);
+        var operations = VirtualTreeDiff.Diff(oldTree, newTree);
+        AssertEqual(3, operations.OfType<UpdatePropertyPatch>().Count(), "A camera update should patch only offset and zoom properties.");
+        AssertEqual(0, operations.OfType<ReplaceEntryPatch>().Count(), "A camera update should retain the Viewport and content entries.");
+    }
+
     private static void PointerEventDslCarriesCoordinates()
     {
         var pointer = new PointerEvent(24, 36, true);
         AssertEqual(24d, pointer.X, "PointerEvent should retain the X coordinate.");
         AssertEqual(36d, pointer.Y, "PointerEvent should retain the Y coordinate.");
         AssertEqual(true, pointer.IsPrimaryButtonPressed, "PointerEvent should retain the primary-button state.");
+        AssertEqual(24d, pointer.LocalX, "PointerEvent should default local X to its compatibility coordinate.");
+        AssertEqual(36d, pointer.LocalY, "PointerEvent should default local Y to its compatibility coordinate.");
+
+        var richPointer = new PointerEvent(
+            12,
+            18,
+            PointerButtons.Secondary | PointerButtons.Middle,
+            KeyModifiers.Control | KeyModifiers.Shift,
+            PointerButton.Secondary,
+            localX: 4,
+            localY: 6);
+        AssertEqual(true, richPointer.IsSecondaryButtonPressed, "PointerEvent should retain secondary-button state.");
+        AssertEqual(true, richPointer.IsMiddleButtonPressed, "PointerEvent should retain middle-button state.");
+        AssertEqual(false, richPointer.IsPrimaryButtonPressed, "PointerEvent button flags should remain independent.");
+        AssertEqual(PointerButton.Secondary, richPointer.ChangedButton, "PointerEvent should identify the changed button.");
+        AssertEqual(KeyModifiers.Control | KeyModifiers.Shift, richPointer.Modifiers, "PointerEvent should retain neutral keyboard modifiers.");
+        AssertEqual(4d, richPointer.LocalX, "PointerEvent should retain source-local X independently from parent X.");
+        AssertEqual(6d, richPointer.LocalY, "PointerEvent should retain source-local Y independently from parent Y.");
+        richPointer.Handled = true;
+        AssertEqual(true, richPointer.Handled, "PointerEvent should let a neutral handler consume the native event.");
+
+        var wheel = new PointerWheelEvent(10, 20, 0, 120, modifiers: KeyModifiers.Control);
+        AssertEqual(120d, wheel.DeltaY, "PointerWheelEvent should retain vertical wheel delta.");
+        AssertEqual(KeyModifiers.Control, wheel.Modifiers, "PointerWheelEvent should retain neutral keyboard modifiers.");
 
         Action<PointerEvent> pointerDown = _ => { };
         Action<PointerEvent> pointerMove = _ => { };
@@ -1154,6 +1233,30 @@ internal static class Program
             false,
             element.VirtualEvents[EventKeys.MouseLeftButtonDown].Equals(tunnelElement.VirtualEvents[EventKeys.MouseLeftButtonDown]),
             "Changing pointer routing should replace the virtual event descriptor.");
+        var secondaryElement = Component.Div()
+            .OnPointerDown(pointerDown, PointerButton.Secondary, EventRouting.Tunnel, capturePointer: true)
+            .OnPointerUp(pointerUp, PointerButton.Secondary, EventRouting.Tunnel, releasePointerCapture: true)
+            .OnPointerWheel(_ => { }, EventRouting.Tunnel);
+        AssertEqual(
+            PointerButton.Secondary,
+            secondaryElement.VirtualEvents[EventKeys.MouseRightButtonDown].Button,
+            "PointerDown should retain an explicit secondary button.");
+        AssertEqual(
+            true,
+            secondaryElement.VirtualEvents[EventKeys.MouseRightButtonDown].CapturePointer,
+            "Secondary PointerDown should retain pointer capture.");
+        AssertEqual(
+            PointerButton.Secondary,
+            secondaryElement.VirtualEvents[EventKeys.MouseRightButtonUp].Button,
+            "PointerUp should retain an explicit secondary button.");
+        AssertEqual(
+            VirtualEventKind.PointerWheel,
+            secondaryElement.VirtualEvents[EventKeys.MouseWheel].Kind,
+            "PointerWheel should use the neutral wheel event kind.");
+        AssertEqual(
+            false,
+            element.VirtualEvents[EventKeys.MouseLeftButtonDown].Equals(secondaryElement.VirtualEvents[EventKeys.MouseRightButtonDown]),
+            "Changing the pointer button should replace the virtual event descriptor.");
 
         var mouseElement = Component.Div()
             .OnMouseDown(() => { })

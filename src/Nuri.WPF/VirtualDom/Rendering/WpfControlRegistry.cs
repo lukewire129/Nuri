@@ -273,6 +273,14 @@ namespace Nuri.WPF
                 return new DivElement(scrollViewer, scrollViewer);
             }
 
+            if (kind == DivTypes.Viewport)
+            {
+                return new DivElement(new WpfViewportHost())
+                {
+                    ClipToBounds = true
+                };
+            }
+
             return new DivElement(CreateDivHost(kind));
         }
 
@@ -283,6 +291,9 @@ namespace Nuri.WPF
                 || propertyName == Nuri.Constants.PropertyKeys.JustifyContent
                 || propertyName == Nuri.Constants.PropertyKeys.RowSpacing
                 || propertyName == Nuri.Constants.PropertyKeys.ColumnSpacing
+                || propertyName == Nuri.Constants.PropertyKeys.ViewportOffsetX
+                || propertyName == Nuri.Constants.PropertyKeys.ViewportOffsetY
+                || propertyName == Nuri.Constants.PropertyKeys.ViewportZoom
                 || propertyName == "RowDefinitions"
                 || propertyName == "ColumnDefinitions";
         }

@@ -23,8 +23,11 @@ public sealed class WorkflowComponent : Component
     {
         var (selectedId, setSelectedId) = useState<string?>("prepare");
         var (nodes, setNodes) = useState(InitialNodes);
+        var (camera, setCamera) = useState(new ViewportCamera(0, 0, 1));
         var dragRef = useRef<DragState?>(null);
+        var panRef = useRef<ViewportPanState?>(null);
         var nodesRef = useLatest(nodes);
+        var cameraRef = useLatest(camera);
         var dragHandlers = useMemo(() => InitialNodes.ToDictionary(
             node => node.Id,
             node => new DragHandlers(
@@ -56,6 +59,69 @@ public sealed class WorkflowComponent : Component
                         .ToArray());
                 },
                 _ => dragRef.Current = null)));
+        var cameraActions = useMemo(() => new ViewportCameraActions(
+            () => setCamera(current => current with { OffsetX = current.OffsetX - 80 }),
+            () => setCamera(current => current with { OffsetX = current.OffsetX + 80 }),
+            () => setCamera(current => current with { Zoom = Math.Min(2, current.Zoom + 0.1) }),
+            () => setCamera(current => current with { Zoom = Math.Max(0.5, current.Zoom - 0.1) }),
+            () => setCamera(_ => new ViewportCamera(0, 0, 1)),
+            wheel =>
+            {
+                if ((wheel.Modifiers & KeyModifiers.Control) == 0 || wheel.DeltaY == 0)
+                    return;
+
+                setCamera(current =>
+                {
+                    var zoom = Math.Clamp(
+                        current.Zoom * Math.Pow(1.1, wheel.DeltaY / 120),
+                        0.5,
+                        2);
+                    var contentX = current.OffsetX + (wheel.LocalX / current.Zoom);
+                    var contentY = current.OffsetY + (wheel.LocalY / current.Zoom);
+                    return current with
+                    {
+                        OffsetX = contentX - (wheel.LocalX / zoom),
+                        OffsetY = contentY - (wheel.LocalY / zoom),
+                        Zoom = zoom
+                    };
+                });
+                wheel.Handled = true;
+            }));
+        var panHandlers = useMemo(() => new ViewportPanHandlers(
+            pointer =>
+            {
+                var current = cameraRef.Current;
+                panRef.Current = new ViewportPanState(
+                    pointer.X,
+                    pointer.Y,
+                    current.OffsetX,
+                    current.OffsetY,
+                    current.Zoom);
+                pointer.Handled = true;
+            },
+            pointer =>
+            {
+                if (panRef.Current is not ViewportPanState pan)
+                    return;
+
+                if (!pointer.IsSecondaryButtonPressed)
+                {
+                    panRef.Current = null;
+                    return;
+                }
+
+                setCamera(current => current with
+                {
+                    OffsetX = pan.OffsetX - ((pointer.X - pan.StartX) / pan.Zoom),
+                    OffsetY = pan.OffsetY - ((pointer.Y - pan.StartY) / pan.Zoom)
+                });
+                pointer.Handled = true;
+            },
+            pointer =>
+            {
+                panRef.Current = null;
+                pointer.Handled = true;
+            }));
 
         var selected = nodes.FirstOrDefault(node => node.Id == selectedId);
         var nodesById = nodes.ToDictionary(node => node.Id);
@@ -68,26 +134,56 @@ public sealed class WorkflowComponent : Component
         .ToArray();
         var surface = Component.Absolute(surfaceChildren)
             .Size(SurfaceWidth, SurfaceHeight)
-            .Background("#f8fafc")
+            .Background("#f8fafc");
+        var viewport = Component.Viewport(surface)
+            .ViewportOffset(camera.OffsetX, camera.OffsetY)
+            .ViewportZoom(camera.Zoom)
+            .Height(SurfaceHeight)
+            .Background("#e2e8f0")
             .Brush("#cbd5e1")
-            .Thickness(1);
+            .Thickness(1)
+            .CornerRadius(12)
+            .OnPointerWheel(cameraActions.ZoomAtPointer, EventRouting.Tunnel)
+            .OnPointerDown(
+                panHandlers.PointerDown,
+                PointerButton.Secondary,
+                EventRouting.Tunnel,
+                capturePointer: true)
+            .OnPointerMove(panHandlers.PointerMove, EventRouting.Tunnel)
+            .OnPointerUp(
+                panHandlers.PointerUp,
+                PointerButton.Secondary,
+                EventRouting.Tunnel,
+                releasePointerCapture: true);
 
         return
             Component.Grid(
-                Component.Div(
-                    Component.Text("Workflow Editor")
-                        .FontSize(26)
-                        .FontWeight(FontWeightValue.Bold),
-                    Component.Text("Drag nodes to update Position without rebuilding their native identity.")
-                        .FontColor("#64748b")
-                        .Margin(top: 6)
-                )
-                .Row(0),
                 Component.Grid(
                     Component.Div(
-                        DivTypes.Scroll,
-                        surface
+                        Component.Text("Workflow Editor")
+                            .FontSize(26)
+                            .FontWeight(FontWeightValue.Bold),
+                        Component.Text("Drag nodes, right-drag to pan, and Ctrl+Wheel to zoom around the pointer.")
+                            .FontColor("#64748b")
+                            .Margin(top: 6)
                     )
+                    .Column(0),
+                    Component.Row(new IElement[]
+                    {
+                        Component.Button("Pan left", cameraActions.PanLeft),
+                        Component.Button("Pan right", cameraActions.PanRight),
+                        Component.Button("-", cameraActions.ZoomOut),
+                        Component.Text($"{camera.Zoom:P0}").Width(44).HCenter().VCenter(),
+                        Component.Button("+", cameraActions.ZoomIn),
+                        Component.Button("Reset", cameraActions.Reset)
+                    })
+                    .Spacing(8)
+                    .Column(1)
+                )
+                .Columns(Star, Auto)
+                .Row(0),
+                Component.Grid(
+                    viewport
                     .Column(0),
                     Inspector(selected, nodes, setNodes)
                         .Column(1)
@@ -191,7 +287,29 @@ internal sealed record WorkflowNode(string Id, string Title, double X, double Y,
 
 internal sealed record DragState(string Id, double StartX, double StartY, double OriginX, double OriginY);
 
+internal sealed record ViewportCamera(double OffsetX, double OffsetY, double Zoom);
+
+internal sealed record ViewportPanState(
+    double StartX,
+    double StartY,
+    double OffsetX,
+    double OffsetY,
+    double Zoom);
+
 internal sealed record DragHandlers(
+    Action<PointerEvent> PointerDown,
+    Action<PointerEvent> PointerMove,
+    Action<PointerEvent> PointerUp);
+
+internal sealed record ViewportCameraActions(
+    Action PanLeft,
+    Action PanRight,
+    Action ZoomIn,
+    Action ZoomOut,
+    Action Reset,
+    Action<PointerWheelEvent> ZoomAtPointer);
+
+internal sealed record ViewportPanHandlers(
     Action<PointerEvent> PointerDown,
     Action<PointerEvent> PointerMove,
     Action<PointerEvent> PointerUp);

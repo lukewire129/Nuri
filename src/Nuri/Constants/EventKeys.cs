@@ -15,9 +15,15 @@ namespace Nuri.Constants
         public const string MouseLeftButtonDown = "MouseLeftButtonDown";
         public const string MouseLeftButtonUp = "MouseLeftButtonUp";
         public const string MouseMove = "MouseMove";
+        public const string MouseRightButtonDown = "MouseRightButtonDown";
+        public const string MouseRightButtonUp = "MouseRightButtonUp";
+        public const string MouseWheel = "MouseWheel";
         public const string PreviewMouseLeftButtonDown = "PreviewMouseLeftButtonDown";
         public const string PreviewMouseLeftButtonUp = "PreviewMouseLeftButtonUp";
         public const string PreviewMouseMove = "PreviewMouseMove";
+        public const string PreviewMouseRightButtonDown = "PreviewMouseRightButtonDown";
+        public const string PreviewMouseRightButtonUp = "PreviewMouseRightButtonUp";
+        public const string PreviewMouseWheel = "PreviewMouseWheel";
         public const string PreviewKeyDown = "PreviewKeyDown";
         public const string PreviewKeyUp = "PreviewKeyUp";
         public const string TextChanged = "TextChanged";

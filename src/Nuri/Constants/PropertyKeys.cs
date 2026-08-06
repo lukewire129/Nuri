@@ -19,6 +19,9 @@ namespace Nuri.Constants
         public const string Text = "Text";
         public const string TextOverflow = "TextOverflow";
         public const string Title = "Title";
+        public const string ViewportOffsetX = "ViewportOffsetX";
+        public const string ViewportOffsetY = "ViewportOffsetY";
+        public const string ViewportZoom = "ViewportZoom";
         public const string Width = "Width";
         public const string VirtualizedItemsSource = "VirtualizedItemsSource";
     }

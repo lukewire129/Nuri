@@ -57,6 +57,12 @@ namespace Nuri.WPF
                 case PropertyKeys.PositionY:
                     Canvas.SetTop(element, ToDouble(value));
                     return true;
+                case PropertyKeys.ViewportOffsetX:
+                    return TrySetViewportOffsetX(element, value);
+                case PropertyKeys.ViewportOffsetY:
+                    return TrySetViewportOffsetY(element, value);
+                case PropertyKeys.ViewportZoom:
+                    return TrySetViewportZoom(element, value);
                 case PropertyKeys.Name:
                     element.Name = (string)value!;
                     return true;
@@ -173,6 +179,12 @@ namespace Nuri.WPF
                 case PropertyKeys.PositionY:
                     element.ClearValue(Canvas.TopProperty);
                     return true;
+                case PropertyKeys.ViewportOffsetX:
+                    return TryResetViewportOffsetX(element);
+                case PropertyKeys.ViewportOffsetY:
+                    return TryResetViewportOffsetY(element);
+                case PropertyKeys.ViewportZoom:
+                    return TryResetViewportZoom(element);
                 case PropertyKeys.Name:
                     element.ClearValue(FrameworkElement.NameProperty);
                     return true;
@@ -267,6 +279,60 @@ namespace Nuri.WPF
             else
                 return false;
 
+            return true;
+        }
+
+        private static bool TrySetViewportOffsetX(FrameworkElement element, object? value)
+        {
+            if (element is not WpfViewportHost viewport)
+                return false;
+
+            viewport.OffsetX = ToDouble(value);
+            return true;
+        }
+
+        private static bool TrySetViewportOffsetY(FrameworkElement element, object? value)
+        {
+            if (element is not WpfViewportHost viewport)
+                return false;
+
+            viewport.OffsetY = ToDouble(value);
+            return true;
+        }
+
+        private static bool TrySetViewportZoom(FrameworkElement element, object? value)
+        {
+            if (element is not WpfViewportHost viewport)
+                return false;
+
+            viewport.Zoom = ToDouble(value);
+            return true;
+        }
+
+        private static bool TryResetViewportOffsetX(FrameworkElement element)
+        {
+            if (element is not WpfViewportHost viewport)
+                return false;
+
+            viewport.OffsetX = 0;
+            return true;
+        }
+
+        private static bool TryResetViewportOffsetY(FrameworkElement element)
+        {
+            if (element is not WpfViewportHost viewport)
+                return false;
+
+            viewport.OffsetY = 0;
+            return true;
+        }
+
+        private static bool TryResetViewportZoom(FrameworkElement element)
+        {
+            if (element is not WpfViewportHost viewport)
+                return false;
+
+            viewport.Zoom = 1;
             return true;
         }
 

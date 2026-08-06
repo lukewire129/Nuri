@@ -57,6 +57,9 @@ namespace Nuri.Avalonia
 
             if (virtualEvent.Kind == VirtualEventKind.PointerDown)
             {
+                if (virtualEvent.Button != PointerButton.Primary)
+                    return false;
+
                 EventHandler<PointerPressedEventArgs> pointerHandler = (_, args) =>
                 {
                     if (virtualEvent.CapturePointer)
@@ -95,6 +98,9 @@ namespace Nuri.Avalonia
 
             if (virtualEvent.Kind == VirtualEventKind.PointerUp)
             {
+                if (virtualEvent.Button != PointerButton.Primary)
+                    return false;
+
                 EventHandler<PointerReleasedEventArgs> pointerHandler = (_, args) =>
                 {
                     try

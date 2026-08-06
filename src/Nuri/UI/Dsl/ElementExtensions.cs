@@ -93,6 +93,42 @@ namespace Nuri.UI.Dsl
             return node;
         }
 
+        public static T ViewportOffset<T>(this T node, double x, double y) where T : IDiv
+        {
+            EnsureViewportLayout(node, PropertyKeys.ViewportOffsetX);
+            ValidateFinite(x, nameof(x));
+            ValidateFinite(y, nameof(y));
+            node.SetProperty(PropertyKeys.ViewportOffsetX, x);
+            node.SetProperty(PropertyKeys.ViewportOffsetY, y);
+            return node;
+        }
+
+        public static T ViewportOffsetX<T>(this T node, double x) where T : IDiv
+        {
+            EnsureViewportLayout(node, PropertyKeys.ViewportOffsetX);
+            ValidateFinite(x, nameof(x));
+            node.SetProperty(PropertyKeys.ViewportOffsetX, x);
+            return node;
+        }
+
+        public static T ViewportOffsetY<T>(this T node, double y) where T : IDiv
+        {
+            EnsureViewportLayout(node, PropertyKeys.ViewportOffsetY);
+            ValidateFinite(y, nameof(y));
+            node.SetProperty(PropertyKeys.ViewportOffsetY, y);
+            return node;
+        }
+
+        public static T ViewportZoom<T>(this T node, double zoom) where T : IDiv
+        {
+            EnsureViewportLayout(node, PropertyKeys.ViewportZoom);
+            if (double.IsNaN(zoom) || double.IsInfinity(zoom) || zoom <= 0)
+                throw new ArgumentOutOfRangeException(nameof(zoom), zoom, "Viewport zoom must be finite and greater than zero.");
+
+            node.SetProperty(PropertyKeys.ViewportZoom, zoom);
+            return node;
+        }
+
         public static T Scale<T>(this T node, double value) where T : IElement
         {
             return node.Scale(value, value);
@@ -298,6 +334,20 @@ namespace Nuri.UI.Dsl
                 return;
 
             throw new InvalidOperationException($"{propertyName} is supported only by Grid layouts, not '{node.Kind}'.");
+        }
+
+        private static void EnsureViewportLayout(IDiv node, string propertyName)
+        {
+            if (node.Kind == DivTypes.Viewport)
+                return;
+
+            throw new InvalidOperationException($"{propertyName} is supported only by Viewport layouts, not '{node.Kind}'.");
+        }
+
+        private static void ValidateFinite(double value, string parameterName)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value))
+                throw new ArgumentOutOfRangeException(parameterName, value, "Viewport offset must be finite.");
         }
 
         private static void ValidateSpacing(double value)
@@ -570,9 +620,19 @@ namespace Nuri.UI.Dsl
             EventRouting routing = EventRouting.Bubble,
             bool capturePointer = false) where T : IElement
         {
+            return node.OnPointerDown(handler, PointerButton.Primary, routing, capturePointer);
+        }
+
+        public static T OnPointerDown<T>(
+            this T node,
+            Action<PointerEvent> handler,
+            PointerButton button,
+            EventRouting routing = EventRouting.Bubble,
+            bool capturePointer = false) where T : IElement
+        {
             node.AddVirtualEvent(
-                EventKeys.MouseLeftButtonDown,
-                new VirtualEvent(VirtualEventKind.PointerDown, handler, capturePointer, routing));
+                GetPointerButtonEventKey(button, isDown: true),
+                new VirtualEvent(VirtualEventKind.PointerDown, handler, capturePointer, routing, button));
             return node;
         }
 
@@ -593,10 +653,41 @@ namespace Nuri.UI.Dsl
             EventRouting routing = EventRouting.Bubble,
             bool releasePointerCapture = false) where T : IElement
         {
+            return node.OnPointerUp(handler, PointerButton.Primary, routing, releasePointerCapture);
+        }
+
+        public static T OnPointerUp<T>(
+            this T node,
+            Action<PointerEvent> handler,
+            PointerButton button,
+            EventRouting routing = EventRouting.Bubble,
+            bool releasePointerCapture = false) where T : IElement
+        {
             node.AddVirtualEvent(
-                EventKeys.MouseLeftButtonUp,
-                new VirtualEvent(VirtualEventKind.PointerUp, handler, releasePointerCapture, routing));
+                GetPointerButtonEventKey(button, isDown: false),
+                new VirtualEvent(VirtualEventKind.PointerUp, handler, releasePointerCapture, routing, button));
             return node;
+        }
+
+        public static T OnPointerWheel<T>(
+            this T node,
+            Action<PointerWheelEvent> handler,
+            EventRouting routing = EventRouting.Bubble) where T : IElement
+        {
+            node.AddVirtualEvent(
+                EventKeys.MouseWheel,
+                new VirtualEvent(VirtualEventKind.PointerWheel, handler, routing: routing));
+            return node;
+        }
+
+        private static string GetPointerButtonEventKey(PointerButton button, bool isDown)
+        {
+            return button switch
+            {
+                PointerButton.Primary => isDown ? EventKeys.MouseLeftButtonDown : EventKeys.MouseLeftButtonUp,
+                PointerButton.Secondary => isDown ? EventKeys.MouseRightButtonDown : EventKeys.MouseRightButtonUp,
+                _ => throw new NotSupportedException("Unsupported pointer button.")
+            };
         }
 
         public static T OnKeyDown<T>(this T node, Action<KeyboardKey> handler) where T : IElement
