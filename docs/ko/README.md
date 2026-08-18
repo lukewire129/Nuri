@@ -12,6 +12,7 @@
 | `docs/renderers/README.md` | [Renderer 계약](renderers/README.md) |
 | `docs/performance/DUXEL_PERFORMANCE_ANALYSIS.md` | [DUXEL_PERFORMANCE_ANALYSIS.md](performance/DUXEL_PERFORMANCE_ANALYSIS.md) |
 | `docs/guides/FORMATTING.md` | [FORMATTING.md](guides/FORMATTING.md) |
+| `docs/guides/YAML_STYLES.md` | [YAML_STYLES.md](guides/YAML_STYLES.md) |
 
 지속적으로 유지하는 영어 기준 문서를 변경할 때는 같은 작업에서 동일한 하위 경로의 한국어 번역도 수정합니다. Code symbol, path, command, API name, package version 및 측정값은 영어 문서와 동일하게 유지합니다.
 

@@ -9,6 +9,7 @@ The English documents in this directory are the shared implementation reference 
 | Runtime, hooks, keys, reconciliation, invalidation, lifecycle | [Runtime Architecture](architecture/RUNTIME_ARCHITECTURE.md), [Runtime Identity](architecture/RUNTIME_IDENTITY.md), [Lifecycle](architecture/LIFECYCLE.md) |
 | Renderer materialization or parity | [Renderer Contracts](renderers/README.md), then the relevant architecture sections and source |
 | Duxel performance | [Duxel Performance Analysis](performance/DUXEL_PERFORMANCE_ANALYSIS.md) |
+| YAML visual styles, theme tokens, external overrides | [YAML Styles](guides/YAML_STYLES.md) |
 | Formatter | [Formatting](guides/FORMATTING.md) |
 
 `operations/SESSION_HANDOFF.md` is an optional recovery note. It is not a design authority and is not required reading for normal work.

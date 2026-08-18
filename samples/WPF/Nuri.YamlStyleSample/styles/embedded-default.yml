@@ -1,0 +1,18 @@
+styles:
+  card:
+    padding: 20
+    gap: 10
+    background: "#18191D"
+    radius: 12
+  title:
+    font-size: 22
+    font-weight: 700
+    foreground: "#FFFFFF"
+  description:
+    font-size: 14
+    foreground: "#A0A0A0"
+  primary-button:
+    padding: [10, 16]
+    background: "#5B8CFF"
+    foreground: "#FFFFFF"
+    radius: 8

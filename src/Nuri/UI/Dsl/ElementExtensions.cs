@@ -28,6 +28,15 @@ namespace Nuri.UI.Dsl
             return node;
         }
 
+        public static T Style<T>(this T node, string styleName) where T : IElement
+        {
+            if (string.IsNullOrWhiteSpace(styleName))
+                throw new ArgumentException("Style name cannot be empty.", nameof(styleName));
+
+            node.StyleName = styleName;
+            return node;
+        }
+
         public static T Name<T>(this T node, string name) where T : IElement
         {
             node.Name = name;
@@ -47,6 +56,34 @@ namespace Nuri.UI.Dsl
             return node;
         }
 
+
+        public static T MinWidth<T>(this T node, double value) where T : IElement
+        {
+            ValidateSizeConstraint(value, nameof(value));
+            node.SetProperty(PropertyKeys.MinWidth, value);
+            return node;
+        }
+
+        public static T MinHeight<T>(this T node, double value) where T : IElement
+        {
+            ValidateSizeConstraint(value, nameof(value));
+            node.SetProperty(PropertyKeys.MinHeight, value);
+            return node;
+        }
+
+        public static T MaxWidth<T>(this T node, double value) where T : IElement
+        {
+            ValidateSizeConstraint(value, nameof(value));
+            node.SetProperty(PropertyKeys.MaxWidth, value);
+            return node;
+        }
+
+        public static T MaxHeight<T>(this T node, double value) where T : IElement
+        {
+            ValidateSizeConstraint(value, nameof(value));
+            node.SetProperty(PropertyKeys.MaxHeight, value);
+            return node;
+        }
         public static T Opacity<T>(this T node, double value) where T : IElement
         {
             node.SetProperty("Opacity", value);
@@ -342,6 +379,12 @@ namespace Nuri.UI.Dsl
                 return;
 
             throw new InvalidOperationException($"{propertyName} is supported only by Viewport layouts, not '{node.Kind}'.");
+        }
+
+        private static void ValidateSizeConstraint(double value, string parameterName)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value) || value < 0)
+                throw new ArgumentOutOfRangeException(parameterName, value, "Size constraints must be finite and non-negative.");
         }
 
         private static void ValidateFinite(double value, string parameterName)

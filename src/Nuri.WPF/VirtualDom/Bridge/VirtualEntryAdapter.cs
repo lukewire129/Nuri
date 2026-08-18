@@ -1,5 +1,6 @@
 using Nuri.VirtualDom;
 using System.Collections.Generic;
+using Nuri.UI.Styles;
 
 namespace Nuri.WPF
 {
@@ -9,6 +10,8 @@ namespace Nuri.WPF
         {
             if (element is Nuri.UI.Dsl.Component component)
                 return ToVirtualEntry(component);
+
+            StyleManager.Apply(element);
 
             var properties = new List<KeyValuePair<string, object?>>(element.Properties.Count);
             foreach (var property in element.Properties)
@@ -51,6 +54,9 @@ namespace Nuri.WPF
                 if (!rendered.Properties.ContainsKey(property.Key))
                     rendered.Properties[property.Key] = property.Value;
             }
+
+            if (string.IsNullOrWhiteSpace(rendered.StyleName) && !string.IsNullOrWhiteSpace(component.StyleName))
+                rendered.StyleName = component.StyleName;
 
             ApplyComponentKey(component, rendered);
 

@@ -31,7 +31,11 @@ namespace Nuri.UI
 
         public string Key { get; set; } = string.Empty;
 
+        public string StyleName { get; set; } = string.Empty;
+
         public List<TElement> Children { get; set; } = new List<TElement>();
+
+        public HashSet<string> AppliedStyleProperties { get; } = new HashSet<string>();
 
         public Dictionary<string, object> Properties { get; set; } = new Dictionary<string, object>();
 
@@ -92,6 +96,7 @@ namespace Nuri.UI
 
         public TElement SetProperty(string name, object value)
         {
+            AppliedStyleProperties.Remove(name);
             Properties[name] = value;
             LastPropertyName = name;
             return (TElement)(object)this;

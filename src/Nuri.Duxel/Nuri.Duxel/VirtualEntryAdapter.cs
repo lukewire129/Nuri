@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Nuri.UI.Dsl;
 using Nuri.UI.Values;
+using Nuri.UI.Styles;
 using Nuri.VirtualDom;
 
 namespace Nuri.Duxel;
@@ -13,6 +14,8 @@ internal static class VirtualEntryAdapter
         {
             return ToVirtualEntry(component);
         }
+
+        StyleManager.Apply(element);
 
         List<KeyValuePair<string, object?>>? properties = null;
         if (element.Properties.Count > 0)
@@ -87,6 +90,11 @@ internal static class VirtualEntryAdapter
             {
                 rendered.Properties[property.Key] = property.Value;
             }
+        }
+
+        if (string.IsNullOrWhiteSpace(rendered.StyleName) && !string.IsNullOrWhiteSpace(component.StyleName))
+        {
+            rendered.StyleName = component.StyleName;
         }
 
         if (string.IsNullOrWhiteSpace(rendered.Key) && !string.IsNullOrWhiteSpace(component.Key))

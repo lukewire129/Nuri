@@ -1,0 +1,19 @@
+theme:
+  colors:
+    surface: "#18191D"
+    text: "#F5F5F5"
+    primary: "#5B8CFF"
+  spacing:
+    lg: 20
+  radius:
+    lg: 16
+
+styles:
+  card:
+    background: $colors.surface
+    padding: $spacing.lg
+    radius: $radius.lg
+  title:
+    foreground: $colors.text
+  primary-button:
+    background: $colors.primary

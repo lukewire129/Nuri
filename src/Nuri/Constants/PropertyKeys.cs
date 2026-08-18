@@ -9,6 +9,10 @@ namespace Nuri.Constants
         public const string Foreground = "Foreground";
         public const string Grow = "Grow";
         public const string Height = "Height";
+        public const string MaxHeight = "MaxHeight";
+        public const string MaxWidth = "MaxWidth";
+        public const string MinHeight = "MinHeight";
+        public const string MinWidth = "MinWidth";
         public const string IsChecked = "IsChecked";
         public const string JustifyContent = "JustifyContent";
         public const string Name = "Name";

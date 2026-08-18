@@ -199,6 +199,7 @@ namespace Nuri.Avalonia
                 rendered.Key = component.Key;
         }
 
+
         public void Dispose()
         {
             if (_disposed)

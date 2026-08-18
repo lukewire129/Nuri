@@ -267,6 +267,7 @@ namespace Nuri.WPF
                 rendered.Key = component.Key;
         }
 
+
         public void Dispose()
         {
             if (_disposed)

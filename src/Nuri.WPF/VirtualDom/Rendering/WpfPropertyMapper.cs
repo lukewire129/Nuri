@@ -33,6 +33,18 @@ namespace Nuri.WPF
                 case PropertyKeys.Height:
                     element.Height = ToDouble(value);
                     return true;
+                case PropertyKeys.MinWidth:
+                    element.MinWidth = ToDouble(value);
+                    return true;
+                case PropertyKeys.MinHeight:
+                    element.MinHeight = ToDouble(value);
+                    return true;
+                case PropertyKeys.MaxWidth:
+                    element.MaxWidth = ToDouble(value);
+                    return true;
+                case PropertyKeys.MaxHeight:
+                    element.MaxHeight = ToDouble(value);
+                    return true;
                 case "Margin":
                     element.Margin = (Thickness)value!;
                     return true;
@@ -154,6 +166,18 @@ namespace Nuri.WPF
                     return true;
                 case PropertyKeys.Height:
                     element.ClearValue(FrameworkElement.HeightProperty);
+                    return true;
+                case PropertyKeys.MinWidth:
+                    element.ClearValue(FrameworkElement.MinWidthProperty);
+                    return true;
+                case PropertyKeys.MinHeight:
+                    element.ClearValue(FrameworkElement.MinHeightProperty);
+                    return true;
+                case PropertyKeys.MaxWidth:
+                    element.ClearValue(FrameworkElement.MaxWidthProperty);
+                    return true;
+                case PropertyKeys.MaxHeight:
+                    element.ClearValue(FrameworkElement.MaxHeightProperty);
                     return true;
                 case "Margin":
                     element.ClearValue(FrameworkElement.MarginProperty);

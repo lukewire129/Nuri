@@ -1,0 +1,5 @@
+# Copied beside the executable. Values here override the embedded fallback.
+styles:
+  card:
+    padding: 24
+    gap: 12

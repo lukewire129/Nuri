@@ -477,6 +477,7 @@ public sealed class NuriDuxelScreen : UiScreen, IDisposable
         _requestFrame();
     }
 
+
     private RootReplacement? TakePendingRootReplacement()
     {
         lock (_rootReplacementGate)

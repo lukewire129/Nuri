@@ -1,3 +1,4 @@
+using System.IO;
 using Nuri.VirtualDom;
 using Nuri.Runtime;
 using Nuri.Runtime.Invalidation;
@@ -9,6 +10,7 @@ using Nuri.UI.Events;
 using Nuri.UI.Navigation;
 using Nuri.UI.Values;
 using Nuri.UI.Virtualization;
+using Nuri.UI.Styles;
 using Nuri.Constants;
 using Nuri.Platform.Abstractions;
 using Nuri.UI.Controls;
@@ -67,6 +69,7 @@ internal static class Program
         VirtualizedItemsCaptureAnImmutableSnapshot();
         VirtualizedItemsUseSafeDuplicateIdentities();
         VirtualizedItemsRejectComponentTemplatesLazily();
+        YamlStylesResolveTokensOverridesAndFallbacks();
         Console.WriteLine("Nuri.Tests passed.");
     }
 
@@ -1391,6 +1394,92 @@ internal static class Program
             () => Component.Grid().Columns("Auto,two*"),
             "Malformed star weights should fail immediately.");
     }
+
+    private static void YamlStylesResolveTokensOverridesAndFallbacks()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "nuri-style-" + Guid.NewGuid().ToString("N") + ".yml");
+        try
+        {
+            File.WriteAllText(path, @"
+theme:
+  colors:
+    surface: ""#18191D""
+  spacing:
+    lg: 20
+styles:
+  button:
+    padding: [8, 16]
+    radius: 8
+    font-weight: 600
+  card:
+    padding: $spacing.lg
+    background: $colors.surface
+  primary:
+    extends: button
+    background: ""#5B8CFF""
+");
+
+            using (var configuration = new StyleConfiguration()
+                .AddEmbeddedYaml(@"
+styles:
+  button:
+    height: 36
+    radius: 6
+")
+                .AddFile(path))
+            {
+                StyleManager.Configure(configuration);
+
+                var button = Component.Button("Continue").Style("primary").Height(44);
+                StyleManager.Apply(button);
+                AssertEqual(44d, button.Properties[PropertyKeys.Height], "Inline element properties must override YAML styles.");
+                AssertEqual(new FontWeightValue(600), button.Properties["FontWeight"], "Extended YAML styles must retain base properties.");
+                AssertEqual(
+                    new ThicknessValue(16, 8, 16, 8),
+                    button.Properties["Padding"],
+                    "Two-value YAML thickness must map to vertical and horizontal values.");
+
+                var card = Component.Column(new IElement[] { Component.Text("Card") }).Style("card");
+                StyleManager.Apply(card);
+                AssertEqual(ThicknessValue.Uniform(20), card.Properties["Padding"], "Theme spacing tokens must resolve before style application.");
+                AssertEqual(
+                    new BrushValue.Solid(ColorValue.FromHex("#18191D")),
+                    card.Properties[PropertyKeys.Background],
+                    "Theme color tokens must resolve before style application.");
+
+                var stableButton = Component.Button("Continue").Style("button");
+                StyleManager.Apply(stableButton);
+                AssertEqual(36d, stableButton.Properties[PropertyKeys.Height], "Embedded YAML styles must apply before an external override exists.");
+
+            }
+
+            File.WriteAllText(path, @"
+styles:
+  button:
+    padding: abc
+");
+            using (var invalidConfiguration = new StyleConfiguration()
+                .AddEmbeddedYaml(@"
+styles:
+  button:
+    height: 36
+")
+                .AddFile(path))
+            {
+                StyleManager.Configure(invalidConfiguration);
+                var fallbackButton = Component.Button("Continue").Style("button");
+                StyleManager.Apply(fallbackButton);
+                AssertEqual(36d, fallbackButton.Properties[PropertyKeys.Height], "Invalid external YAML at startup must fall back to the embedded default.");
+            }
+        }
+        finally
+        {
+            StyleManager.Reset();
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+    }
+
 
     private static VirtualEntry Row(string key, bool selected)
     {

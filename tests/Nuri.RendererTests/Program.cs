@@ -1,3 +1,4 @@
+using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using Avalonia.Animation;
@@ -9,6 +10,7 @@ using Nuri.UI.Controls;
 using Nuri.UI.Dsl;
 using Nuri.UI.Events;
 using Nuri.UI.Values;
+using Nuri.UI.Styles;
 using Nuri.VirtualDom;
 using Nuri.WPF;
 using AvaloniaControl = Avalonia.Controls.Control;
@@ -53,6 +55,7 @@ internal static class Program
     {
         WpfNamedColorsMatchCorePalette();
         TextOverflowMappingsRemainConsistent();
+        WpfYamlStylesMaterializeExternalOverrides();
         RunSuite(() => new WpfDriver());
         WpfRepeatedEffectLifecycleRemainsStable();
         WpfDisposedRootIgnoresQueuedInvalidations();
@@ -75,6 +78,50 @@ internal static class Program
         WpfRunBootstrapsStaAndClosesEveryWindowWithTheMainWindow();
         Console.WriteLine("Nuri.RendererTests passed.");
     }
+    private static void WpfYamlStylesMaterializeExternalOverrides()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "nuri-wpf-style-" + Guid.NewGuid().ToString("N") + ".yml");
+        try
+        {
+            File.WriteAllText(path, @"
+styles:
+  primary:
+    height: 44
+    min-width: 120
+    min-height: 40
+    max-width: 240
+    max-height: 80
+    background: ""#5B8CFF""
+");
+            using (var configuration = new StyleConfiguration()
+                .AddEmbeddedYaml(@"
+styles:
+  primary:
+    height: 36
+    radius: 8
+")
+                .AddFile(path))
+            {
+                StyleManager.Configure(configuration);
+
+                var initial = (WpfButton)WpfVirtualEntryRenderer.Build(
+                    Component.Button("Continue").Style("primary").ToVirtualEntry());
+                AssertEqual(44d, initial.Height, "WPF: external YAML styles must materialize into native properties.");
+                AssertEqual(120d, initial.MinWidth, "WPF: YAML min-width must materialize into native constraints.");
+                AssertEqual(40d, initial.MinHeight, "WPF: YAML min-height must materialize into native constraints.");
+                AssertEqual(240d, initial.MaxWidth, "WPF: YAML max-width must materialize into native constraints.");
+                AssertEqual(80d, initial.MaxHeight, "WPF: YAML max-height must materialize into native constraints.");
+
+            }
+        }
+        finally
+        {
+            StyleManager.Reset();
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+    }
+
 
     private static void WpfDiagnosticsCanExcludeInspectorRoot()
     {

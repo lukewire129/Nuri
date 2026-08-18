@@ -24,6 +24,18 @@ namespace Nuri.Avalonia
                 case "Height":
                     control.Height = ToDouble(value);
                     return true;
+                case PropertyKeys.MinWidth:
+                    control.MinWidth = ToDouble(value);
+                    return true;
+                case PropertyKeys.MinHeight:
+                    control.MinHeight = ToDouble(value);
+                    return true;
+                case PropertyKeys.MaxWidth:
+                    control.MaxWidth = ToDouble(value);
+                    return true;
+                case PropertyKeys.MaxHeight:
+                    control.MaxHeight = ToDouble(value);
+                    return true;
                 case "Opacity":
                     control.Opacity = ToDouble(value);
                     return true;
@@ -105,6 +117,18 @@ namespace Nuri.Avalonia
                     return true;
                 case "Height":
                     control.ClearValue(Layoutable.HeightProperty);
+                    return true;
+                case PropertyKeys.MinWidth:
+                    control.ClearValue(Layoutable.MinWidthProperty);
+                    return true;
+                case PropertyKeys.MinHeight:
+                    control.ClearValue(Layoutable.MinHeightProperty);
+                    return true;
+                case PropertyKeys.MaxWidth:
+                    control.ClearValue(Layoutable.MaxWidthProperty);
+                    return true;
+                case PropertyKeys.MaxHeight:
+                    control.ClearValue(Layoutable.MaxHeightProperty);
                     return true;
                 case "Opacity":
                     control.ClearValue(Visual.OpacityProperty);

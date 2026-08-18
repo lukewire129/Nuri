@@ -18,7 +18,11 @@ namespace Nuri.UI
 
         string Key { get; set; }
 
+        string StyleName { get; set; }
+
         List<TElement> Children { get; set; }
+
+        HashSet<string> AppliedStyleProperties { get; }
 
         Dictionary<string, object> Properties { get; set; }
 
