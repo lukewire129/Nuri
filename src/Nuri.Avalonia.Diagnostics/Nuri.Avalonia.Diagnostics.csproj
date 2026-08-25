@@ -3,20 +3,22 @@
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
-    <Version>0.1.0</Version>
+    <Version>0.3.0</Version>
+    <PackageVersion Condition="'$(NuriToolsReleaseVersion)' != ''">$(NuriToolsReleaseVersion)</PackageVersion>
     <IsPackable>true</IsPackable>
-    <PackageId>Nuri.Avalonia</PackageId>
-    <Title>Nuri Avalonia Renderer</Title>
+    <PackageId>Nuri.Avalonia.Diagnostics</PackageId>
+    <Title>Nuri Avalonia Diagnostics</Title>
     <Authors>lukewire129</Authors>
-    <Description>Avalonia renderer, native control materialization, events, and animation support for the Nuri MVU runtime.</Description>
+    <Description>Runtime inspector and diagnostics window for Nuri Avalonia applications.</Description>
     <PackageProjectUrl>https://github.com/lukewire129/Nuri</PackageProjectUrl>
     <RepositoryUrl>https://github.com/lukewire129/Nuri</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>nuri;avalonia;mvu;virtual-ui;hooks;csharp;dotnet</PackageTags>
+    <PackageTags>nuri;avalonia;diagnostics;devtools;inspector;csharp;dotnet</PackageTags>
     <Copyright>Copyright (c) 2026 lukewire129.</Copyright>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <IncludeSymbols>true</IncludeSymbols>
@@ -24,15 +26,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="11.3.12" />
-    <PackageReference Include="Avalonia.Desktop" Version="11.3.12" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.12" />
-    <ProjectReference Include="..\Nuri\Nuri.csproj" />
+    <Compile Include="..\Nuri.Diagnostics.Shared\*.cs" Link="Shared\%(Filename)%(Extension)" />
+    <None Include="..\..\assets\icon.png" Pack="true" PackagePath="\" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\..\assets\icon.png" Pack="true" PackagePath="\" />
-    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <ProjectReference Include="..\Nuri.Avalonia\Nuri.Avalonia.csproj" />
   </ItemGroup>
 
 </Project>

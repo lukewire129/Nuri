@@ -79,6 +79,8 @@ internal static class Program
         WpfVirtualizedItemsStayLazyAndRecycleContainers();
         WpfMeasuredVirtualizedItemsUseNaturalRowHeights();
         RunSuite(() => new AvaloniaDriver());
+        AvaloniaDiagnosticsTrackRootsAndAppliedPatchBatches();
+        AvaloniaDiagnosticsCanExcludeInspectorRoot();
         AvaloniaWindowRootFillsWindowClientArea();
         WpfRunBootstrapsStaAndClosesEveryWindowWithTheMainWindow();
         Console.WriteLine("Nuri.RendererTests passed.");
@@ -95,6 +97,52 @@ internal static class Program
         AssertEqual(AvaloniaHorizontalAlignment.Stretch, rootControl.HorizontalAlignment, "Avalonia: Root control must stretch horizontally.");
         AssertEqual(AvaloniaVerticalAlignment.Stretch, rootControl.VerticalAlignment, "Avalonia: Root control must stretch vertically.");
         AssertSame(rootControl, host.Content!, "Avalonia: Root control must be assigned as host content.");
+    }
+
+    private static void AvaloniaDiagnosticsTrackRootsAndAppliedPatchBatches()
+    {
+        NuriDiagnostics.Disable();
+        NuriDiagnostics.ClearLogs();
+        var initialRootCount = NuriDiagnostics.GetSnapshot().Roots.Count;
+        var component = new PatchDiagnosticsComponent();
+        var root = new AvaloniaDriver().Initialize(component);
+
+        NuriDiagnostics.Enable();
+        AssertEqual(initialRootCount + 1, NuriDiagnostics.GetSnapshot().Roots.Count, "Avalonia: a root mounted before diagnostics enablement should be discoverable.");
+
+        component.Value = "updated";
+        root.Rebuild();
+        var metrics = NuriDiagnostics.GetSnapshot().Roots.Single(item => item.Renderer == "Avalonia");
+        AssertEqual(1L, metrics.PatchBatchCount, "Avalonia: diagnostics should record one applied rebuild batch.");
+        AssertEqual(1, metrics.LastPatchCount, "Avalonia: a text-only rebuild should apply one patch.");
+        AssertEqual(1, metrics.LastPatchCounts[PatchOperationType.UpdateProperty], "Avalonia: diagnostics should identify the applied property patch.");
+
+        NuriDiagnostics.Disable();
+        root.Dispose();
+        NuriDiagnostics.Enable();
+        AssertEqual(initialRootCount, NuriDiagnostics.GetSnapshot().Roots.Count, "Avalonia: disposal while diagnostics are disabled should unregister the root.");
+        NuriDiagnostics.ClearLogs();
+        NuriDiagnostics.Disable();
+    }
+
+    private static void AvaloniaDiagnosticsCanExcludeInspectorRoot()
+    {
+        NuriDiagnostics.Enable();
+        NuriDiagnostics.ClearLogs();
+        var initialRootCount = NuriDiagnostics.GetSnapshot().Roots.Count;
+        var root = Avalonia.AvaloniaApplicationRoot.Initialize(
+            Component.Text("Inspector"),
+            new AvaloniaTestHost(),
+            new ImmediateScheduler(),
+            includeInDiagnostics: false);
+
+        AssertEqual(initialRootCount, NuriDiagnostics.GetSnapshot().Roots.Count, "Avalonia: an excluded inspector root should not appear in diagnostics.");
+        root.Rebuild();
+        AssertEqual(initialRootCount, NuriDiagnostics.GetSnapshot().Roots.Count, "Avalonia: rebuilding an excluded inspector root should remain excluded.");
+
+        root.Dispose();
+        NuriDiagnostics.ClearLogs();
+        NuriDiagnostics.Disable();
     }
     private static void WpfYamlStylesMaterializeExternalOverrides()
     {

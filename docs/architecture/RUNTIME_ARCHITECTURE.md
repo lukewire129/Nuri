@@ -139,17 +139,17 @@ When diagnostics are enabled, the WPF property path records `RuntimeLogKind.Unsu
 
 The WPF event add path similarly records `RuntimeLogKind.UnsupportedEvent` when a neutral event cannot be converted or the mapped native event is absent on the target control. Native delegate compatibility remains unchanged, event removal does not emit warnings, and messages are deduplicated by native control CLR type plus source event name until `NuriDiagnostics.ClearLogs()` is called.
 
-`Nuri.WPF.Diagnostics` and `Nuri.Duxel.Diagnostics` are renderer-specific diagnostics packages. Both compile the same platform-neutral inspector component source, which reads `RuntimeSnapshot` and renders component tree, detail, hook, store, runtime-log, and console views through the Core DSL. The packages do not depend on each other: WPF hosts the inspector in a secondary WPF window, while Duxel hosts it in a separate Duxel window. `NuriDiagnostics.Changed` requests a renderer-owned inspector rebuild instead of mutating a hook from the inspected renderer thread.
+`Nuri.WPF.Diagnostics`, `Nuri.Avalonia.Diagnostics`, and `Nuri.Duxel.Diagnostics` are renderer-specific diagnostics packages. All compile the same platform-neutral inspector component source, which reads `RuntimeSnapshot` and renders component tree, detail, hook, store, runtime-log, and console views through the Core DSL. The packages do not depend on each other: WPF and Avalonia host the inspector in secondary retained windows, while Duxel hosts it in a separate Duxel window. `NuriDiagnostics.Changed` requests a renderer-owned inspector rebuild instead of mutating a hook from the inspected renderer thread. Because Avalonia does not yet materialize `ItemsTypes.Virtualized`, its inspector renders each bounded, at-most-200-row diagnostics list through an eager Scroll fallback; WPF and Duxel retain virtualized inspector lists.
 
 `Nuri.WPFDiagnosticsSample` and `Nuri.DuxelDiagnosticsSample` configure `UseAttachDevTools()` in Debug builds and exercise hooks, stores, keyed lifecycle, patch counts, console capture, and each renderer-specific inspector host. The WPF sample also exercises selected-component highlighting.
 
-`WpfDevTools.OpenInspector(...)`, `DuxelDevTools.OpenInspector(...)`, and `DuxelDevTools.RunInspector(...)` accept an optional `snapshotProvider`. A retained renderer that owns a mutable virtual tree must capture snapshots on its UI thread. WPF dispatches capture through its Dispatcher, and the Duxel application builder invokes capture at a Duxel frame boundary.
+`WpfDevTools.OpenInspector(...)`, `AvaloniaDevTools.OpenInspector(...)`, `DuxelDevTools.OpenInspector(...)`, and `DuxelDevTools.RunInspector(...)` accept an optional `snapshotProvider`. A retained renderer that owns a mutable virtual tree must capture snapshots on its UI thread. WPF and Avalonia dispatch capture through their UI Dispatchers, and the Duxel application builder invokes capture at a Duxel frame boundary. Avalonia does not yet expose selected-component native highlighting.
 
-WPF and Duxel expose lazy `NuriApplication.Create<TComponent>(...)` builders implementing `INuriDebugHost`. The diagnostics-package extensions `UseAttachDevTools()` and `UseAttachDevTools(DebugKey)` configure `F12` by default or any explicit `F1` through `F12` key. Calling the extension before startup enables diagnostics before the first render. WPF permits late configuration with one warning; Duxel requires shortcut configuration before its blocking `Run()` starts.
+WPF, Avalonia, and Duxel expose lazy `NuriApplication.Create<TComponent>(...)` builders implementing `INuriDebugHost`. The diagnostics-package extensions `UseAttachDevTools()` and `UseAttachDevTools(DebugKey)` configure `F12` by default or any explicit `F1` through `F12` key. Calling the extension before startup enables diagnostics before the first render. WPF and Avalonia permit late configuration with one warning; Duxel requires shortcut configuration before its blocking `Run()` starts.
 
-Inspector roots use `includeInDiagnostics: false` in both WPF and Duxel. Core diagnostics exclude the inspector root and descendants before the initial render, then release the exclusion on disposal. This prevents the inspector from observing its own render and producing a diagnostics-change/rebuild loop while leaving the inspected application diagnostics enabled.
+Inspector roots use `includeInDiagnostics: false` in WPF, Avalonia, and Duxel. Core diagnostics exclude the inspector root and descendants before the initial render, then release the exclusion on disposal. This prevents the inspector from observing its own render and producing a diagnostics-change/rebuild loop while leaving the inspected application diagnostics enabled.
 
-The former Duxel-hosted common `Nuri.DevTools` package has been removed. Applications reference only the matching `Nuri.WPF.Diagnostics` or `Nuri.Duxel.Diagnostics` package; shared inspector sources are compiled into each package and are not published as a third common package.
+The former Duxel-hosted common `Nuri.DevTools` package has been removed. Applications reference only the matching `Nuri.WPF.Diagnostics`, `Nuri.Avalonia.Diagnostics`, or `Nuri.Duxel.Diagnostics` package; shared inspector sources are compiled into each package and are not published as a common package.
 
 ## Neutral Transform Animation
 
@@ -287,6 +287,7 @@ dotnet run --project "tests\Nuri.RendererTests\Nuri.RendererTests.csproj" -c Rel
 dotnet run --project "tests\Nuri.DuxelRendererTests\Nuri.DuxelRendererTests.csproj" -c Release
 dotnet run --project "tests\Nuri.DevToolsTests\Nuri.DevToolsTests.csproj" -c Release
 dotnet run --project "tests\Nuri.DuxelDiagnosticsTests\Nuri.DuxelDiagnosticsTests.csproj" -c Release
+dotnet run --project "tests\Nuri.AvaloniaDiagnosticsTests\Nuri.AvaloniaDiagnosticsTests.csproj" -c Release
 dotnet run --project "tests\Nuri.FormatterTests\Nuri.FormatterTests.csproj" -c Release
 dotnet build "Nuri.sln" -c Release
 dotnet run --project "perf\Nuri.Performance\Nuri.Performance.csproj" -c Release -- --label after

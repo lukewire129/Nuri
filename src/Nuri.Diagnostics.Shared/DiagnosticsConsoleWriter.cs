@@ -53,6 +53,7 @@ internal sealed class DiagnosticsConsoleWriter(TextWriter inner) : TextWriter
                 || typeName.StartsWith("Nuri.Runtime.Diagnostics.", StringComparison.Ordinal)
                 || typeName.StartsWith("Nuri.Diagnostics.", StringComparison.Ordinal)
                 || typeName.StartsWith("Nuri.WPF.Diagnostics.", StringComparison.Ordinal)
+                || typeName.StartsWith("Nuri.Avalonia.Diagnostics.", StringComparison.Ordinal)
                 || typeName.StartsWith("Nuri.Duxel.Diagnostics.", StringComparison.Ordinal))
             {
                 continue;

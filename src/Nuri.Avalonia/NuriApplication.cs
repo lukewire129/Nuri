@@ -15,19 +15,31 @@ namespace Nuri.Avalonia
         private static readonly List<AvaloniaApplicationRoot> Roots = new List<AvaloniaApplicationRoot>();
         private static bool _hotReloadAttached;
 
+        public static NuriApplicationBuilder<TComponent> Create<TComponent>(
+            string[] args,
+            string title,
+            double width = 800,
+            double height = 600)
+            where TComponent : Component, new()
+        {
+            return new NuriApplicationBuilder<TComponent>(args, title, width, height);
+        }
+
         public static void Run<TComponent>(string[] args, string title, double width = 800, double height = 600)
             where TComponent : Component, new()
         {
-            EnsureHotReloadAttached();
-
-            AppBuilder
-                .Configure(() => new NuriAvaloniaApp(CreateRoot<TComponent>(title, width, height)))
-                .UsePlatformDetect()
-                .LogToTrace()
-                .StartWithClassicDesktopLifetime(args);
+            Create<TComponent>(args, title, width, height).Run();
         }
 
         public static AvaloniaApplicationRoot Attach(Window window, IElement rootElement)
+        {
+            return Attach(window, rootElement, includeInDiagnostics: true);
+        }
+
+        public static AvaloniaApplicationRoot Attach(
+            Window window,
+            IElement rootElement,
+            bool includeInDiagnostics)
         {
             if (window == null)
                 throw new ArgumentNullException(nameof(window));
@@ -37,7 +49,7 @@ namespace Nuri.Avalonia
 
             EnsureHotReloadAttached();
 
-            var root = AvaloniaApplicationRoot.Initialize(rootElement, window);
+            var root = AvaloniaApplicationRoot.Initialize(rootElement, window, includeInDiagnostics);
             Register(root);
             window.Closed += (_, __) =>
             {
@@ -46,6 +58,20 @@ namespace Nuri.Avalonia
             };
 
             return root;
+        }
+
+        internal static void Run(
+            string[] args,
+            IElement rootElement,
+            Action<Window>? windowCreated)
+        {
+            EnsureHotReloadAttached();
+
+            AppBuilder
+                .Configure(() => new NuriAvaloniaApp(rootElement, windowCreated))
+                .UsePlatformDetect()
+                .LogToTrace()
+                .StartWithClassicDesktopLifetime(args);
         }
 
         internal static void Register(AvaloniaApplicationRoot root)
@@ -102,7 +128,7 @@ namespace Nuri.Avalonia
                 root.ScheduleComponentRebuild(component);
         }
 
-        private static WindowView CreateRoot<TComponent>(string title, double width, double height)
+        internal static WindowView CreateRoot<TComponent>(string title, double width, double height)
             where TComponent : Component, new()
         {
             return new WindowView(new TComponent())
@@ -114,10 +140,12 @@ namespace Nuri.Avalonia
     internal sealed class NuriAvaloniaApp : Application
     {
         private readonly IElement _rootElement;
+        private readonly Action<Window>? _windowCreated;
 
-        public NuriAvaloniaApp(IElement rootElement)
+        public NuriAvaloniaApp(IElement rootElement, Action<Window>? windowCreated = null)
         {
             _rootElement = rootElement;
+            _windowCreated = windowCreated;
         }
 
         public override void Initialize()
@@ -131,6 +159,7 @@ namespace Nuri.Avalonia
             {
                 var window = new Window();
                 NuriApplication.Attach(window, _rootElement);
+                _windowCreated?.Invoke(window);
                 desktop.MainWindow = window;
             }
 

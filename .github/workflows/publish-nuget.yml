@@ -26,10 +26,13 @@ jobs:
           dotnet-version: '9.0.x'
 
       - name: Restore package projects
-        run: dotnet restore src/Nuri.WPF/Nuri.WPF.csproj
+        run: dotnet restore src/Nuri.WPF/Nuri.WPF.csproj && dotnet restore src/Nuri.Avalonia/Nuri.Avalonia.csproj
 
       - name: Restore diagnostics package projects
-        run: dotnet restore src/Nuri.WPF.Diagnostics/Nuri.WPF.Diagnostics.csproj && dotnet restore src/Nuri.Duxel/Nuri.Duxel.Diagnostics/Nuri.Duxel.Diagnostics.csproj
+        run: dotnet restore src/Nuri.WPF.Diagnostics/Nuri.WPF.Diagnostics.csproj && dotnet restore src/Nuri.Avalonia.Diagnostics/Nuri.Avalonia.Diagnostics.csproj
+
+#      - name: Restore Duxel diagnostics package project
+#        run: dotnet restore src/Nuri.Duxel/Nuri.Duxel.Diagnostics/Nuri.Duxel.Diagnostics.csproj
 
       - name: Pack Nuri
         run: dotnet pack src/Nuri/Nuri.csproj -c Release --no-restore -m:1 -p:Version=${{ inputs.version }} -o artifacts/packages
@@ -37,11 +40,17 @@ jobs:
       - name: Pack Nuri.WPF
         run: dotnet pack src/Nuri.WPF/Nuri.WPF.csproj -c Release --no-restore -m:1 -p:Version=${{ inputs.version }} -o artifacts/packages
 
+      - name: Pack Nuri.Avalonia
+        run: dotnet pack src/Nuri.Avalonia/Nuri.Avalonia.csproj -c Release --no-restore -m:1 -p:Version=${{ inputs.version }} -o artifacts/packages
+
 #      - name: Pack Nuri.Duxel.Windows
 #        run: dotnet pack src/Nuri.Duxel/Nuri.Duxel.Windows/Nuri.Duxel.Windows.csproj -c Release --no-restore -m:1 -p:NuriToolsReleaseVersion=${{ inputs.version }} -o artifacts/packages
 
       - name: Pack Nuri.WPF.Diagnostics
         run: dotnet pack src/Nuri.WPF.Diagnostics/Nuri.WPF.Diagnostics.csproj -c Release --no-restore -m:1 -p:Version=${{ inputs.version }} -p:NuriToolsReleaseVersion=${{ inputs.version }} -o artifacts/packages
+
+      - name: Pack Nuri.Avalonia.Diagnostics
+        run: dotnet pack src/Nuri.Avalonia.Diagnostics/Nuri.Avalonia.Diagnostics.csproj -c Release --no-restore -m:1 -p:Version=${{ inputs.version }} -p:NuriToolsReleaseVersion=${{ inputs.version }} -o artifacts/packages
 
 #      - name: Pack Nuri.Duxel.Diagnostics
 #        run: dotnet pack src/Nuri.Duxel/Nuri.Duxel.Diagnostics/Nuri.Duxel.Diagnostics.csproj -c Release --no-restore -m:1 -p:Version=${{ inputs.version }} -p:NuriToolsReleaseVersion=${{ inputs.version }} -o artifacts/packages
@@ -58,11 +67,17 @@ jobs:
       - name: Publish Nuri.WPF
         run: dotnet nuget push artifacts/packages/Nuri.WPF.${{ inputs.version }}.nupkg --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
 
+      - name: Publish Nuri.Avalonia
+        run: dotnet nuget push artifacts/packages/Nuri.Avalonia.${{ inputs.version }}.nupkg --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+
 #      - name: Publish Nuri.Duxel.Windows
 #        run: dotnet nuget push artifacts/packages/Nuri.Duxel.Windows.${{ inputs.version }}.nupkg --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
 
       - name: Publish Nuri.WPF.Diagnostics
         run: dotnet nuget push artifacts/packages/Nuri.WPF.Diagnostics.${{ inputs.version }}.nupkg --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: Publish Nuri.Avalonia.Diagnostics
+        run: dotnet nuget push artifacts/packages/Nuri.Avalonia.Diagnostics.${{ inputs.version }}.nupkg --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
 
 #      - name: Publish Nuri.Duxel.Diagnostics
 #        run: dotnet nuget push artifacts/packages/Nuri.Duxel.Diagnostics.${{ inputs.version }}.nupkg --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate

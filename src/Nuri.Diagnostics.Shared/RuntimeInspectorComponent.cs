@@ -7,13 +7,15 @@ namespace Nuri.Diagnostics.Internal;
 
 internal sealed class RuntimeInspectorComponent(
     Action<string?>? highlightRequested = null,
-    Func<RuntimeSnapshot>? snapshotProvider = null) : Component
+    Func<RuntimeSnapshot>? snapshotProvider = null,
+    bool useVirtualizedLists = true) : Component
 {
     private const int MaximumVisibleLogs = 200;
     private const double TreeRowExtent = 36;
     private const double RuntimeLogRowExtent = 26;
     private const double ConsoleLogEstimatedExtent = 58;
     private readonly Func<RuntimeSnapshot> _snapshotProvider = snapshotProvider ?? NuriDiagnostics.GetSnapshot;
+    private readonly bool _useVirtualizedLists = useVirtualizedLists;
 
     public override IElement Render()
     {
@@ -41,8 +43,9 @@ internal sealed class RuntimeInspectorComponent(
                         setDetailTab,
                         collapsedNodes,
                         setCollapsedNodes,
-                        SelectComponent)
-                    : BuildConsole(snapshot))
+                        SelectComponent,
+                        _useVirtualizedLists)
+                    : BuildConsole(snapshot, _useVirtualizedLists))
             .Background("#EAF0F7")
             .Padding(18)
             .Spacing(12);
@@ -116,7 +119,8 @@ internal sealed class RuntimeInspectorComponent(
         Action<Func<DetailTab, DetailTab>> setDetailTab,
         HashSet<string> collapsedNodes,
         Action<Func<HashSet<string>, HashSet<string>>> setCollapsedNodes,
-        Action<ComponentSnapshot> selectComponent)
+        Action<ComponentSnapshot> selectComponent,
+        bool useVirtualizedLists)
     {
         var treeRows = BuildTreeRows(
             snapshot,
@@ -128,7 +132,7 @@ internal sealed class RuntimeInspectorComponent(
         return Grid(
                 BuildSurface(
                         "Component tree",
-                        BuildVirtualizedTree(treeRows),
+                        BuildVirtualizedTree(treeRows, useVirtualizedLists),
                         $"{treeRows.Count:N0} visible"
                 )
                     .Column(0),
@@ -137,7 +141,7 @@ internal sealed class RuntimeInspectorComponent(
                                 "Component inspector",
                                 BuildDetails(selectedComponent, detailTab, setDetailTab, snapshot))
                             .Row(0),
-                        BuildSurface("Runtime events", BuildRuntimeLogs(snapshot))
+                        BuildSurface("Runtime events", BuildRuntimeLogs(snapshot, useVirtualizedLists))
                             .Row(1))
                     .Rows(Stars(2), Star)
                     .RowSpacing(10)
@@ -203,8 +207,13 @@ internal sealed class RuntimeInspectorComponent(
         return rows;
     }
 
-    internal static IElement BuildVirtualizedTree(IReadOnlyList<InspectorTreeRow> rows)
+    internal static IElement BuildVirtualizedTree(
+        IReadOnlyList<InspectorTreeRow> rows,
+        bool useVirtualizedLists = true)
     {
+        if (!useVirtualizedLists)
+            return BuildEagerScroll(rows.Select(BuildTreeRow));
+
         return VirtualizedItems(
                 rows,
                 row => row.NodeId,
@@ -371,7 +380,7 @@ internal sealed class RuntimeInspectorComponent(
             : Div(rows.ToArray()).Spacing(5);
     }
 
-    internal static IElement BuildRuntimeLogs(RuntimeSnapshot snapshot)
+    internal static IElement BuildRuntimeLogs(RuntimeSnapshot snapshot, bool useVirtualizedLists = true)
     {
         var logs = snapshot.RecentLogs
             .Where(log => log.Kind != RuntimeLogKind.Console && log.Kind != RuntimeLogKind.AppLog)
@@ -379,9 +388,12 @@ internal sealed class RuntimeInspectorComponent(
             .Take(MaximumVisibleLogs)
             .ToArray();
 
-        return logs.Length == 0
-            ? Text("No runtime events.").FontColor("#616161")
-            : VirtualizedItems(
+        if (logs.Length == 0)
+            return Text("No runtime events.").FontColor("#616161");
+        if (!useVirtualizedLists)
+            return BuildEagerScroll(logs.Select(RenderRuntimeLog));
+
+        return VirtualizedItems(
                     logs,
                     log => $"runtime:{log.Sequence}",
                     RuntimeLogRowExtent,
@@ -389,18 +401,18 @@ internal sealed class RuntimeInspectorComponent(
                 .Grow();
     }
 
-    internal static IElement BuildConsole(RuntimeSnapshot snapshot)
+    internal static IElement BuildConsole(RuntimeSnapshot snapshot, bool useVirtualizedLists = true)
     {
         return Grid(
                 BuildSurface(
                         "Console output",
-                        BuildConsoleLogs(snapshot))
+                        BuildConsoleLogs(snapshot, useVirtualizedLists))
                     .Row(0))
             .Rows(Star)
             .Grow();
     }
 
-    internal static IElement BuildConsoleLogs(RuntimeSnapshot snapshot)
+    internal static IElement BuildConsoleLogs(RuntimeSnapshot snapshot, bool useVirtualizedLists = true)
     {
         var logs = snapshot.RecentLogs
             .Where(log => log.Kind is RuntimeLogKind.Console or RuntimeLogKind.AppLog or RuntimeLogKind.FullRebuild)
@@ -408,15 +420,23 @@ internal sealed class RuntimeInspectorComponent(
             .Take(MaximumVisibleLogs)
             .ToArray();
 
-        return logs.Length == 0
-            ? Text("No console output.").FontColor("#616161")
-            : VirtualizedItems(
+        if (logs.Length == 0)
+            return Text("No console output.").FontColor("#616161");
+        if (!useVirtualizedLists)
+            return BuildEagerScroll(logs.Select(RenderConsoleLog));
+
+        return VirtualizedItems(
                     logs,
                     RenderConsoleLog,
                     estimatedItemExtent: ConsoleLogEstimatedExtent,
                     bufferPixels: 320,
                     itemKey: log => $"console:{log.Sequence}")
                 .Grow();
+    }
+
+    private static IElement BuildEagerScroll(IEnumerable<IElement> rows)
+    {
+        return Div(DivTypes.Scroll, Div(rows.ToArray()).Spacing(2)).Grow();
     }
 
     private static IElement RenderRuntimeLog(RuntimeLogEntry log)

@@ -3,6 +3,7 @@ using System.Threading;
 using Avalonia.Controls;
 using Nuri.Platform.Abstractions;
 using Nuri.Runtime;
+using Nuri.Runtime.Diagnostics;
 using Nuri.Runtime.Invalidation;
 using Nuri.Runtime.Lifecycle;
 using Nuri.UI;
@@ -21,6 +22,8 @@ namespace Nuri.Avalonia
         private RenderCoordinator<IElement, Control>? _coordinator;
         private IUiScheduler? _scheduler;
         private string _treePrefix = string.Empty;
+        private string? _excludedDiagnosticsRootId;
+        private bool _includeInDiagnostics = true;
         private readonly ComponentInvalidationQueue _invalidations = new ComponentInvalidationQueue();
         private bool _rebuildScheduled;
         private bool _disposed;
@@ -34,10 +37,19 @@ namespace Nuri.Avalonia
 
         public static AvaloniaApplicationRoot Initialize(IElement rootElement, Window mainWindow)
         {
+            return Initialize(rootElement, mainWindow, includeInDiagnostics: true);
+        }
+
+        public static AvaloniaApplicationRoot Initialize(
+            IElement rootElement,
+            Window mainWindow,
+            bool includeInDiagnostics)
+        {
             if (mainWindow == null)
                 throw new ArgumentNullException(nameof(mainWindow));
 
             var instance = new AvaloniaApplicationRoot();
+            instance._includeInDiagnostics = includeInDiagnostics;
             var host = new AvaloniaApplicationHost(mainWindow);
             instance.InitializeInternal(rootElement, host, new AvaloniaScheduler(), host.ApplyWindowProperties);
             return instance;
@@ -49,7 +61,18 @@ namespace Nuri.Avalonia
             IUiScheduler scheduler,
             Action<IElement>? applyHostProperties = null)
         {
+            return Initialize(rootElement, host, scheduler, includeInDiagnostics: true, applyHostProperties);
+        }
+
+        public static AvaloniaApplicationRoot Initialize(
+            IElement rootElement,
+            IHostAdapter<Control> host,
+            IUiScheduler scheduler,
+            bool includeInDiagnostics,
+            Action<IElement>? applyHostProperties = null)
+        {
             var instance = new AvaloniaApplicationRoot();
+            instance._includeInDiagnostics = includeInDiagnostics;
             instance.InitializeInternal(rootElement, host, scheduler, applyHostProperties ?? (_ => { }));
             return instance;
         }
@@ -87,6 +110,12 @@ namespace Nuri.Avalonia
             _rootElement = rootElement;
             _scheduler = scheduler;
 
+            if (!_includeInDiagnostics)
+            {
+                _excludedDiagnosticsRootId = rootElement.Id;
+                NuriDiagnostics.ExcludeRoot(_excludedDiagnosticsRootId);
+            }
+
             _runtime = new ApplicationRuntime<IElement>(() =>
             {
                 return _rootElement ?? throw new InvalidOperationException("Application root element is not initialized.");
@@ -98,9 +127,12 @@ namespace Nuri.Avalonia
                 host,
                 () => _currentRootVisual,
                 root => _currentRootVisual = root,
-                applyHostProperties);
+                applyHostProperties,
+                _includeInDiagnostics ? _treePrefix : null);
 
             Coordinator.Initialize();
+            if (_includeInDiagnostics)
+                NuriDiagnostics.RegisterRoot(_treePrefix, "Avalonia", () => _runtime?.CurrentVirtualEntry);
         }
 
         private static void PrepareRoot(IElement rootElement, string treePrefix)
@@ -111,10 +143,14 @@ namespace Nuri.Avalonia
 
         public void ScheduleComponentRebuild(Component component)
         {
+            if (_disposed)
+                return;
+
             if (!IsInThisTree(component))
                 return;
 
             _invalidations.Enqueue(component);
+            NuriDiagnostics.Log(RuntimeLogKind.ComponentInvalidated, _treePrefix, component.Id, "Component scheduled for rebuild.");
             if (_rebuildScheduled)
                 return;
 
@@ -124,17 +160,31 @@ namespace Nuri.Avalonia
 
         private void ProcessScheduledRebuild()
         {
+            if (_disposed)
+            {
+                _invalidations.Clear();
+                _rebuildScheduled = false;
+                return;
+            }
+
             var dirtyComponents = _invalidations.DrainCoveredByParents();
             _rebuildScheduled = false;
 
+            if (dirtyComponents.Count == 0)
+                return;
+
             foreach (var invalidation in dirtyComponents)
+            {
+                NuriDiagnostics.Log(RuntimeLogKind.SubtreeRebuild, _treePrefix, invalidation.ComponentId, "Subtree rebuild scheduled.");
                 Rebuild(invalidation.Component, invalidation.ComponentId);
+            }
         }
 
         private void Rebuild(Component component, string componentId)
         {
             if (string.Equals(componentId, Runtime.CurrentVirtualEntry.Id, StringComparison.Ordinal))
             {
+                NuriDiagnostics.Log(RuntimeLogKind.FullRebuild, _treePrefix, componentId, "Dirty root requested full rebuild.");
                 Rebuild();
                 return;
             }
@@ -143,6 +193,7 @@ namespace Nuri.Avalonia
                 ?? Runtime.CurrentVirtualEntry.FindById(componentId);
             if (oldEntry == null)
             {
+                NuriDiagnostics.Log(RuntimeLogKind.FullRebuild, _treePrefix, componentId, "Dirty subtree was not found.");
                 Rebuild();
                 return;
             }
@@ -150,7 +201,10 @@ namespace Nuri.Avalonia
             var newVisual = RenderComponentSubtree(component, componentId, oldEntry.ParentId);
             var newEntry = newVisual.ToVirtualEntry();
             if (!Coordinator.RebuildSubtree(oldEntry, newEntry, componentId))
+            {
+                NuriDiagnostics.Log(RuntimeLogKind.FullRebuild, _treePrefix, componentId, "Subtree replacement failed.");
                 Rebuild();
+            }
         }
 
         private bool IsInThisTree(Component component)
@@ -205,10 +259,17 @@ namespace Nuri.Avalonia
             if (_disposed)
                 return;
 
+            _disposed = true;
+            _invalidations.Clear();
+            _rebuildScheduled = false;
+
             if (_currentRootVisual != null)
                 AvaloniaVirtualEntryRenderer.DetachNativeControls(_currentRootVisual);
             ComponentLifecycle.DisposeSubtree(_treePrefix + "_0");
-            _disposed = true;
+            if (_includeInDiagnostics)
+                NuriDiagnostics.UnregisterRoot(_treePrefix);
+            else if (_excludedDiagnosticsRootId != null)
+                NuriDiagnostics.IncludeRoot(_excludedDiagnosticsRootId);
         }
     }
 }

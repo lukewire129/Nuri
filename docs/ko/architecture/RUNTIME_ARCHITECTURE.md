@@ -139,17 +139,17 @@ Diagnostics가 활성화된 경우 WPF property 경로는 mapper, 쓰기 가능�
 
 WPF event add 경로도 중립 event를 변환할 수 없거나 변환된 native event가 대상 control에 없으면 `RuntimeLogKind.UnsupportedEvent`를 기록합니다. Native delegate 호환성은 그대로 유지하고 event 제거는 warning을 만들지 않으며, `NuriDiagnostics.ClearLogs()`가 호출될 때까지 native control CLR type과 source event 이름 조합으로 message 중복을 억제합니다.
 
-`Nuri.WPF.Diagnostics`와 `Nuri.Duxel.Diagnostics`는 renderer별 diagnostics package입니다. 두 package는 동일한 platform-neutral inspector component source를 compile하며, 이 component는 `RuntimeSnapshot`을 읽고 Core DSL을 통해 component tree, detail, hook, store, runtime-log 및 console view를 렌더합니다. 두 package는 서로 의존하지 않습니다. WPF는 secondary WPF window에서 inspector를 host하고 Duxel은 별도 Duxel window에서 host합니다. `NuriDiagnostics.Changed`는 검사 대상 renderer thread에서 hook을 변경하지 않고 renderer가 소유한 inspector rebuild를 요청합니다.
+`Nuri.WPF.Diagnostics`, `Nuri.Avalonia.Diagnostics` 및 `Nuri.Duxel.Diagnostics`는 renderer별 diagnostics package입니다. 모두 동일한 platform-neutral inspector component source를 compile하며, 이 component는 `RuntimeSnapshot`을 읽고 Core DSL을 통해 component tree, detail, hook, store, runtime-log 및 console view를 렌더합니다. Package는 서로 의존하지 않습니다. WPF와 Avalonia는 secondary retained window에서 inspector를 host하고 Duxel은 별도 Duxel window에서 host합니다. `NuriDiagnostics.Changed`는 검사 대상 renderer thread에서 hook을 변경하지 않고 renderer가 소유한 inspector rebuild를 요청합니다. Avalonia는 아직 `ItemsTypes.Virtualized`를 materialize하지 않으므로 inspector의 제한된 최대 200-row diagnostics list를 eager Scroll fallback으로 렌더하며, WPF와 Duxel은 virtualized inspector list를 유지합니다.
 
 `Nuri.WPFDiagnosticsSample`과 `Nuri.DuxelDiagnosticsSample`은 Debug build에서 `UseAttachDevTools()`를 설정하고 hook, store, keyed lifecycle, patch count, console capture 및 renderer별 inspector host를 검증합니다. WPF sample은 선택 component highlighting도 검증합니다.
 
-`WpfDevTools.OpenInspector(...)`, `DuxelDevTools.OpenInspector(...)` 및 `DuxelDevTools.RunInspector(...)`는 선택적인 `snapshotProvider`를 받습니다. 변경 가능한 virtual tree를 소유한 retained renderer는 UI thread에서 snapshot을 capture해야 합니다. WPF는 Dispatcher를 통해 capture를 dispatch하고 Duxel application builder는 Duxel frame boundary에서 capture를 실행합니다.
+`WpfDevTools.OpenInspector(...)`, `AvaloniaDevTools.OpenInspector(...)`, `DuxelDevTools.OpenInspector(...)` 및 `DuxelDevTools.RunInspector(...)`는 선택적인 `snapshotProvider`를 받습니다. 변경 가능한 virtual tree를 소유한 retained renderer는 UI thread에서 snapshot을 capture해야 합니다. WPF와 Avalonia는 UI Dispatcher를 통해 capture를 dispatch하고 Duxel application builder는 Duxel frame boundary에서 capture를 실행합니다. Avalonia는 아직 선택 component의 native highlighting을 노출하지 않습니다.
 
-WPF와 Duxel은 `INuriDebugHost`를 구현하는 lazy `NuriApplication.Create<TComponent>(...)` builder를 노출합니다. Diagnostics package extension인 `UseAttachDevTools()` 및 `UseAttachDevTools(DebugKey)`는 기본 `F12` 또는 명시적인 `F1`부터 `F12` key를 설정합니다. Startup 전에 extension을 호출하면 첫 render 전에 diagnostics가 활성화됩니다. WPF는 한 번의 warning과 함께 늦은 설정을 허용하며, Duxel은 blocking `Run()`이 시작되기 전에 shortcut을 설정해야 합니다.
+WPF, Avalonia 및 Duxel은 `INuriDebugHost`를 구현하는 lazy `NuriApplication.Create<TComponent>(...)` builder를 노출합니다. Diagnostics package extension인 `UseAttachDevTools()` 및 `UseAttachDevTools(DebugKey)`는 기본 `F12` 또는 명시적인 `F1`부터 `F12` key를 설정합니다. Startup 전에 extension을 호출하면 첫 render 전에 diagnostics가 활성화됩니다. WPF와 Avalonia는 한 번의 warning과 함께 늦은 설정을 허용하며, Duxel은 blocking `Run()`이 시작되기 전에 shortcut을 설정해야 합니다.
 
-Inspector root는 WPF와 Duxel 모두에서 `includeInDiagnostics: false`를 사용합니다. Core diagnostics는 initial render 전에 inspector root와 descendant를 제외하고 dispose 시 exclusion을 해제합니다. 따라서 검사 대상 application diagnostics는 계속 활성화하면서 inspector 자신의 render가 diagnostics-change/rebuild loop를 만드는 것을 방지합니다.
+Inspector root는 WPF, Avalonia 및 Duxel에서 `includeInDiagnostics: false`를 사용합니다. Core diagnostics는 initial render 전에 inspector root와 descendant를 제외하고 dispose 시 exclusion을 해제합니다. 따라서 검사 대상 application diagnostics는 계속 활성화하면서 inspector 자신의 render가 diagnostics-change/rebuild loop를 만드는 것을 방지합니다.
 
-기존 Duxel-hosted 공통 `Nuri.DevTools` package는 제거했습니다. Application은 renderer에 맞는 `Nuri.WPF.Diagnostics` 또는 `Nuri.Duxel.Diagnostics` package만 참조합니다. 공유 inspector source는 각 package에 compile되며 세 번째 common package로 publish하지 않습니다.
+기존 Duxel-hosted 공통 `Nuri.DevTools` package는 제거했습니다. Application은 renderer에 맞는 `Nuri.WPF.Diagnostics`, `Nuri.Avalonia.Diagnostics` 또는 `Nuri.Duxel.Diagnostics` package만 참조합니다. 공유 inspector source는 각 package에 compile되며 common package로 publish하지 않습니다.
 
 ## 중립 Transform Animation
 
@@ -287,6 +287,7 @@ dotnet run --project "tests\Nuri.RendererTests\Nuri.RendererTests.csproj" -c Rel
 dotnet run --project "tests\Nuri.DuxelRendererTests\Nuri.DuxelRendererTests.csproj" -c Release
 dotnet run --project "tests\Nuri.DevToolsTests\Nuri.DevToolsTests.csproj" -c Release
 dotnet run --project "tests\Nuri.DuxelDiagnosticsTests\Nuri.DuxelDiagnosticsTests.csproj" -c Release
+dotnet run --project "tests\Nuri.AvaloniaDiagnosticsTests\Nuri.AvaloniaDiagnosticsTests.csproj" -c Release
 dotnet run --project "tests\Nuri.FormatterTests\Nuri.FormatterTests.csproj" -c Release
 dotnet build "Nuri.sln" -c Release
 dotnet run --project "perf\Nuri.Performance\Nuri.Performance.csproj" -c Release -- --label after

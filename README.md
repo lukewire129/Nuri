@@ -23,6 +23,7 @@ Duxel remains the primary backend parity and expansion priority. The existing Av
 - `src/Nuri`: platform-neutral runtime, DSL, virtual DOM, diffing, patch operations, values, events, routing, and lifecycle hooks.
 - `src/Nuri.WPF`: WPF renderer adapter, WPF control registry, WPF property/event mapping, WPF animation materialization, and application host.
 - `src/Nuri.WPF.Diagnostics`: WPF runtime inspector package and `UseAttachDevTools()` integration.
+- `src/Nuri.Avalonia.Diagnostics`: Avalonia runtime inspector package and `UseAttachDevTools()` integration.
 - `src/Nuri.Duxel/Nuri.Duxel`: Duxel immediate-mode renderer adapter over `Duxel.App`.
 - `src/Nuri.Duxel/Nuri.Duxel.Windows`: Windows application/frame integration over `Duxel.Windows.App`.
 - `src/Nuri.Duxel/Nuri.Duxel.Diagnostics`: Duxel runtime inspector package and `UseAttachDevTools()` integration.
@@ -224,7 +225,7 @@ app.Run();
 
 ## Runtime Diagnostics
 
-Reference the diagnostics package that matches the renderer: `Nuri.WPF.Diagnostics` or `Nuri.Duxel.Diagnostics`. Both expose `UseAttachDevTools()`, default to F12, and compile the same platform-neutral inspector UI into the renderer-specific package.
+Reference the diagnostics package that matches the renderer: `Nuri.WPF.Diagnostics`, `Nuri.Avalonia.Diagnostics`, or `Nuri.Duxel.Diagnostics`. All expose `UseAttachDevTools()`, default to F12, and compile the same platform-neutral inspector UI into the renderer-specific package.
 
 ```csharp
 var app = NuriApplication.Create<AppComponent>("Nuri App", 940, 620);
@@ -236,7 +237,7 @@ app.UseAttachDevTools();
 app.Run();
 ```
 
-Import `Nuri.WPF.Diagnostics` for WPF or `Nuri.Duxel.Diagnostics` for Duxel. The matching samples are `Nuri.WPFDiagnosticsSample` and `Nuri.DuxelDiagnosticsSample`.
+Import `Nuri.WPF.Diagnostics` for WPF, `Nuri.Avalonia.Diagnostics` for Avalonia, or `Nuri.Duxel.Diagnostics` for Duxel. The matching samples are `Nuri.WPFDiagnosticsSample` and `Nuri.DuxelDiagnosticsSample`.
 
 ## WPF Samples
 
