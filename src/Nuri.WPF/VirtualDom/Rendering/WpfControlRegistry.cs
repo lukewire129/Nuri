@@ -10,6 +10,9 @@ namespace Nuri.WPF
     {
         public static FrameworkElement Create(Nuri.VirtualDom.VirtualEntry entry)
         {
+            if (entry.Type == VirtualControlTypes.Native)
+                return CreateNative(entry);
+
             return Create(entry.Type, entry.Kind);
         }
 
@@ -58,6 +61,20 @@ namespace Nuri.WPF
             }
         }
 
+        private static FrameworkElement CreateNative(Nuri.VirtualDom.VirtualEntry entry)
+        {
+            if (!entry.Properties.TryGetValue(Nuri.Constants.PropertyKeys.NativeControl, out var value)
+                || value is not Nuri.UI.NativeControlDescriptor descriptor)
+                throw new InvalidOperationException("Native element is missing its native control descriptor.");
+
+            if (!typeof(FrameworkElement).IsAssignableFrom(descriptor.NativeType))
+                throw new InvalidOperationException($"Native control '{descriptor.NativeType.FullName}' cannot be materialized by the WPF renderer. Expected a FrameworkElement.");
+
+            if (descriptor.Create() is not FrameworkElement native)
+                throw new InvalidOperationException($"Native factory for '{descriptor.NativeType.FullName}' did not create a FrameworkElement.");
+
+            return native;
+        }
         public static FrameworkElement GetPropertyTarget(FrameworkElement element, string propertyName)
         {
             if (element is DivElement div && IsHostProperty(propertyName))

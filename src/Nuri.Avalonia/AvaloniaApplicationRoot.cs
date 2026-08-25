@@ -205,6 +205,8 @@ namespace Nuri.Avalonia
             if (_disposed)
                 return;
 
+            if (_currentRootVisual != null)
+                AvaloniaVirtualEntryRenderer.DetachNativeControls(_currentRootVisual);
             ComponentLifecycle.DisposeSubtree(_treePrefix + "_0");
             _disposed = true;
         }

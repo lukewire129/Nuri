@@ -21,6 +21,13 @@ Runtime identity, key, and required regression-test contracts are defined in [RU
 - If both a parent and child are dirty, the parent rebuild covers the child.
 - A renderer-requested root replacement keeps the existing root identity. A partial replacement preserves hook/effect state for stable component identities, while a reset replacement disposes the previous root state before rendering the new root. Duxel applies the replacement at the next frame boundary and flushes newly pending effects only after the replacement projection commits.
 
+## Native Islands
+
+- `Native<TNative>(mount: ..., render: ...)` creates one renderer-owned native control for a retained virtual entry.
+- `mount` runs exactly once after creation and may return a cleanup. `render` runs after creation and again when the retained entry receives a new native descriptor during a committed Nuri render.
+- Renderer removal, replacement, and root disposal run the native cleanup before detaching the control. A native island is a leaf: Nuri never reconciles its internal native tree.
+- The active renderer validates the native CLR type before creation. WPF accepts `FrameworkElement`, Avalonia accepts `Control`, and Duxel rejects native islands.
+
 ## Effects
 
 - `useEffect` without dependencies runs after every committed render of that component.

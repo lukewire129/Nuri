@@ -6,6 +6,8 @@ using Avalonia;
 using Avalonia.Animation;
 using Avalonia.Animation.Easings;
 using Avalonia.Controls;
+using Nuri.Constants;
+using Nuri.UI;
 using Nuri.UI.Values;
 using Nuri.VirtualDom;
 
@@ -23,7 +25,10 @@ namespace Nuri.Avalonia
             control.Tag = entry.Id;
 
             foreach (var property in entry.Properties)
-                AvaloniaPropertyMapper.TrySetProperty(control, property.Key, property.Value);
+            {
+                if (property.Key != PropertyKeys.NativeControl)
+                    AvaloniaPropertyMapper.TrySetProperty(control, property.Key, property.Value);
+            }
 
             foreach (var evt in entry.Events)
                 AddEventHandler(control, evt);
@@ -31,6 +36,7 @@ namespace Nuri.Avalonia
             foreach (var child in entry.Children)
                 AvaloniaControlRegistry.AddChild(control, Build(child));
 
+            MountNativeControl(control, entry);
             return control;
         }
 
@@ -48,7 +54,13 @@ namespace Nuri.Avalonia
                         break;
                     case UpdatePropertyPatch updateProperty:
                         if (controlIndex.TryGetValue(updateProperty.Target.Id, out var updateTarget))
-                            AvaloniaPropertyMapper.TrySetProperty(updateTarget, updateProperty.PropertyName, updateProperty.Value);
+                        {
+                            if (updateProperty.PropertyName == PropertyKeys.NativeControl
+                                && updateProperty.Value is NativeControlDescriptor descriptor)
+                                NativeControlLifecycle.Render(updateTarget, descriptor);
+                            else
+                                AvaloniaPropertyMapper.TrySetProperty(updateTarget, updateProperty.PropertyName, updateProperty.Value);
+                        }
                         break;
                     case RemovePropertyPatch removeProperty:
                         if (controlIndex.TryGetValue(removeProperty.Target.Id, out var removeTarget))
@@ -151,6 +163,7 @@ namespace Nuri.Avalonia
             if (target.Parent is not Control parent)
                 return;
 
+            UnmountNativeControls(target);
             var replacement = Build(operation.NewEntry);
             RemoveFromIndex(controlIndex, target);
             AvaloniaControlRegistry.ReplaceChild(parent, target, replacement);
@@ -173,6 +186,7 @@ namespace Nuri.Avalonia
                 return;
 
             RemoveFromIndex(controlIndex, child);
+            UnmountNativeControls(child);
             AvaloniaControlRegistry.RemoveChild(parent, child);
         }
 
@@ -218,6 +232,26 @@ namespace Nuri.Avalonia
 
             foreach (var child in AvaloniaControlRegistry.GetChildren(control).ToArray())
                 RemoveFromIndex(index, child);
+        }
+
+        private static void MountNativeControl(Control control, VirtualEntry entry)
+        {
+            if (entry.Properties.TryGetValue(PropertyKeys.NativeControl, out var value)
+                && value is NativeControlDescriptor descriptor)
+                NativeControlLifecycle.MountAndRender(control, descriptor);
+        }
+
+        internal static void DetachNativeControls(Control control)
+        {
+            UnmountNativeControls(control);
+        }
+
+        private static void UnmountNativeControls(Control control)
+        {
+            foreach (var child in AvaloniaControlRegistry.GetChildren(control).ToArray())
+                UnmountNativeControls(child);
+
+            NativeControlLifecycle.Unmount(control);
         }
     }
 }

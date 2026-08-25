@@ -86,6 +86,69 @@ public abstract partial class Component
             .Columns(columnWidths.Lengths);
     }
 
+    public static NativeElement Native<TNative>(Action<TNative> mount)
+        where TNative : class, new()
+    {
+        return CreateNative(() => new TNative(), mount, null, null);
+    }
+
+    public static NativeElement Native<TNative>(
+        Action<TNative> mount,
+        Action<TNative> render)
+        where TNative : class, new()
+    {
+        return CreateNative(() => new TNative(), mount, null, render);
+    }
+
+    public static NativeElement Native<TNative>(
+        Func<TNative, Action?> mount,
+        Action<TNative> render)
+        where TNative : class, new()
+    {
+        return CreateNative(() => new TNative(), null, mount, render);
+    }
+
+    public static NativeElement Native<TNative>(
+        Func<TNative> create,
+        Action<TNative> mount,
+        Action<TNative>? render = null)
+        where TNative : class
+    {
+        return CreateNative(create, mount, null, render);
+    }
+
+    public static NativeElement Native<TNative>(
+        Func<TNative> create,
+        Func<TNative, Action?> mount,
+        Action<TNative> render)
+        where TNative : class
+    {
+        return CreateNative(create, null, mount, render);
+    }
+
+    private static NativeElement CreateNative<TNative>(
+        Func<TNative> create,
+        Action<TNative>? mount,
+        Func<TNative, Action?>? mountWithCleanup,
+        Action<TNative>? render)
+        where TNative : class
+    {
+        if (create == null)
+            throw new ArgumentNullException(nameof(create));
+
+        return new NativeElement(new NativeControlDescriptor(
+            typeof(TNative),
+            () => create() ?? throw new InvalidOperationException($"Native factory for '{typeof(TNative).FullName}' returned null."),
+            mountWithCleanup == null
+                ? mount == null ? null : native =>
+                {
+                    mount((TNative)native);
+                    return null;
+                }
+                : native => mountWithCleanup((TNative)native),
+            render == null ? _ => { } : native => render((TNative)native)));
+    }
+
     public static ImageElement Image()
     {
         return new ImageElement();

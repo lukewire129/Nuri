@@ -11,6 +11,9 @@ namespace Nuri.Avalonia
     {
         public static Control Create(VirtualEntry entry)
         {
+            if (entry.Type == VirtualControlTypes.Native)
+                return CreateNative(entry);
+
             return Create(entry.Type, entry.Kind);
         }
 
@@ -33,6 +36,20 @@ namespace Nuri.Avalonia
             }
         }
 
+        private static Control CreateNative(VirtualEntry entry)
+        {
+            if (!entry.Properties.TryGetValue(Nuri.Constants.PropertyKeys.NativeControl, out var value)
+                || value is not Nuri.UI.NativeControlDescriptor descriptor)
+                throw new InvalidOperationException("Native element is missing its native control descriptor.");
+
+            if (!typeof(Control).IsAssignableFrom(descriptor.NativeType))
+                throw new InvalidOperationException($"Native control '{descriptor.NativeType.FullName}' cannot be materialized by the Avalonia renderer. Expected an Avalonia Control.");
+
+            if (descriptor.Create() is not Control native)
+                throw new InvalidOperationException($"Native factory for '{descriptor.NativeType.FullName}' did not create an Avalonia Control.");
+
+            return native;
+        }
         public static void AddChild(Control parent, Control child, int? index = null)
         {
             if (parent is Panel panel)

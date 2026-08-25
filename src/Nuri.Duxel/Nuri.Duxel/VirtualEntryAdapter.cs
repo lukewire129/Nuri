@@ -15,6 +15,9 @@ internal static class VirtualEntryAdapter
             return ToVirtualEntry(component);
         }
 
+
+        if (element.Type == Nuri.UI.Controls.VirtualControlTypes.Native)
+            throw new NotSupportedException("Native elements cannot be materialized by the Duxel renderer.");
         StyleManager.Apply(element);
 
         List<KeyValuePair<string, object?>>? properties = null;

@@ -13,11 +13,27 @@ namespace Nuri.Avalonia
         public AvaloniaApplicationHost(Window window)
         {
             _window = window ?? throw new ArgumentNullException(nameof(window));
+            ConfigureContentHost(_window, null);
+        }
+
+        internal static void ConfigureContentHost(ContentControl host, Control? root)
+        {
+            host.HorizontalContentAlignment = global::Avalonia.Layout.HorizontalAlignment.Stretch;
+            host.VerticalContentAlignment = global::Avalonia.Layout.VerticalAlignment.Stretch;
+            if (root == null)
+                return;
+
+            root.HorizontalAlignment = global::Avalonia.Layout.HorizontalAlignment.Stretch;
+            root.VerticalAlignment = global::Avalonia.Layout.VerticalAlignment.Stretch;
+            host.Content = root;
         }
 
         public void SetContent(Control root)
         {
-            _window.Content = root;
+            if (root == null)
+                throw new ArgumentNullException(nameof(root));
+
+            ConfigureContentHost(_window, root);
         }
 
         public void ApplyWindowProperties(IElement rootElement)

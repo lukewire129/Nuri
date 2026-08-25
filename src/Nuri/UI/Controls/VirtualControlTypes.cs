@@ -7,6 +7,7 @@ namespace Nuri.UI.Controls
         public const string Image = "Image";
         public const string Input = "Input";
         public const string Items = "Items";
+        public const string Native = "Native";
         public const string Overlay = "Overlay";
         public const string Select = "Select";
         public const string Text = "Text";

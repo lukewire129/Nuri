@@ -19,6 +19,13 @@ Nuri lifecycle은 virtual tree render, diff, patch, commit, effect flush 순서�
 - 부모와 자식이 모두 dirty이면 부모 rebuild가 자식을 포함합니다.
 - Renderer가 요청한 root replacement는 기존 root identity를 유지합니다. Partial replacement는 stable component identity의 hook/effect state를 보존하고, reset replacement는 새 root를 render하기 전에 이전 root state를 dispose합니다. Duxel은 다음 frame 경계에서 replacement를 적용하고 replacement projection이 commit된 뒤에만 새 pending effect를 실행합니다.
 
+## Native Island
+
+- `Native<TNative>(mount: ..., render: ...)`는 유지되는 virtual entry마다 renderer가 소유하는 native control 하나를 생성합니다.
+- `mount`는 생성 뒤 정확히 한 번 실행되고 cleanup을 반환할 수 있습니다. `render`는 생성 뒤와 유지되는 entry가 commit된 Nuri render 중 새 native descriptor를 받을 때마다 실행됩니다.
+- Renderer의 제거, 교체 및 root dispose는 control을 detach하기 전에 native cleanup을 실행합니다. Native island는 leaf이므로 Nuri가 내부 native tree를 reconcile하지 않습니다.
+- Active renderer는 생성 전에 native CLR type을 검증합니다. WPF는 `FrameworkElement`를 받고 Avalonia는 `Control`을 받으며 Duxel은 native island를 거부합니다.
+
 ## Effect
 
 - dependency가 없는 `useEffect`는 해당 component의 commit된 render마다 실행됩니다.

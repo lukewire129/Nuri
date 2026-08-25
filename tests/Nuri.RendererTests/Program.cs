@@ -14,8 +14,11 @@ using Nuri.UI.Styles;
 using Nuri.VirtualDom;
 using Nuri.WPF;
 using AvaloniaControl = Avalonia.Controls.Control;
+using AvaloniaTextBox = Avalonia.Controls.TextBox;
 using AvaloniaContentControl = Avalonia.Controls.ContentControl;
 using AvaloniaDecorator = Avalonia.Controls.Decorator;
+using AvaloniaHorizontalAlignment = Avalonia.Layout.HorizontalAlignment;
+using AvaloniaVerticalAlignment = Avalonia.Layout.VerticalAlignment;
 using AvaloniaPanel = Avalonia.Controls.Panel;
 using AvaloniaTextBlock = Avalonia.Controls.TextBlock;
 using AvaloniaVisual = Avalonia.Visual;
@@ -57,6 +60,7 @@ internal static class Program
         TextOverflowMappingsRemainConsistent();
         WpfYamlStylesMaterializeExternalOverrides();
         RunSuite(() => new WpfDriver());
+        NativeControlsMountRenderAndCleanup();
         WpfRepeatedEffectLifecycleRemainsStable();
         WpfDisposedRootIgnoresQueuedInvalidations();
         WpfMultipleRootsIsolateStateAndCleanupClosedWindows();
@@ -75,8 +79,22 @@ internal static class Program
         WpfVirtualizedItemsStayLazyAndRecycleContainers();
         WpfMeasuredVirtualizedItemsUseNaturalRowHeights();
         RunSuite(() => new AvaloniaDriver());
+        AvaloniaWindowRootFillsWindowClientArea();
         WpfRunBootstrapsStaAndClosesEveryWindowWithTheMainWindow();
         Console.WriteLine("Nuri.RendererTests passed.");
+    }
+
+    private static void AvaloniaWindowRootFillsWindowClientArea()
+    {
+        var host = new AvaloniaContentControl();
+        var rootControl = new AvaloniaPanel();
+        Nuri.Avalonia.AvaloniaApplicationHost.ConfigureContentHost(host, rootControl);
+
+        AssertEqual(AvaloniaHorizontalAlignment.Stretch, host.HorizontalContentAlignment, "Avalonia: Window content must stretch horizontally.");
+        AssertEqual(AvaloniaVerticalAlignment.Stretch, host.VerticalContentAlignment, "Avalonia: Window content must stretch vertically.");
+        AssertEqual(AvaloniaHorizontalAlignment.Stretch, rootControl.HorizontalAlignment, "Avalonia: Root control must stretch horizontally.");
+        AssertEqual(AvaloniaVerticalAlignment.Stretch, rootControl.VerticalAlignment, "Avalonia: Root control must stretch vertically.");
+        AssertSame(rootControl, host.Content!, "Avalonia: Root control must be assigned as host content.");
     }
     private static void WpfYamlStylesMaterializeExternalOverrides()
     {
@@ -120,6 +138,82 @@ styles:
             if (File.Exists(path))
                 File.Delete(path);
         }
+    }
+
+    private static void NativeControlsMountRenderAndCleanup()
+    {
+        var wpfMounts = 0;
+        var wpfRenders = 0;
+        var wpfCleanups = 0;
+        var wpfInitial = Component.Div(
+            Component.Native<WpfTextBox>(
+                mount: _ =>
+                {
+                    wpfMounts++;
+                    return () => wpfCleanups++;
+                },
+                render: editor =>
+                {
+                    wpfRenders++;
+                    editor.Text = "initial";
+                })
+            .Width(240));
+        var wpfInitialEntry = wpfInitial.ToVirtualEntry();
+        var wpfRoot = WpfVirtualEntryRenderer.Build(wpfInitialEntry);
+        var wpfEditor = (WpfTextBox)WpfVirtualEntryRenderer.FindElementById(wpfRoot, "0_1")!;
+        AssertEqual("initial", wpfEditor.Text, "WPF: Native render must configure the mounted native control.");
+        AssertEqual(240d, wpfEditor.Width, "WPF: Native controls must receive neutral visual properties.");
+        AssertEqual(1, wpfMounts, "WPF: Native mount must run once.");
+
+        var wpfUpdatedEntry = Component.Div(
+            Component.Native<WpfTextBox>(
+                mount: _ => throw new InvalidOperationException("Native mount must not run during a retained update."),
+                render: editor =>
+                {
+                    wpfRenders++;
+                    editor.Text = "updated";
+                })
+            .Width(240))
+            .ToVirtualEntry();
+        WpfVirtualEntryRenderer.ApplyDiff(wpfRoot, VirtualTreeDiff.Diff(wpfInitialEntry, wpfUpdatedEntry));
+        AssertEqual("updated", wpfEditor.Text, "WPF: Native render must receive latest component output without replacing the native control.");
+        AssertEqual(2, wpfRenders, "WPF: Native render must execute for the initial mount and retained update.");
+
+        var wpfRemovedEntry = Component.Div().ToVirtualEntry();
+        WpfVirtualEntryRenderer.ApplyDiff(wpfRoot, VirtualTreeDiff.Diff(wpfUpdatedEntry, wpfRemovedEntry));
+        AssertEqual(1, wpfCleanups, "WPF: Native cleanup must run when the control is unmounted.");
+
+        var avaloniaMounts = 0;
+        var avaloniaCleanups = 0;
+        var avaloniaInitial = Component.Div(
+            Component.Native<AvaloniaTextBox>(
+                mount: _ =>
+                {
+                    avaloniaMounts++;
+                    return () => avaloniaCleanups++;
+                },
+                render: editor => editor.Text = "initial")
+            .Width(240));
+        var avaloniaInitialEntry = avaloniaInitial.ToVirtualEntry();
+        var avaloniaRoot = Nuri.Avalonia.AvaloniaVirtualEntryRenderer.Build(avaloniaInitialEntry);
+        var avaloniaEditor = (AvaloniaTextBox)((AvaloniaPanel)avaloniaRoot).Children.Single();
+        AssertEqual("initial", avaloniaEditor.Text, "Avalonia: Native render must configure the mounted native control.");
+        AssertEqual(240d, avaloniaEditor.Width, "Avalonia: Native controls must receive neutral visual properties.");
+        AssertEqual(1, avaloniaMounts, "Avalonia: Native mount must run once.");
+
+        var avaloniaUpdatedEntry = Component.Div(
+            Component.Native<AvaloniaTextBox>(
+                mount: _ => throw new InvalidOperationException("Native mount must not run during a retained update."),
+                render: editor => editor.Text = "updated")
+            .Width(240))
+            .ToVirtualEntry();
+        Nuri.Avalonia.AvaloniaVirtualEntryRenderer.ApplyDiff(avaloniaRoot, VirtualTreeDiff.Diff(avaloniaInitialEntry, avaloniaUpdatedEntry));
+        AssertEqual("updated", avaloniaEditor.Text, "Avalonia: Native render must receive latest component output without replacing the native control.");
+
+        var avaloniaRemovedEntry = Component.Div().ToVirtualEntry();
+        Nuri.Avalonia.AvaloniaVirtualEntryRenderer.ApplyDiff(avaloniaRoot, VirtualTreeDiff.Diff(avaloniaUpdatedEntry, avaloniaRemovedEntry));
+        AssertEqual(1, avaloniaCleanups, "Avalonia: Native cleanup must run when the control is unmounted.");
+
     }
 
 

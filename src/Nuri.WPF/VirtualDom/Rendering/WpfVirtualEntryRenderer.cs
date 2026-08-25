@@ -1,5 +1,6 @@
 using Nuri.Constants;
 using Nuri.UI.Controls;
+using Nuri.UI;
 using Nuri.VirtualDom;
 using Nuri.UI.Values;
 using Nuri.Runtime.Diagnostics;
@@ -85,7 +86,7 @@ namespace Nuri.WPF
             ApplyProperties(element, entry);
             ApplyEvents(element, entry);
             ApplyChildren(element, entry);
-
+            MountNativeControl(element, entry);
             return element;
         }
 
@@ -121,7 +122,7 @@ namespace Nuri.WPF
         {
             foreach (var property in entry.Properties)
             {
-                if (IsHostOnlyWindowProperty(entry, property.Key))
+                if (property.Key == PropertyKeys.NativeControl || IsHostOnlyWindowProperty(entry, property.Key))
                     continue;
 
                 SetProperty(element, property.Key, property.Value);
@@ -164,11 +165,17 @@ namespace Nuri.WPF
             else
                 throw new InvalidOperationException($"Unsupported parent type for replace: {parent?.GetType().Name ?? "null"}");
         }
-
         private static void UpdateProperty(Dictionary<string, FrameworkElement> controlIndex, UpdatePropertyPatch operation)
         {
             if (!controlIndex.TryGetValue(operation.Target.Id, out var target))
                 return;
+
+            if (operation.PropertyName == PropertyKeys.NativeControl
+                && operation.Value is NativeControlDescriptor descriptor)
+            {
+                NativeControlLifecycle.Render(target, descriptor);
+                return;
+            }
 
             if (!IsHostOnlyWindowProperty(operation.Target, operation.PropertyName))
                 SetProperty(target, operation.PropertyName, operation.Value);
@@ -301,10 +308,18 @@ namespace Nuri.WPF
                     RemoveEventHandler(element, evt);
 
                 EventHandlers.Remove(element);
+                NativeControlLifecycle.Unmount(element);
             }
 
             foreach (var child in entry.Children)
                 DetachEvents(controlIndex, child);
+        }
+
+        private static void MountNativeControl(FrameworkElement element, VirtualEntry entry)
+        {
+            if (entry.Properties.TryGetValue(PropertyKeys.NativeControl, out var value)
+                && value is NativeControlDescriptor descriptor)
+                NativeControlLifecycle.MountAndRender(element, descriptor);
         }
 
         private static void LogUnsupportedEvent(FrameworkElement element, string eventName, string? wpfEventName)

@@ -16,6 +16,7 @@ namespace Nuri.Constants
         public const string IsChecked = "IsChecked";
         public const string JustifyContent = "JustifyContent";
         public const string Name = "Name";
+        public const string NativeControl = "NativeControl";
         public const string PositionX = "PositionX";
         public const string PositionY = "PositionY";
         public const string RowSpacing = "RowSpacing";
