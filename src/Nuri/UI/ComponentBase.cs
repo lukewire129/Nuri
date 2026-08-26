@@ -120,6 +120,12 @@ namespace Nuri.UI
             return (TElement)(object)this;
         }
 
+        protected TService useService<TService>()
+            where TService : class
+        {
+            return NuriServices.GetRequiredService<TService>();
+        }
+
         protected (T state, Action<Func<T, T>> setState) useState<T>(T initialValue)
         {
             _hasUsedHooks = true;

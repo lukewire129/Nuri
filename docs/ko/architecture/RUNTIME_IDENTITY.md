@@ -44,6 +44,8 @@ Component key는 렌더 결과 root에 별도 key가 없을 때 virtual root로 
 ## Hook 및 Effect
 
 - Hook slot은 순서 기반이며 render 사이에 일관되게 호출해야 합니다.
+- `useService<T>()`는 `NuriServices.UseServiceProvider(...)`로 구성한 process-wide `IServiceProvider`에서 resolve합니다. Hook slot을 소비하지 않고, service 변경을 구독하거나 invalidation을 요청하지 않습니다.
+- Nuri는 service를 등록, 생성 또는 dispose하지 않습니다. Render 전에 provider를 구성하고 lifetime과 dispose 소유권은 host container가 정의하게 해야 합니다. Service가 소유한 state를 관찰하려면 application 코드에서 store 또는 effect를 사용해야 합니다.
 - `useState`는 함수형 setter인 `setState(current => next)`를 사용합니다.
 - 이전 state가 필요한 변경은 전달된 `current`를 사용하고, 값 교체는 `setState(_ => value)`를 사용합니다.
 - `useEffect(..., [])`는 부모 render에서 새 CLR 객체가 생성되더라도 안정적인 논리 component에서는 한 번만 mount됩니다.

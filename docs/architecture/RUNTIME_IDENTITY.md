@@ -48,6 +48,8 @@ Ancestry entries must be registered when node numbers are assigned and removed w
 ## Hooks and Effects
 
 - Hook slots are ordered and must be called consistently between renders.
+- `useService<T>()` resolves from the process-wide `IServiceProvider` configured through `NuriServices.UseServiceProvider(...)`. It does not consume a hook slot, subscribe to service changes, or trigger invalidation.
+- Nuri does not register, construct, or dispose services. Configure the provider before rendering, and let the host container define lifetimes and own disposal. Application code must use stores or effects to observe service-owned state.
 - `useState` uses a functional setter: `setState(current => next)`.
 - Use the supplied `current` value when the update depends on previous state. Use `setState(_ => value)` for replacement.
 - `useEffect(..., [])` mounts once for a stable logical component, even if a new CLR component object is allocated during a parent render.

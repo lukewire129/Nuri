@@ -25,6 +25,7 @@ internal static class Program
         AlignedKeyedChildrenPreserveIdentityAndPatchOnlyChanges();
         KeyedSlidingWindowPreservesRetainedChildIdentities();
         SubtreeRebuildPreservesRenderedDescendantIdentities();
+        UseServiceResolvesRegisteredSingletonDuringRender();
         UseReducerDispatchesFromCurrentState();
         UseStateReusesSetterForStableLogicalComponent();
         UseStateSetterTracksLatestComponentOwner();
@@ -71,6 +72,18 @@ internal static class Program
         VirtualizedItemsRejectComponentTemplatesLazily();
         YamlStylesResolveTokensOverridesAndFallbacks();
         Console.WriteLine("Nuri.Tests passed.");
+    }
+
+    private static void UseServiceResolvesRegisteredSingletonDuringRender()
+    {
+        var service = new ServiceProbeValue("Nuri");
+        NuriServices.UseServiceProvider(new ServiceProbeProvider(service));
+
+        var component = new ServiceProbe();
+        var rendered = component.Render();
+
+        AssertEqual("Nuri", rendered.Properties["Text"], "useService should resolve the registered singleton while rendering.");
+        AssertEqual(true, ReferenceEquals(service, component.ResolvedService), "useService should return the registered singleton instance.");
     }
 
     private static void NamedColorsUseWpfCompatibleValues()
@@ -1611,6 +1624,17 @@ styles:
         }
     }
 
+    private sealed class ServiceProbe : Component
+    {
+        public ServiceProbeValue? ResolvedService { get; private set; }
+
+        public override IElement Render()
+        {
+            ResolvedService = useService<ServiceProbeValue>();
+            return Text(ResolvedService.Name);
+        }
+    }
+
     private static void DiagnosticsTrackPatchBatchesAndVirtualizedRows()
     {
         const string rootId = "diagnostics-patch-root";
@@ -1781,4 +1805,31 @@ styles:
     }
 
     private sealed record StoreTestState(string Name, string Role, int LoginCount);
+
+    private sealed class ServiceProbeValue
+    {
+        public ServiceProbeValue(string name)
+        {
+            Name = name;
+        }
+
+        public string Name { get; }
+    }
+
+    private sealed class ServiceProbeProvider : IServiceProvider
+    {
+        private readonly ServiceProbeValue _service;
+
+        public ServiceProbeProvider(ServiceProbeValue service)
+        {
+            _service = service;
+        }
+
+        public object? GetService(Type serviceType)
+        {
+            return serviceType == typeof(ServiceProbeValue)
+                ? _service
+                : null;
+        }
+    }
 }
