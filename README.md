@@ -10,9 +10,9 @@
 
 Nuri is a C# MVU UI library. Components describe UI with platform-neutral virtual elements, and renderer adapters materialize those descriptions into native controls.
 
-The supported renderer paths are WPF through `Nuri.WPF` and Duxel on Windows through `Nuri.Duxel.Windows`. The platform-neutral immediate-mode Duxel renderer is packaged as `Nuri.Duxel` and is referenced by the Windows host.
+The recommended renderer paths are WPF through `Nuri.WPF` and Avalonia through `Nuri.Avalonia`. Avalonia applications should keep their host lifecycle and attach Nuri content to an existing window. Duxel on Windows through `Nuri.Duxel.Windows` remains available for renderer testing and experimentation.
 
-Duxel remains the primary backend parity and expansion priority. The existing Avalonia adapter remains available as a regression baseline.
+The platform-neutral immediate-mode Duxel renderer is packaged as `Nuri.Duxel` and is referenced by the Windows host.
 
 ## What Nuri Does
 
@@ -28,15 +28,16 @@ Duxel remains the primary backend parity and expansion priority. The existing Av
 - `src/Nuri`: platform-neutral runtime, DSL, virtual DOM, diffing, patch operations, values, events, routing, and lifecycle hooks.
 - `src/Nuri.WPF`: WPF renderer adapter, WPF control registry, WPF property/event mapping, WPF animation materialization, and application host.
 - `src/Nuri.WPF.Diagnostics`: WPF runtime inspector package and `UseAttachDevTools()` integration.
+- `src/Nuri.Avalonia`: retained-control adapter for Avalonia host applications.
 - `src/Nuri.Avalonia.Diagnostics`: Avalonia runtime inspector package and `UseAttachDevTools()` integration.
 - `src/Nuri.Duxel/Nuri.Duxel`: Duxel immediate-mode renderer adapter over `Duxel.App`.
 - `src/Nuri.Duxel/Nuri.Duxel.Windows`: Windows application/frame integration over `Duxel.Windows.App`.
 - `src/Nuri.Duxel/Nuri.Duxel.Diagnostics`: Duxel runtime inspector package and `UseAttachDevTools()` integration.
 - `src/Nuri.WPF.PreviewHost` and `src/Nuri.Duxel/Nuri.Duxel.PreviewHost`: out-of-process preview hosts.
-- `src/Nuri.Avalonia`: existing Avalonia renderer adapter retained as a regression baseline rather than the next backend expansion target.
 - `src/Nuri.Formatter`: conservative C# formatter used by the Visual Studio integration.
 - `samples/WPF`: focused WPF samples that exercise concrete behavior.
-- `samples/Duxel`: focused Duxel samples used to drive the next backend implementation slices.
+- `samples/Avalonia`: Avalonia host and renderer integration samples.
+- `samples/Duxel`: focused Duxel renderer testing samples.
 - `tests/Nuri.Tests`: lightweight Core behavior tests.
 - `perf`: performance sanity harnesses.
 
@@ -94,46 +95,64 @@ ToggleButton("Pinned", value => setPinned(_ => value));
 PasswordBox();
 ```
 
-## State And Hooks
+## Basic Avalonia App
 
-Use `useState` for local component state:
-
-```csharp
-var (text, setText) = useState(string.Empty);
-
-return TextBox(text, value => setText(_ => value));
-```
-
-Use `useEffect` for post-render effects. Omitting dependencies runs after every render. Passing `[]` runs on mount and cleans up on unmount.
-
-If no cleanup is needed, use the `Action` overload and do not return anything:
+For Avalonia, create and configure the native application and window in the host, then attach Nuri content to the window:
 
 ```csharp
-useEffect(() =>
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
+using Nuri.Avalonia;
+
+public sealed class App : Application
 {
-    TrackRender();
-}, [route]);
+    public override void OnFrameworkInitializationCompleted()
+    {
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            var window = new Window
+            {
+                Title = "Nuri Avalonia",
+                Width = 720,
+                Height = 480
+            };
+
+            NuriApplication.Attach(window, new CounterComponent());
+            desktop.MainWindow = window;
+        }
+
+        base.OnFrameworkInitializationCompleted();
+    }
+}
 ```
 
-Return a cleanup action only when the effect owns something that should be disposed or unsubscribed:
+`Attach` is the recommended integration path: Avalonia continues to own application startup, window configuration, and application services, while Nuri owns the attached virtual tree and disposes it when the window closes.
+
+WPF supports the same two startup models: use `NuriApplication.Run(...)` for the minimal path or create a `Window` in `App.OnStartup` and call `NuriApplication.Attach(...)` for host-owned configuration. The [Getting Started guide](docs/guides/GETTING_STARTED.md) includes WPF and Avalonia `Attach` examples plus Avalonia window transparency and title-bar customization extensions.
+
+## Basic Duxel Test App
+
+`Nuri.Duxel.Windows` uses the same Core component API but is intended for renderer testing and experimentation rather than as the recommended starting point for a new application.
 
 ```csharp
-useEffect(() =>
-{
-    StartSubscription();
-    return StopSubscription;
-}, []);
+using Nuri.Duxel;
+
+var app = NuriApplication.Create<CounterComponent>(
+    title: "Nuri Duxel",
+    width: 720,
+    height: 480);
+
+app.Run();
 ```
 
-Track dependencies with C# collection expressions:
+## Learn Nuri
 
-```csharp
-useEffect(() =>
-{
-    Refresh(route);
-    return null;
-}, [route]);
-```
+The detailed guides keep the README focused while documenting the runtime contracts users and coding agents need:
+
+- [Getting Started](docs/guides/GETTING_STARTED.md): renderer selection, first component, keys, DI setup, and component boundaries.
+- [Hook Reference](docs/guides/HOOKS.md): state, reducer, refs, memoization, effects, stores, services, navigation, and render-scope guidance.
+- [Nuri AI Skill](skills/nuri/SKILL.md): concise AI authoring rules that point back to the full guides.
 
 ## Routing
 
@@ -210,23 +229,6 @@ Text("Play")
 ```
 
 Use `.Transitions("Margin", ...)` only when the animated property needs to be selected explicitly.
-
-## Basic Duxel App
-
-Run a Duxel application on Windows through the `Nuri.Duxel.Windows` host:
-
-```csharp
-using Nuri.Duxel;
-
-var app = NuriApplication.Create<CounterComponent>(
-    title: "Nuri Duxel",
-    width: 720,
-    height: 480);
-
-app.Run();
-```
-
-`Nuri.Duxel` owns immediate-mode projection, while `Nuri.Duxel.Windows` owns the native window, input bridge, and frame-loop integration.
 
 ## Runtime Diagnostics
 

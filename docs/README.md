@@ -11,6 +11,8 @@ The English documents in this directory are the shared implementation reference 
 | Duxel performance | [Duxel Performance Analysis](performance/DUXEL_PERFORMANCE_ANALYSIS.md) |
 | YAML visual styles, theme tokens, external overrides | [YAML Styles](guides/YAML_STYLES.md) |
 | Formatter | [Formatting](guides/FORMATTING.md) |
+| First application, component boundaries, and DI provider setup | [Getting Started](guides/GETTING_STARTED.md) |
+| Hook API, ordering, effects, stores, navigation, and render scope | [Hook Reference](guides/HOOKS.md) |
 
 `operations/SESSION_HANDOFF.md` is an optional recovery note. It is not a design authority and is not required reading for normal work.
 
