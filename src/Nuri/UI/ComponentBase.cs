@@ -120,12 +120,23 @@ namespace Nuri.UI
             return (TElement)(object)this;
         }
 
+        /// <summary>
+        /// Resolves a service from the configured <see cref="IServiceProvider"/> without consuming a hook slot. Does not re-render the component when the service changes internally.
+        /// </summary>
+        /// <typeparam name="TService">The service type to resolve.</typeparam>
+        /// <returns>The resolved service instance.</returns>
         protected TService useService<TService>()
             where TService : class
         {
             return NuriServices.GetRequiredService<TService>();
         }
 
+        /// <summary>
+        /// Stores local component state and returns the current value with a functional setter. Call in the same order on every render and never conditionally.
+        /// </summary>
+        /// <typeparam name="T">The state type.</typeparam>
+        /// <param name="initialValue">The initial state value.</param>
+        /// <returns>A tuple of the current state and a setter that receives the current value and returns the next value.</returns>
         protected (T state, Action<Func<T, T>> setState) useState<T>(T initialValue)
         {
             _hasUsedHooks = true;
@@ -158,6 +169,14 @@ namespace Nuri.UI
             return (hook.Value, hook.Setter);
         }
 
+        /// <summary>
+        /// Manages state transformed by dispatching actions through a reducer. Call in the same order on every render and never conditionally.
+        /// </summary>
+        /// <typeparam name="TState">The state type.</typeparam>
+        /// <typeparam name="TAction">The action type.</typeparam>
+        /// <param name="reducer">Pure function mapping the current state and an action to the next state.</param>
+        /// <param name="initialState">The initial state value.</param>
+        /// <returns>A tuple of the current state and a dispatch function for actions.</returns>
         protected (TState state, Action<TAction> dispatch) useReducer<TState, TAction>(Func<TState, TAction, TState> reducer, TState initialState)
         {
             if (reducer == null)
@@ -192,6 +211,12 @@ namespace Nuri.UI
             return (state, Dispatch);
         }
 
+        /// <summary>
+        /// Retains a mutable value across renders without invalidating the component when <see cref="Ref{T}.Current"/> changes. Call in the same order on every render and never conditionally.
+        /// </summary>
+        /// <typeparam name="T">The referenced value type.</typeparam>
+        /// <param name="initialValue">The initial referenced value.</param>
+        /// <returns>A <see cref="Ref{T}"/> whose <see cref="Ref{T}.Current"/> persists across renders.</returns>
         protected Ref<T> useRef<T>(T initialValue)
         {
             _hasUsedHooks = true;
@@ -204,6 +229,12 @@ namespace Nuri.UI
             return reference;
         }
 
+        /// <summary>
+        /// Retains a stable reference while updating <see cref="Ref{T}.Current"/> to the latest rendered value, so callbacks always see current data without re-creating the reference.
+        /// </summary>
+        /// <typeparam name="T">The referenced value type.</typeparam>
+        /// <param name="value">The latest value for this render.</param>
+        /// <returns>A <see cref="Ref{T}"/> with its current value updated to <paramref name="value"/>.</returns>
         protected Ref<T> useLatest<T>(T value)
         {
             var reference = useRef(value);
@@ -211,11 +242,25 @@ namespace Nuri.UI
             return reference;
         }
 
+        /// <summary>
+        /// Reads a <see cref="Store{T}"/> and re-renders the component when its value changes.
+        /// </summary>
+        /// <typeparam name="T">The store value type.</typeparam>
+        /// <param name="store">The store to read.</param>
+        /// <returns>The current store value.</returns>
         protected T useStore<T>(Store<T> store)
         {
             return useStore(store, value => value);
         }
 
+        /// <summary>
+        /// Reads a selected projection of a <see cref="Store{T}"/> and re-renders only when the selected value changes.
+        /// </summary>
+        /// <typeparam name="T">The store value type.</typeparam>
+        /// <typeparam name="TResult">The projected result type.</typeparam>
+        /// <param name="store">The store to read.</param>
+        /// <param name="selector">Projects the store value to the value the component depends on.</param>
+        /// <returns>The selected value.</returns>
         protected TResult useStore<T, TResult>(Store<T> store, Func<T, TResult> selector)
         {
             if (store == null)
@@ -250,6 +295,13 @@ namespace Nuri.UI
             return selectedValue;
         }
 
+        /// <summary>
+        /// Caches a computed value until one of its dependencies changes by <see cref="object.Equals(object)"/>. Use for expensive, stable derived values, not to hide state ownership. Call in the same order on every render and never conditionally.
+        /// </summary>
+        /// <typeparam name="T">The computed value type.</typeparam>
+        /// <param name="factory">Produces the cached value.</param>
+        /// <param name="dependencies">Values that, when changed, invalidate the cache.</param>
+        /// <returns>The cached or recomputed value.</returns>
         protected T useMemo<T>(Func<T> factory, params object?[] dependencies)
         {
             if (factory == null)
@@ -276,6 +328,10 @@ namespace Nuri.UI
             }
         }
 
+        /// <summary>
+        /// Runs an effect after the virtual tree is committed, with no dependencies (runs after every render). The previous cleanup runs before a re-run and on unmount.
+        /// </summary>
+        /// <param name="effect">The effect to run.</param>
         protected void useEffect(Action effect)
         {
             if (effect == null)
@@ -288,6 +344,11 @@ namespace Nuri.UI
             }, null);
         }
 
+        /// <summary>
+        /// Runs an effect after the virtual tree is committed when the given dependencies change. Pass an empty array to run once. The previous cleanup runs before a re-run and on unmount.
+        /// </summary>
+        /// <param name="effect">The effect to run.</param>
+        /// <param name="dependencies">Values that, when changed, trigger the effect again.</param>
         protected void useEffect(Action effect, params object?[] dependencies)
         {
             if (effect == null)
@@ -300,11 +361,20 @@ namespace Nuri.UI
             }, dependencies);
         }
 
+        /// <summary>
+        /// Runs an effect that may return a cleanup delegate, with no dependencies (runs after every render).
+        /// </summary>
+        /// <param name="effect">The effect; its returned delegate is invoked as cleanup before re-run and on unmount.</param>
         protected void useEffect(Func<Action?> effect)
         {
             useEffect(effect, null);
         }
 
+        /// <summary>
+        /// Runs an effect that may return a cleanup delegate when the given dependencies change. The previous cleanup runs before a re-run and on unmount.
+        /// </summary>
+        /// <param name="effect">The effect; its returned delegate is invoked as cleanup before re-run and on unmount.</param>
+        /// <param name="dependencies">Values that, when changed, trigger the effect again. Omit or pass null to run after every render; pass an empty array to run once for the component.</param>
         protected void useEffect(Func<Action?> effect, params object?[]? dependencies)
         {
             if (effect == null)
@@ -718,13 +788,24 @@ namespace Nuri.UI
         }
     }
 
+    /// <summary>
+    /// A mutable container whose <see cref="Current"/> value persists across renders. Returned by <c>useRef</c> and <c>useLatest</c>.
+    /// </summary>
+    /// <typeparam name="T">The referenced value type.</typeparam>
     public sealed class Ref<T>
     {
+        /// <summary>
+        /// Creates a reference with the given initial value.
+        /// </summary>
+        /// <param name="current">The initial value.</param>
         public Ref(T current)
         {
             Current = current;
         }
 
+        /// <summary>
+        /// Gets or sets the current referenced value. Mutating this does not invalidate the component.
+        /// </summary>
         public T Current { get; set; }
     }
 }

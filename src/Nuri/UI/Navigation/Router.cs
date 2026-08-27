@@ -4,6 +4,9 @@ using Nuri.UI.Dsl;
 
 namespace Nuri.UI.Navigation
 {
+    /// <summary>
+    /// Renders the content of the route that matches the current route key, or an optional not-found fallback. Pair with <see cref="RouteDefinition"/> and <c>useNavigation</c>.
+    /// </summary>
     public sealed class Router : Component
     {
         private readonly string _currentRoute;
