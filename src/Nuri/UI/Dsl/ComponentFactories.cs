@@ -100,6 +100,26 @@ public abstract partial class Component
         return Div (DivTypes.Column, children);
     }
 
+    /// <summary>
+    /// Creates a vertical stack <see cref="Div"/>, an alias for <see cref="Column(IElement[])"/>.
+    /// </summary>
+    /// <param name="children">Child elements to arrange vertically.</param>
+    /// <returns>A new vertical stack <see cref="Div"/>.</returns>
+    public static Div VStack(params IElement[] children)
+    {
+        return Column(children);
+    }
+
+    /// <summary>
+    /// Creates a horizontal stack <see cref="Div"/>, an alias for <see cref="Row(IElement[])"/>.
+    /// </summary>
+    /// <param name="children">Child elements to arrange horizontally.</param>
+    /// <returns>A new horizontal stack <see cref="Div"/>.</returns>
+    public static Div HStack(params IElement[] children)
+    {
+        return Row(children);
+    }
+
         /// <summary>
         /// Creates a <see cref="Div"/> using an <see cref="DivTypes.Absolute"/> layout, where children are positioned with the <c>Position</c>, <c>PositionX</c>, or <c>PositionY</c> fluent methods in the layout coordinate space.
         /// </summary>
@@ -118,6 +138,16 @@ public abstract partial class Component
     public static Div Viewport(IElement content)
     {
         return new Div(DivTypes.Viewport, content);
+    }
+
+    /// <summary>
+    /// Creates a single-content scrollable <see cref="DivTypes.Scroll"/> <see cref="Div"/> that scrolls the given <paramref name="content"/>.
+    /// </summary>
+    /// <param name="content">The single content element scrolled by the container.</param>
+    /// <returns>A new scroll <see cref="Div"/>.</returns>
+    public static Div Scroll(IElement content)
+    {
+        return new Div(DivTypes.Scroll, content);
     }
 
     /// <summary>
