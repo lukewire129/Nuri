@@ -14,6 +14,7 @@ public sealed class RouterTransitionComponent : Component
         var (navigation, navigator) = useNavigation("home");
         var (displayedRoute, setDisplayedRoute) = useState(navigation.CurrentRoute);
         var (opacity, setOpacity) = useState(1.0);
+
         var requestedRoute = navigation.CurrentRoute;
 
         useEffect(() =>
@@ -38,7 +39,8 @@ public sealed class RouterTransitionComponent : Component
             };
         }, [requestedRoute, displayedRoute]);
 
-        return Div(
+        return
+            Div(
                 DivTypes.Scroll,
                 Div(
                     Text("Router transition with hooks")
@@ -49,33 +51,34 @@ public sealed class RouterTransitionComponent : Component
                         .FontColor("#94A3B8")
                         .Margin(top: 6, bottom: 20),
                     Div(
-                            DivTypes.Row,
-                            NavigationButton("home", "Home", navigation, navigator),
-                            NavigationButton("profile", "Profile", navigation, navigator),
-                            NavigationButton("settings", "Settings", navigation, navigator))
-                        .Spacing(10),
+                        DivTypes.Row,
+                        NavigationButton("home", "Home", navigation, navigator),
+                        NavigationButton("profile", "Profile", navigation, navigator),
+                        NavigationButton("settings", "Settings", navigation, navigator)
+                    )
+                    .Spacing(10),
                     Div(
-                            DivTypes.Row,
-                            Button("Go back", navigator.GoBack)
-                                .Size(100, 36)
-                                .Background(navigator.CanGoBack ? "#334155" : "#1E293B")
-                                .FontColor(navigator.CanGoBack ? "#F8FAFC" : "#64748B"),
-                            Text($"Requested: {requestedRoute}  |  Displayed: {displayedRoute}  |  History: {navigation.BackStack.Count}")
-                                .FontColor("#CBD5E1"))
-                        .Spacing(14)
-                        .Margin(top: 14, bottom: 20),
+                        DivTypes.Row,
+                        Button("Go back", navigator.GoBack)
+                            .Size(100, 36)
+                            .Background(navigator.CanGoBack ? "#334155" : "#1E293B")
+                            .FontColor(navigator.CanGoBack ? "#F8FAFC" : "#64748B"),
+                        Text($"Requested: {requestedRoute}  |  Displayed: {displayedRoute}  |  History: {navigation.BackStack.Count}")
+                            .FontColor("#CBD5E1")
+                    )
+                    .Spacing(14)
+                    .Margin(top: 14, bottom: 20),
                     Div(
-                            Router(
-                                displayedRoute,
-                                Route("home", () => new HomeRoute(navigator)),
-                                Route("profile", () => new ProfileRoute(navigator)),
-                                Route("settings", () => new SettingsRoute(navigator))))
-                        .Opacity(opacity)
-                        .Transition(TransitionDuration, EasingValue.CubicOut),
+                        Router(displayedRoute, Route("home", () => new HomeRoute(navigator)), Route("profile", () => new ProfileRoute(navigator)), Route("settings", () => new SettingsRoute(navigator)))
+                    )
+                    .Opacity(opacity)
+                    .Transition(TransitionDuration, EasingValue.CubicOut),
                     Text("Select routes quickly: effect cleanup cancels the pending replacement and keeps the latest request.")
                         .FontColor("#94A3B8")
-                        .Margin(top: 18))
-                    .Spacing(12))
+                        .Margin(top: 18)
+                )
+                .Spacing(12)
+            )
             .Padding(28)
             .Background("#0B1120");
     }
@@ -130,21 +133,8 @@ internal sealed class HomeRoute : Component
     {
         var (count, setCount) = useState(0);
 
-        return RouteLayout.Surface(
-            "Home",
-            "The current keyed route stays mounted until the exit animation finishes.",
-            Text($"Route-local counter: {count}")
-                .FontSize(20)
-                .FontColor("#FDE68A"),
-            Div(
-                    DivTypes.Row,
-                    Button("Increment", () => setCount(current => current + 1))
-                        .Size(110, 36),
-                    Button("Open profile", () => _navigator.Navigate("profile"))
-                        .Size(130, 36))
-                .Spacing(10),
-            Text("Returning after replacement mounts a fresh keyed route subtree.")
-                .FontColor("#94A3B8"));
+        return
+            RouteLayout.Surface("Home", "The current keyed route stays mounted until the exit animation finishes.", Text($"Route-local counter: {count}").FontSize(20).FontColor("#FDE68A"), Div(DivTypes.Row, Button("Increment", () => setCount(current => current + 1)).Size(110, 36), Button("Open profile", () => _navigator.Navigate("profile")).Size(130, 36)).Spacing(10), Text("Returning after replacement mounts a fresh keyed route subtree.").FontColor("#94A3B8"));
     }
 }
 
@@ -161,22 +151,8 @@ internal sealed class ProfileRoute : Component
     {
         var (name, setName) = useState("Nuri");
 
-        return RouteLayout.Surface(
-            "Profile",
-            "Route content can keep using ordinary hooks while the parent controls transitions.",
-            Text("Display name").FontColor("#CBD5E1"),
-            TextBox(name, value => setName(_ => value))
-                .Width(360),
-            Text($"Hello, {name}.")
-                .FontSize(18)
-                .FontColor("#F8FAFC"),
-            Div(
-                    DivTypes.Row,
-                    Button("Open settings", () => _navigator.Navigate("settings"))
-                        .Size(130, 36),
-                    Button("Replace with home", () => _navigator.Replace("home"))
-                        .Size(150, 36))
-                .Spacing(10));
+        return
+            RouteLayout.Surface("Profile", "Route content can keep using ordinary hooks while the parent controls transitions.", Text("Display name").FontColor("#CBD5E1"), TextBox(name, value => setName(_ => value)).Width(360), Text($"Hello, {name}.").FontSize(18).FontColor("#F8FAFC"), Div(DivTypes.Row, Button("Open settings", () => _navigator.Navigate("settings")).Size(130, 36), Button("Replace with home", () => _navigator.Replace("home")).Size(150, 36)).Spacing(10));
     }
 }
 
@@ -193,20 +169,8 @@ internal sealed class SettingsRoute : Component
     {
         var (notifications, setNotifications) = useState(true);
 
-        return RouteLayout.Surface(
-            "Settings",
-            "Navigation history remains independent from the animation state.",
-            CheckBox("Enable notifications", value => setNotifications(_ => value))
-                .Checked(notifications),
-            Text($"Notifications are {(notifications ? "enabled" : "disabled")}.")
-                .FontColor("#F8FAFC"),
-            Div(
-                    DivTypes.Row,
-                    Button("Go back", _navigator.GoBack)
-                        .Size(110, 36),
-                    Button("Replace with home", () => _navigator.Replace("home"))
-                        .Size(150, 36))
-                .Spacing(10));
+        return
+            RouteLayout.Surface("Settings", "Navigation history remains independent from the animation state.", CheckBox("Enable notifications", value => setNotifications(_ => value)).Checked(notifications), Text($"Notifications are {(notifications ? "enabled" : "disabled")}.").FontColor("#F8FAFC"), Div(DivTypes.Row, Button("Go back", _navigator.GoBack).Size(110, 36), Button("Replace with home", () => _navigator.Replace("home")).Size(150, 36)).Spacing(10));
     }
 }
 

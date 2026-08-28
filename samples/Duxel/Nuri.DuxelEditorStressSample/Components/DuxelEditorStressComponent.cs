@@ -63,26 +63,22 @@ public sealed class DuxelEditorStressComponent : Component
                 : state.Lines,
             state.Lines,
             state.Filtered);
+
         var diagnostics = NuriDiagnostics.GetSnapshot();
         var root = diagnostics.Roots.FirstOrDefault();
         var virtualized = diagnostics.VirtualizedItems
             .OrderByDescending(item => item.ItemCount)
             .FirstOrDefault();
 
-        return Grid(
-                Header(
-                        state,
-                        visibleLines.Length,
-                        EditMiddle,
-                        SwapMiddle,
-                        () => Update(current => current with
-                        {
-                            Filtered = !current.Filtered,
-                            Status = current.Filtered ? "Showing all lines" : "Showing every 100th line"
-                        }))
+        return
+            Grid(
+                Header(state, visibleLines.Length, EditMiddle, SwapMiddle, () => Update(current => current with {Filtered = !current.Filtered, Status = current.Filtered ? "Showing all lines" : "Showing every 100th line"}))
                     .Row(0),
-                Workspace(visibleLines).Row(1),
-                StatusBar(state.Status, root, virtualized).Row(2))
+                Workspace(visibleLines)
+                    .Row(1),
+                StatusBar(state.Status, root, virtualized)
+                    .Row(2)
+            )
             .Rows("Auto,*,Auto")
             .Padding(16)
             .Background("#111827");

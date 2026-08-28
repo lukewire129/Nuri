@@ -8,12 +8,7 @@ public sealed class YamlStyleComponent : Component
     {
         return
             Column(
-                new IElement[]
-                {
-                    Text("Nuri").Style("title"),
-                    Text("YAML Style System").Style("description"),
-                    Button("Continue").Style("primary-button")
-                }
+                new IElement[]{Text("Nuri").Style("title"), Text("YAML Style System").Style("description"), Button("Continue").Style("primary-button")}
             )
             .Style("card");
     }

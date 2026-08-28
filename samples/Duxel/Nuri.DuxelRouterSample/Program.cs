@@ -16,7 +16,8 @@ internal sealed class RouterSampleApp : Component
     {
         var (navigation, navigator) = useNavigation("home");
 
-        return Div(
+        return
+            Div(
                 DivTypes.Scroll,
                 Div(
                     Text("Standard Router")
@@ -26,26 +27,26 @@ internal sealed class RouterSampleApp : Component
                         .FontColor("#94A3B8")
                         .Margin(top: 6, bottom: 18),
                     Div(
-                            DivTypes.Row,
-                            NavigationButton("home", "Home", navigation, navigator),
-                            NavigationButton("profile", "Profile", navigation, navigator),
-                            NavigationButton("activity", "Activity", navigation, navigator))
-                        .Spacing(10),
+                        DivTypes.Row,
+                        NavigationButton("home", "Home", navigation, navigator),
+                        NavigationButton("profile", "Profile", navigation, navigator),
+                        NavigationButton("activity", "Activity", navigation, navigator)
+                    )
+                    .Spacing(10),
                     Div(
-                            DivTypes.Row,
-                            Button("Back", navigator.GoBack)
-                                .Size(90, 34)
-                                .Background(navigator.CanGoBack ? "#334155" : "#1E293B"),
-                            Text($"Current: {navigation.CurrentRoute} | Back stack: {navigation.BackStack.Count}")
-                                .FontColor("#CBD5E1"))
-                        .Spacing(12)
-                        .Margin(top: 14, bottom: 18),
-                    Router(
-                        navigation,
-                        Route("home", () => new HomePage(navigator)),
-                        Route("profile", () => new ProfilePage(navigator)),
-                        Route("activity", () => new ActivityPage(navigator))))
-                    .Spacing(12))
+                        DivTypes.Row,
+                        Button("Back", navigator.GoBack)
+                            .Size(90, 34)
+                            .Background(navigator.CanGoBack ? "#334155" : "#1E293B"),
+                        Text($"Current: {navigation.CurrentRoute} | Back stack: {navigation.BackStack.Count}")
+                            .FontColor("#CBD5E1")
+                    )
+                    .Spacing(12)
+                    .Margin(top: 14, bottom: 18),
+                    Router(navigation, Route("home", () => new HomePage(navigator)), Route("profile", () => new ProfilePage(navigator)), Route("activity", () => new ActivityPage(navigator)))
+                )
+                .Spacing(12)
+            )
             .Padding(24)
             .Background("#0B1120");
     }
@@ -79,7 +80,8 @@ internal sealed class HomePage : Component
     {
         var (count, setCount) = useState(0);
 
-        return Div(
+        return
+            Div(
                 Text("Home")
                     .FontSize(24)
                     .FontColor("#F8FAFC"),
@@ -90,13 +92,15 @@ internal sealed class HomePage : Component
                     .FontSize(20)
                     .FontColor("#FDE68A"),
                 Div(
-                        DivTypes.Row,
-                        Button("Increment", () => setCount(current => current + 1))
-                            .Size(110, 36),
-                        Button("Open profile", () => _navigator.Navigate("profile"))
-                            .Size(130, 36))
-                    .Spacing(10)
-                    .Margin(top: 14))
+                    DivTypes.Row,
+                    Button("Increment", () => setCount(current => current + 1))
+                        .Size(110, 36),
+                    Button("Open profile", () => _navigator.Navigate("profile"))
+                        .Size(130, 36)
+                )
+                .Spacing(10)
+                .Margin(top: 14)
+            )
             .Padding(22)
             .Background("#111827")
             .Brush("#334155")
@@ -118,26 +122,30 @@ internal sealed class ProfilePage : Component
     {
         var (name, setName) = useState("Nuri");
 
-        return Div(
+        return
+            Div(
                 Text("Profile")
                     .FontSize(24)
                     .FontColor("#F8FAFC"),
                 Text("Each route owns independent hook state.")
                     .FontColor("#94A3B8")
                     .Margin(top: 4, bottom: 18),
-                Text("Display name").FontColor("#CBD5E1"),
+                Text("Display name")
+                    .FontColor("#CBD5E1"),
                 TextBox(name, value => setName(_ => value))
                     .Width(360),
                 Text($"Hello, {name}.")
                     .FontSize(18)
                     .FontColor("#F8FAFC"),
                 Div(
-                        DivTypes.Row,
-                        Button("Navigate activity", () => _navigator.Navigate("activity"))
-                            .Size(150, 36),
-                        Button("Replace with home", () => _navigator.Replace("home"))
-                            .Size(150, 36))
-                    .Spacing(10))
+                    DivTypes.Row,
+                    Button("Navigate activity", () => _navigator.Navigate("activity"))
+                        .Size(150, 36),
+                    Button("Replace with home", () => _navigator.Replace("home"))
+                        .Size(150, 36)
+                )
+                .Spacing(10)
+            )
             .Spacing(12)
             .Padding(22)
             .Background("#111827")
@@ -160,7 +168,8 @@ internal sealed class ActivityPage : Component
     {
         var (subscribed, setSubscribed) = useState(true);
 
-        return Div(
+        return
+            Div(
                 Text("Activity")
                     .FontSize(24)
                     .FontColor("#F8FAFC"),
@@ -172,7 +181,8 @@ internal sealed class ActivityPage : Component
                 Text($"Activity updates are {(subscribed ? "enabled" : "disabled")}.")
                     .FontColor("#F8FAFC"),
                 Button("Go back", _navigator.GoBack)
-                    .Size(110, 36))
+                    .Size(110, 36)
+            )
             .Spacing(12)
             .Padding(22)
             .Background("#111827")

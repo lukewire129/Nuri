@@ -16,7 +16,8 @@ internal sealed class NavigationSampleApp : Component
     {
         var (navigation, navigator) = useNavigation("home");
 
-        return Div(
+        return
+            Div(
                 DivTypes.Scroll,
                 Div(
                     Text("Duxel screen navigation")
@@ -26,29 +27,26 @@ internal sealed class NavigationSampleApp : Component
                         .FontColor("#94A3B8")
                         .Margin(top: 6, bottom: 18),
                     Div(
-                            DivTypes.Row,
-                            new NavigationButton("home", "Home", navigation.CurrentRoute, navigator)
-                                .Key("nav-home"),
-                            new NavigationButton("details", "Details", navigation.CurrentRoute, navigator)
-                                .Key("nav-details"),
-                            new NavigationButton("settings", "Settings", navigation.CurrentRoute, navigator)
-                                .Key("nav-settings"))
-                        .Spacing(10),
+                        DivTypes.Row,
+                        new NavigationButton("home", "Home", navigation.CurrentRoute, navigator).Key("nav-home"),
+                        new NavigationButton("details", "Details", navigation.CurrentRoute, navigator).Key("nav-details"),
+                        new NavigationButton("settings", "Settings", navigation.CurrentRoute, navigator).Key("nav-settings")
+                    )
+                    .Spacing(10),
                     Div(
-                            DivTypes.Row,
-                            Button("Back", navigator.GoBack)
-                                .Size(90, 34)
-                                .Background(navigator.CanGoBack ? "#334155" : "#1E293B"),
-                            Text($"Current: {navigation.CurrentRoute} | Back stack: {navigation.BackStack.Count}")
-                                .FontColor("#CBD5E1"))
-                        .Spacing(12)
-                        .Margin(top: 14, bottom: 18),
-                    Router(
-                        navigation,
-                        Route("home", () => new HomeScreen(navigator)),
-                        Route("details", () => new DetailsScreen(navigator)),
-                        Route("settings", () => new SettingsScreen(navigator))))
-                    .Spacing(12))
+                        DivTypes.Row,
+                        Button("Back", navigator.GoBack)
+                            .Size(90, 34)
+                            .Background(navigator.CanGoBack ? "#334155" : "#1E293B"),
+                        Text($"Current: {navigation.CurrentRoute} | Back stack: {navigation.BackStack.Count}")
+                            .FontColor("#CBD5E1")
+                    )
+                    .Spacing(12)
+                    .Margin(top: 14, bottom: 18),
+                    Router(navigation, Route("home", () => new HomeScreen(navigator)), Route("details", () => new DetailsScreen(navigator)), Route("settings", () => new SettingsScreen(navigator)))
+                )
+                .Spacing(12)
+            )
             .Padding(24)
             .Background("#0B1120");
     }
@@ -73,10 +71,11 @@ internal sealed class NavigationButton : Component
     {
         var active = string.Equals(_route, _currentRoute, StringComparison.OrdinalIgnoreCase);
 
-        return Button(_label, () => _navigator.Navigate(_route))
-            .Size(120, 38)
-            .Background(active ? "#2563EB" : "#1E293B")
-            .FontColor("#F8FAFC");
+        return
+            Button(_label, () => _navigator.Navigate(_route))
+                .Size(120, 38)
+                .Background(active ? "#2563EB" : "#1E293B")
+                .FontColor("#F8FAFC");
     }
 }
 
@@ -93,21 +92,10 @@ internal sealed class HomeScreen : Component
     {
         var (count, setCount) = useState(0);
 
-        return Div(new ScreenSurface(
-            "Home",
-            "Navigate pushes this route onto the history stack.",
-            Text($"Home-local counter: {count}")
-                .FontSize(20)
-                .FontColor("#FDE68A"),
+        return
             Div(
-                    DivTypes.Row,
-                    Button("Increment", () => setCount(current => current + 1))
-                        .Size(110, 36),
-                    Button("Open details", () => _navigator.Navigate("details"))
-                        .Size(130, 36))
-                .Spacing(10),
-            Text("Return after leaving this route to see that an unmounted screen starts with fresh local state.")
-                .FontColor("#94A3B8")));
+                new ScreenSurface("Home", "Navigate pushes this route onto the history stack.", Text($"Home-local counter: {count}").FontSize(20).FontColor("#FDE68A"), Div(DivTypes.Row, Button("Increment", () => setCount(current => current + 1)).Size(110, 36), Button("Open details", () => _navigator.Navigate("details")).Size(130, 36)).Spacing(10), Text("Return after leaving this route to see that an unmounted screen starts with fresh local state.").FontColor("#94A3B8"))
+            );
     }
 }
 
@@ -124,24 +112,10 @@ internal sealed class DetailsScreen : Component
     {
         var (name, setName) = useState("Nuri");
 
-        return Div(new ScreenSurface(
-            "Details",
-            "This screen owns controlled input state.",
-            Text("Display name").FontColor("#CBD5E1"),
-            TextBox(name, value => setName(_ => value))
-                .Width(360),
-            Text($"Hello, {name}.")
-                .FontSize(18)
-                .FontColor("#F8FAFC"),
+        return
             Div(
-                    DivTypes.Row,
-                    Button("Navigate settings", () => _navigator.Navigate("settings"))
-                        .Size(150, 36),
-                    Button("Replace with home", () => _navigator.Replace("home"))
-                        .Size(150, 36))
-                .Spacing(10),
-            Text("Replace changes the current route without adding it to the back stack.")
-                .FontColor("#94A3B8")));
+                new ScreenSurface("Details", "This screen owns controlled input state.", Text("Display name").FontColor("#CBD5E1"), TextBox(name, value => setName(_ => value)).Width(360), Text($"Hello, {name}.").FontSize(18).FontColor("#F8FAFC"), Div(DivTypes.Row, Button("Navigate settings", () => _navigator.Navigate("settings")).Size(150, 36), Button("Replace with home", () => _navigator.Replace("home")).Size(150, 36)).Spacing(10), Text("Replace changes the current route without adding it to the back stack.").FontColor("#94A3B8"))
+            );
     }
 }
 
@@ -158,20 +132,10 @@ internal sealed class SettingsScreen : Component
     {
         var (notifications, setNotifications) = useState(true);
 
-        return Div(new ScreenSurface(
-            "Settings",
-            "GoBack restores the previous route from the navigation history.",
-            CheckBox("Enable notifications", value => setNotifications(_ => value))
-                .Checked(notifications),
-            Text($"Notifications are {(notifications ? "enabled" : "disabled")}.")
-                .FontColor("#F8FAFC"),
+        return
             Div(
-                    DivTypes.Row,
-                    Button("Go back", _navigator.GoBack)
-                        .Size(110, 36),
-                    Button("Replace with home", () => _navigator.Replace("home"))
-                        .Size(150, 36))
-                .Spacing(10)));
+                new ScreenSurface("Settings", "GoBack restores the previous route from the navigation history.", CheckBox("Enable notifications", value => setNotifications(_ => value)).Checked(notifications), Text($"Notifications are {(notifications ? "enabled" : "disabled")}.").FontColor("#F8FAFC"), Div(DivTypes.Row, Button("Go back", _navigator.GoBack).Size(110, 36), Button("Replace with home", () => _navigator.Replace("home")).Size(150, 36)).Spacing(10))
+            );
     }
 }
 
@@ -190,14 +154,19 @@ internal sealed class ScreenSurface : Component
 
     public override IElement Render()
     {
-        return Div(
+        return
+            Div(
                 Text(_title)
                     .FontSize(24)
                     .FontColor("#F8FAFC"),
                 Text(_description)
                     .FontColor("#94A3B8")
                     .Margin(top: 4, bottom: 18),
-                Div(_children).Spacing(14))
+                Div(
+                    _children
+                )
+                .Spacing(14)
+            )
             .Padding(22)
             .Background("#111827")
             .Brush("#334155")

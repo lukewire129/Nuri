@@ -27,29 +27,42 @@ public sealed class MasterDetailComponent : Component
 
         var selected = state.Items.FirstOrDefault(item => item.Id == state.SelectedId);
 
-        return Grid(Rows(Auto, Star),
-                Div(Text("Master / Detail").FontSize(26).FontWeight(FontWeightValue.Bold), Text("list selection, detail edit, delete selected, empty state 검증").FontColor("#6b7280").Margin(top: 6, bottom: 18)).Row(0),
+        return
+            Grid(
+                Rows(Auto, Star),
+                Div(
+                    Text("Master / Detail")
+                        .FontSize(26)
+                        .FontWeight(FontWeightValue.Bold),
+                    Text("list selection, detail edit, delete selected, empty state 검증")
+                        .FontColor("#6b7280")
+                        .Margin(top: 6, bottom: 18)
+                )
+                .Row(0),
                 Grid(
-                        Div(DivTypes.Scroll, Div(state.Items.Select(item => (IElement)Row(item, item.Id == state.SelectedId, () => Update(current => current with { SelectedId = item.Id }))).ToArray()))
-                            .Padding(12)
-                            .Background("#ffffff")
-                            .Brush("#e5e7eb")
-                            .Thickness(1)
-                            .CornerRadius(16)
-                            .Column(0),
-                        Detail(selected, text => Update(current => current with
-                            {
-                                Items = current.Items.Select(item => item.Id == current.SelectedId ? item with { Notes = text } : item).ToArray()
-                            }),
-                            () => Update(current =>
-                            {
-                                var remaining = current.Items.Where(item => item.Id != current.SelectedId).ToArray();
-                                return current with { Items = remaining, SelectedId = remaining.FirstOrDefault()?.Id };
-                            }))
-                            .Column(1)
+                    Div(
+                        DivTypes.Scroll,
+                        Div(
+                            state.Items.Select(item => (IElement)Row(item, item.Id == state.SelectedId, () => Update(current => current with {SelectedId = item.Id})))
+                                .ToArray()
+                        )
                     )
-                    .Columns(Pixels(280), Star)
-                    .Row(1))
+                    .Padding(12)
+                    .Background("#ffffff")
+                    .Brush("#e5e7eb")
+                    .Thickness(1)
+                    .CornerRadius(16)
+                    .Column(0),
+                    Detail(selected, text => Update(current => current with {Items = current.Items.Select(item => item.Id == current.SelectedId ? item with {Notes = text} : item).ToArray()}), () => Update(current =>
+{
+    var remaining = current.Items.Where(item => item.Id != current.SelectedId).ToArray();
+    return current with {Items = remaining, SelectedId = remaining.FirstOrDefault()?.Id};
+}))
+                        .Column(1)
+                )
+                .Columns(Pixels(280), Star)
+                .Row(1)
+            )
             .Padding(24)
             .Background("#f3f4f6");
     }

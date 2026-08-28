@@ -33,28 +33,15 @@ internal sealed class TodoItemComponent : Component
 
     public override IElement Render()
     {
-        return Grid(
-                _isEditing
-                    ? TextBox(_item.Text, text => _changeText(_item.Id, text))
-                        .Key($"edit-{_item.Id}")
-                        .Height(34)
-                        .Padding(10, 0, 10, 0)
-                        .TextStart()
-                        .TextVCenter()
-                        .Column(0)
-                    : Div(
-                            Text(_item.IsDone ? "완료" : "진행")
-                                .FontSize(11)
-                                .FontColor(_item.IsDone ? "#047857" : "#2563eb"),
-                            Text(_item.Text)
-                                .FontSize(15)
-                                .FontColor(_item.IsDone ? "#6b7280" : "#111827")
-                                .Margin(top: 4)
-                        )
-                        .Column(0),
-                SecondaryButton(_item.IsDone ? "다시 열기" : "완료", () => _toggleDone(_item.Id)).Column(1),
-                SecondaryButton(_isEditing ? "저장" : "수정", OnEditButtonClick).Column(2),
-                DangerButton("삭제", () => _removeItem(_item.Id)).Column(3)
+        return
+            Grid(
+                _isEditing ? TextBox(_item.Text, text => _changeText(_item.Id, text)).Key($"edit-{_item.Id}").Height(34).Padding(10, 0, 10, 0).TextStart().TextVCenter().Column(0) : Div(Text(_item.IsDone ? "완료" : "진행").FontSize(11).FontColor(_item.IsDone ? "#047857" : "#2563eb"), Text(_item.Text).FontSize(15).FontColor(_item.IsDone ? "#6b7280" : "#111827").Margin(top: 4)).Column(0),
+                SecondaryButton(_item.IsDone ? "다시 열기" : "완료", () => _toggleDone(_item.Id))
+                    .Column(1),
+                SecondaryButton(_isEditing ? "저장" : "수정", OnEditButtonClick)
+                    .Column(2),
+                DangerButton("삭제", () => _removeItem(_item.Id))
+                    .Column(3)
             )
             .Columns(Star, Pixels(92), Pixels(82), Pixels(82))
             .Padding(14)

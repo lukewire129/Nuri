@@ -93,22 +93,21 @@ public sealed class ExplorerTreeComponent : Component
                 ReportLifecycle).Key(node.Id))
             .ToArray();
 
-        return Grid(
-                Header().Row(0),
+        return
+            Grid(
+                Header()
+                    .Row(0),
                 Grid(
-                        TreePanel(tree).Column(0),
-                        DetailPanel(
-                                state,
-                                selected,
-                                value => Update(current => current with { DraftName = value }),
-                                () => RenameSelected(Update),
-                                () => AddChild(Update, isFolder: true),
-                                () => AddChild(Update, isFolder: false),
-                                () => DeleteSelected(Update))
-                            .Column(1))
-                    .Columns(390, Star)
-                    .Row(1),
-                StatusBar(state).Row(2))
+                    TreePanel(tree)
+                        .Column(0),
+                    DetailPanel(state, selected, value => Update(current => current with {DraftName = value}), () => RenameSelected(Update), () => AddChild(Update, isFolder: true), () => AddChild(Update, isFolder: false), () => DeleteSelected(Update))
+                        .Column(1)
+                )
+                .Columns(390, Star)
+                .Row(1),
+                StatusBar(state)
+                    .Row(2)
+            )
             .Rows("Auto,*,Auto")
             .Padding(24)
             .Background("#f3f4f6");

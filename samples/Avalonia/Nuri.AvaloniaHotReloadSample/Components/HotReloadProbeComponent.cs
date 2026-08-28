@@ -10,7 +10,8 @@ public sealed class HotReloadProbeComponent : Component
         var (count, setCount) = useState(0);
         var (count2, setCount2) = useState(0);
 
-        return Div(
+        return
+            Div(
                 Text("Avalonia renderer smoke test")
                     .FontSize(28)
                     .FontWeight(FontWeightValue.Bold)
@@ -20,41 +21,41 @@ public sealed class HotReloadProbeComponent : Component
                     .FontColor("#cbd5e1")
                     .Margin(top: 12),
                 Div(
-                        Text($"Count: {count}")
-                            .FontSize(44)
-                            .FontWeight(FontWeightValue.Bold)
-                            .FontColor("#93c5fd"),
-                        Text ($"Count: {count2}")
-                            .FontSize (44)
-                            .FontWeight (FontWeightValue.Bold)
-                            .FontColor ("#93c5fd"),
-                        Text ("The button uses Core-neutral OnClick and the Avalonia adapter materializes it.")
-                            .FontSize(13)
-                            .FontColor("#94a3b8")
-                            .Margin(top: 10),
-                        Button("Increment", () => setCount(current => current + 1))
-                            .Height(44)
-                            .Padding(18, 0, 18, 0)
-                            .Margin(top: 18)
-                            .Background("#2563eb")
-                            .FontColor("#ffffff")
-                            .Brush("#1d4ed8")
-                            .Thickness(1),
-                        Button ("Increment1", () => setCount2(current => current + 1))
-                            .Height (44)
-                            .Padding (18, 0, 18, 0)
-                            .Margin (top: 18)
-                            .Background ("#2563eb")
-                            .FontColor ("#ffffff")
-                            .Brush ("#1d4ed8")
-                            .Thickness (1)
-                    )
-                    .Padding(22)
-                    .Margin(top: 24)
-                    .Background("#111827")
-                    .Brush("#334155")
-                    .Thickness(1)
-                    .CornerRadius(18),
+                    Text($"Count: {count}")
+                        .FontSize(44)
+                        .FontWeight(FontWeightValue.Bold)
+                        .FontColor("#93c5fd"),
+                    Text($"Count: {count2}")
+                        .FontSize(44)
+                        .FontWeight(FontWeightValue.Bold)
+                        .FontColor("#93c5fd"),
+                    Text("The button uses Core-neutral OnClick and the Avalonia adapter materializes it.")
+                        .FontSize(13)
+                        .FontColor("#94a3b8")
+                        .Margin(top: 10),
+                    Button("Increment", () => setCount(current => current + 1))
+                        .Height(44)
+                        .Padding(18, 0, 18, 0)
+                        .Margin(top: 18)
+                        .Background("#2563eb")
+                        .FontColor("#ffffff")
+                        .Brush("#1d4ed8")
+                        .Thickness(1),
+                    Button("Increment1", () => setCount2(current => current + 1))
+                        .Height(44)
+                        .Padding(18, 0, 18, 0)
+                        .Margin(top: 18)
+                        .Background("#2563eb")
+                        .FontColor("#ffffff")
+                        .Brush("#1d4ed8")
+                        .Thickness(1)
+                )
+                .Padding(22)
+                .Margin(top: 24)
+                .Background("#111827")
+                .Brush("#334155")
+                .Thickness(1)
+                .CornerRadius(18),
                 Text("Hot reload probe: change this sentence and save while running.")
                     .FontSize(12)
                     .FontColor("#64748b")

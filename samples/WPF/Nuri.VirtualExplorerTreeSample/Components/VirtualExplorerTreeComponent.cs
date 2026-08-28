@@ -59,35 +59,24 @@ public sealed class VirtualExplorerTreeComponent : Component
             () => FlattenVisibleRows(state.Nodes, state.ExpandedIds),
             state.Nodes,
             state.ExpandedIds);
+
         var selected = FindNode(state.Nodes, state.SelectedId);
 
-        return Grid(
-                Header(visibleRows.Count).Row(0),
+        return
+            Grid(
+                Header(visibleRows.Count)
+                    .Row(0),
                 Grid(
-                        TreePanel(VirtualizedItems(
-                                visibleRows,
-                                row => row.Node.Id,
-                                RowExtent,
-                                row => NodeRow(row, state.SelectedId, Select, Toggle)))
-                            .Column(0),
-                        DetailPanel(
-                                selected,
-                                visibleRows.Count,
-                                state.Status,
-                                () => Update(current => current with
-                                {
-                                    ExpandedIds = new HashSet<string>(InitiallyExpanded, StringComparer.Ordinal),
-                                    Status = "Expanded all 100 folders."
-                                }),
-                                () => Update(current => current with
-                                {
-                                    ExpandedIds = new HashSet<string>(new[] { "workspace" }, StringComparer.Ordinal),
-                                    Status = "Collapsed all generated folders."
-                                }))
-                            .Column(1))
-                    .Columns(Star, 330)
-                    .Row(1),
-                StatusBar(state.Status, visibleRows.Count).Row(2))
+                    TreePanel(VirtualizedItems(visibleRows, row => row.Node.Id, RowExtent, row => NodeRow(row, state.SelectedId, Select, Toggle)))
+                        .Column(0),
+                    DetailPanel(selected, visibleRows.Count, state.Status, () => Update(current => current with {ExpandedIds = new HashSet<string>(InitiallyExpanded, StringComparer.Ordinal), Status = "Expanded all 100 folders."}), () => Update(current => current with {ExpandedIds = new HashSet<string>(new[]{"workspace"}, StringComparer.Ordinal), Status = "Collapsed all generated folders."}))
+                        .Column(1)
+                )
+                .Columns(Star, 330)
+                .Row(1),
+                StatusBar(state.Status, visibleRows.Count)
+                    .Row(2)
+            )
             .Rows("Auto,*,Auto")
             .Padding(24)
             .Background("#f3f4f6");

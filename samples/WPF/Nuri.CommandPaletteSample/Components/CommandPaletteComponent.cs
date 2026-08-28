@@ -98,9 +98,11 @@ public sealed class CommandPaletteComponent : Component
         }
 
         var filteredCommands = useMemo(() => Filter(state.Query), state.Query);
+
         var selectedIndex = Math.Clamp(state.SelectedIndex, 0, Math.Max(filteredCommands.Length - 1, 0));
 
-        return Div(
+        return
+            Div(
                 Text("Command Palette")
                     .FontSize(22)
                     .FontWeight(FontWeightValue.Bold)
@@ -117,7 +119,9 @@ public sealed class CommandPaletteComponent : Component
                     .FontSize(18)
                     .TextStart()
                     .TextVCenter(),
-                Div(CommandRows(filteredCommands, selectedIndex)),
+                Div(
+                    CommandRows(filteredCommands, selectedIndex)
+                ),
                 Text(state.Status)
                     .Key("status")
                     .FontColor("#93c5fd")

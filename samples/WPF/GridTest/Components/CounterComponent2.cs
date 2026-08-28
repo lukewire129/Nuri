@@ -12,16 +12,16 @@ namespace GridTest.Components
         {
             var (count, setCount) = useState (0);
 
-            return Grid (
-                        Button ($"Comopent2 Count!: {count}", () => setCount (current => current + 1))
-                            .Size (150, 50)
-                            .Start ()
-                            .Row (0),
-
-                        Button ("Comopent2 Count Reset", () => setCount (_ => 0))
-                            .Row (1)
-                    )
-                    .Rows (Pixels(100), Pixels(100));
+            return
+                Grid(
+                    Button($"Comopent2 Count!: {count}", () => setCount(current => current + 1))
+                        .Size(150, 50)
+                        .Start()
+                        .Row(0),
+                    Button("Comopent2 Count Reset", () => setCount(_ => 0))
+                        .Row(1)
+                )
+                .Rows(Pixels(100), Pixels(100));
         }
     }
 

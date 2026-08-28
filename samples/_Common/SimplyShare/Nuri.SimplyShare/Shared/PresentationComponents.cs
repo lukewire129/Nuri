@@ -15,15 +15,15 @@ internal sealed class PageLayout : Component
 
     public override IElement Render()
     {
-        return Div(DivTypes.Scroll,
-                Div(new IElement[]
-                    {
-                        Text(_title).FontSize(30).FontWeight(FontWeightValue.Bold).FontColor(Palette.Ink),
-                        Text(_subtitle).FontSize(13).FontColor(Palette.Muted).Margin(top: 6, bottom: 22)
-                    }
-                    .Concat(_children)
-                    .ToArray())
-                    .Padding(28))
+        return
+            Div(
+                DivTypes.Scroll,
+                Div(
+                    new IElement[]{Text(_title).FontSize(30).FontWeight(FontWeightValue.Bold).FontColor(Palette.Ink), Text(_subtitle).FontSize(13).FontColor(Palette.Muted).Margin(top: 6, bottom: 22)}.Concat(_children)
+                        .ToArray()
+                )
+                .Padding(28)
+            )
             .Background(Palette.Canvas);
     }
 }
@@ -36,7 +36,10 @@ internal sealed class SurfaceCard : Component
 
     public override IElement Render()
     {
-        return Div(_children)
+        return
+            Div(
+                _children
+            )
             .Padding(20)
             .Margin(bottom: 14)
             .Background(Palette.White)

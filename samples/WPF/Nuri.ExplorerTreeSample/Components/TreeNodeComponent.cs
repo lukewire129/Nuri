@@ -61,7 +61,10 @@ internal sealed class TreeNodeComponent : Component
                     _reportLifecycle).Key(child.Id)));
         }
 
-        return Div(elements.ToArray());
+        return
+            Div(
+                elements.ToArray()
+            );
     }
 
     private IElement NodeRow(bool expanded, bool selected)

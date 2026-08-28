@@ -51,18 +51,35 @@ internal sealed class DeviceCard : Component
     public override IElement Render()
     {
         var (hovered, setHovered) = useState(false);
-        return Div(
+
+        return
+            Div(
                 Grid(
-                    Div(DivTypes.Row,
-                            Div(Text(Initials(_device.Nickname)).FontSize(15).FontWeight(FontWeightValue.Bold).FontColor(Palette.White).Center())
-                                .Size(46, 46)
-                                .Background(Palette.Success)
-                                .CornerRadius(23)
-                                .Margin(right: 14),
-                            Div(
-                                Text(_device.Nickname).FontSize(17).FontWeight(FontWeightValue.Bold).FontColor(Palette.Ink),
-                                Text($"{_device.IpAddress}:{_device.Port}").FontSize(11).FontColor(Palette.Muted).Margin(top: 4)))
-                        .Column(0),
+                    Div(
+                        DivTypes.Row,
+                        Div(
+                            Text(Initials(_device.Nickname))
+                                .FontSize(15)
+                                .FontWeight(FontWeightValue.Bold)
+                                .FontColor(Palette.White)
+                                .Center()
+                        )
+                        .Size(46, 46)
+                        .Background(Palette.Success)
+                        .CornerRadius(23)
+                        .Margin(right: 14),
+                        Div(
+                            Text(_device.Nickname)
+                                .FontSize(17)
+                                .FontWeight(FontWeightValue.Bold)
+                                .FontColor(Palette.Ink),
+                            Text($"{_device.IpAddress}:{_device.Port}")
+                                .FontSize(11)
+                                .FontColor(Palette.Muted)
+                                .Margin(top: 4)
+                        )
+                    )
+                    .Column(0),
                     Button("Open chat", () => AppServices.Host.OpenChat(_device))
                         .Width(112)
                         .Height(38)
@@ -70,8 +87,10 @@ internal sealed class DeviceCard : Component
                         .FontColor(Palette.White)
                         .Brush(Palette.Ink)
                         .Thickness(1)
-                        .Column(1))
-                    .Columns(Star, Auto))
+                        .Column(1)
+                )
+                .Columns(Star, Auto)
+            )
             .Padding(20)
             .Margin(left: hovered ? 7 : 0, bottom: 14)
             .Background(hovered ? "#FFFAF7" : Palette.White)

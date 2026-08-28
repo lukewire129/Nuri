@@ -98,16 +98,22 @@ public sealed class EditorStressComponent : Component
         }
 
         var target = GetType().Assembly.GetName().Name ?? "WPF comparison";
-        return Grid(
-                Header(target, state, EditOnce, () => Start(100), () => Start(1_000)).Row(0),
-                Metrics(state).Row(1),
-                Editor(state.Lines).Row(2),
+
+        return
+            Grid(
+                Header(target, state, EditOnce, () => Start(100), () => Start(1_000))
+                    .Row(0),
+                Metrics(state)
+                    .Row(1),
+                Editor(state.Lines)
+                    .Row(2),
                 Text(state.Status)
                     .FontSize(12)
                     .FontColor("#e2e8f0")
                     .Padding(10, 7, 10, 7)
                     .Background(state.Running ? "#b45309" : "#1d4ed8")
-                    .Row(3))
+                    .Row(3)
+            )
             .Rows("Auto,Auto,*,Auto")
             .Padding(16)
             .Background("#111827");

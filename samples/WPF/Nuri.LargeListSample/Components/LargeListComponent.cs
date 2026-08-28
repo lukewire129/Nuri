@@ -15,6 +15,7 @@ public sealed class LargeListComponent : Component
     public override IElement Render()
     {
         var renderCount = useRef(0);
+
         renderCount.Current++;
 
         var (state, setState) = useState(new LargeListState(Seed, string.Empty, null, 1, "Ready"));
@@ -135,22 +136,23 @@ public sealed class LargeListComponent : Component
                 .OrderBy(pair => pair.Key)
                 .Select(pair => $"{pair.Key}={pair.Value}"));
 
-        return Grid(
-                Header(renderCount.Current).Row(0),
-                StressControls(state, filtered.Length, Update, ToggleFirst, SwapFirstTwo, ReverseAll, RemoveFirst, AddFirst, ReplaceAll, Reset).Row(1),
-                MetricsPanel(rootMetrics, virtualizationMetrics, patchTypes).Row(2),
-                VirtualizedItems(
-                        filtered,
-                        item => item.Id,
-                        RowExtent,
-                        item => Row(item, state.SelectedId == item.Id, Select))
+        return
+            Grid(
+                Header(renderCount.Current)
+                    .Row(0),
+                StressControls(state, filtered.Length, Update, ToggleFirst, SwapFirstTwo, ReverseAll, RemoveFirst, AddFirst, ReplaceAll, Reset)
+                    .Row(1),
+                MetricsPanel(rootMetrics, virtualizationMetrics, patchTypes)
+                    .Row(2),
+                VirtualizedItems(filtered, item => item.Id, RowExtent, item => Row(item, state.SelectedId == item.Id, Select))
                     .Margin(top: 14)
                     .Row(3),
                 Text(state.Status)
                     .FontSize(12)
                     .FontColor("#4b5563")
                     .Margin(top: 10)
-                    .Row(4))
+                    .Row(4)
+            )
             .Rows("Auto,Auto,Auto,*,Auto")
             .Padding(24)
             .Background("#f3f4f6");

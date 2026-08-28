@@ -29,58 +29,29 @@ public sealed class DataEntryComponent : Component
             Update(_ => new FormState("", "", "", false, "email", false, Array.Empty<string>()));
         }
 
-        return Grid(Rows(Auto, Star),
-                Header().Row(0),
-                Div(DivTypes.Scroll,
+        return
+            Grid(
+                Rows(Auto, Star),
+                Header()
+                    .Row(0),
+                Div(
+                    DivTypes.Scroll,
                     Div(
-                    Section("Account",
-                        Label("Name"),
-                        TextBox(state.Name, value => Update(current => current with { Name = value }))
-                            .Key("name")
-                            .Height(36)
-                            .Padding(10, 0, 10, 0)
-                            .TextStart()
-                            .TextVCenter(),
-                        Label("Email"),
-                        TextBox(state.Email, value => Update(current => current with { Email = value }))
-                            .Key("email")
-                            .Height(36)
-                            .Padding(10, 0, 10, 0)
-                            .TextStart()
-                            .TextVCenter(),
-                        Label("Password"),
-                        TextBox(state.Password, value => Update(current => current with { Password = value }))
-                            .Key("password")
-                            .Height(36)
-                            .Padding(10, 0, 10, 0)
-                            .TextStart()
-                            .TextVCenter()),
-                    Section("Preferences",
-                        CheckBox("Accept terms", value => Update(current => current with { AcceptTerms = value }))
-                            .Checked(state.AcceptTerms)
-                            .Margin(bottom: 12),
-                        Text("Contact method").FontSize(12).FontColor("#374151").Margin(bottom: 8),
-                        Div(DivTypes.Row,
-                            RadioButton("Email", selected => { if (selected) Update(current => current with { ContactMethod = "email" }); })
-                                .Group("contact")
-                                .Checked(state.ContactMethod == "email")
-                                .Margin(right: 18),
-                            RadioButton("Phone", selected => { if (selected) Update(current => current with { ContactMethod = "phone" }); })
-                                .Group("contact")
-                                .Checked(state.ContactMethod == "phone")),
-                        Text("Dropdown render sanity").FontSize(12).FontColor("#374151").Margin(top: 16, bottom: 8),
-                        Select(Text("Small"), Text("Medium"), Text("Large")).Height(34)),
-                    Section("Validation",
-                        state.Submitted && state.Errors.Length > 0
-                            ? Div(state.Errors.Select(error => (IElement)Text("- " + error).FontColor("#be123c").Margin(bottom: 6)).ToArray())
-                            : Text(state.Submitted ? "Submit passed." : "Submit to validate.").FontColor(state.Submitted ? "#047857" : "#6b7280"),
-                        Grid(
-                                Button("Reset", Reset).Height(36).Column(0),
-                                Button("Submit", Submit).Height(36).Background("#111827").FontColor("#ffffff").Brush("#111827").Thickness(1).Column(1)
-                            )
-                            .Columns(Star, Pixels(100))
-                            .Margin(top: 16))))
-                    .Row(1))
+                        Section("Account", Label("Name"), TextBox(state.Name, value => Update(current => current with {Name = value})).Key("name").Height(36).Padding(10, 0, 10, 0).TextStart().TextVCenter(), Label("Email"), TextBox(state.Email, value => Update(current => current with {Email = value})).Key("email").Height(36).Padding(10, 0, 10, 0).TextStart().TextVCenter(), Label("Password"), TextBox(state.Password, value => Update(current => current with {Password = value})).Key("password").Height(36).Padding(10, 0, 10, 0).TextStart().TextVCenter()),
+                        Section("Preferences", CheckBox("Accept terms", value => Update(current => current with {AcceptTerms = value})).Checked(state.AcceptTerms).Margin(bottom: 12), Text("Contact method").FontSize(12).FontColor("#374151").Margin(bottom: 8), Div(DivTypes.Row, RadioButton("Email", selected =>
+{
+    if (selected)
+        Update(current => current with {ContactMethod = "email"});
+}).Group("contact").Checked(state.ContactMethod == "email").Margin(right: 18), RadioButton("Phone", selected =>
+{
+    if (selected)
+        Update(current => current with {ContactMethod = "phone"});
+}).Group("contact").Checked(state.ContactMethod == "phone")), Text("Dropdown render sanity").FontSize(12).FontColor("#374151").Margin(top: 16, bottom: 8), Select(Text("Small"), Text("Medium"), Text("Large")).Height(34)),
+                        Section("Validation", state.Submitted && state.Errors.Length > 0 ? Div(state.Errors.Select(error => (IElement)Text("- " + error).FontColor("#be123c").Margin(bottom: 6)).ToArray()) : Text(state.Submitted ? "Submit passed." : "Submit to validate.").FontColor(state.Submitted ? "#047857" : "#6b7280"), Grid(Button("Reset", Reset).Height(36).Column(0), Button("Submit", Submit).Height(36).Background("#111827").FontColor("#ffffff").Brush("#111827").Thickness(1).Column(1)).Columns(Star, Pixels(100)).Margin(top: 16))
+                    )
+                )
+                .Row(1)
+            )
             .Padding(24)
             .Background("#f3f4f6");
     }

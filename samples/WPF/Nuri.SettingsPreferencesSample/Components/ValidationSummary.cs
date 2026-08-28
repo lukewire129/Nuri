@@ -16,7 +16,8 @@ internal sealed class ValidationSummary : Component
     {
         if (_errors.Length == 0)
         {
-            return Div(
+            return
+                Div(
                     Text("저장할 수 있는 상태입니다.")
                         .FontSize(13)
                         .FontColor("#047857")
@@ -28,16 +29,16 @@ internal sealed class ValidationSummary : Component
                 .CornerRadius(14);
         }
 
-        return Div(
+        return
+            Div(
                 Text("확인할 항목")
                     .FontSize(13)
                     .FontWeight(FontWeightValue.Bold)
                     .FontColor("#be123c"),
-                Div(_errors.Select(error => (IElement)Text($"- {error}")
-                        .FontSize(12)
-                        .FontColor("#9f1239")
-                        .Margin(top: 6))
-                    .ToArray())
+                Div(
+                    _errors.Select(error => (IElement)Text($"- {error}").FontSize(12).FontColor("#9f1239").Margin(top: 6))
+                        .ToArray()
+                )
             )
             .Padding(14)
             .Background("#fff1f2")

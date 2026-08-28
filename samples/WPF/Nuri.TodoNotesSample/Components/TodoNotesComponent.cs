@@ -169,19 +169,22 @@ public sealed class TodoNotesComponent : Component
         }
 
         var visibleItems = useMemo(() => FilterAndOrder(state.Items, state.Filter), state.Items, state.Filter);
+
         var activeCount = state.Items.Count(item => !item.IsDone);
         var completedCount = state.Items.Length - activeCount;
 
-        return Div(
+        return
+            Div(
                 Header(activeCount, completedCount),
                 Composer(state.Draft, AddItem, SetDraft),
                 Grid(
-                        OverviewPanel(state, activeCount, completedCount).Column(0),
-                        NotesPanel(visibleItems, state.EditingId, state.Filter, completedCount, SetFilter, StartEditing, ChangeItemText, SaveEditing, CancelEditing, ToggleDone, TogglePinned, DeleteItem, ClearCompleted)
-                            .Column(1)
-                    )
-                    .Columns(Pixels(260), Star)
-                    .Margin(top:24)
+                    OverviewPanel(state, activeCount, completedCount)
+                        .Column(0),
+                    NotesPanel(visibleItems, state.EditingId, state.Filter, completedCount, SetFilter, StartEditing, ChangeItemText, SaveEditing, CancelEditing, ToggleDone, TogglePinned, DeleteItem, ClearCompleted)
+                        .Column(1)
+                )
+                .Columns(Pixels(260), Star)
+                .Margin(top: 24)
             )
             .Padding(32)
             .Background("#0b1120");

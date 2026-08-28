@@ -9,33 +9,36 @@ public sealed class AnimatedDashboardComponent : Component
     public override IElement Render()
     {
         var (focused, setFocused) = useState(true);
+
         var cardOpacity = focused ? 1.0 : 0.35;
 
-        return Div(
+        return
+            Div(
                 DivTypes.Scroll,
                 Div(
-                Text("Animated Dashboard")
-                    .FontSize(30)
-                    .FontWeight(FontWeightValue.Bold)
-                    .FontColor("#f8fafc"),
-                Text("The same Core component runs through the WPF, Avalonia, and Duxel renderers.")
-                    .FontSize(14)
-                    .FontColor("#94a3b8")
-                    .Margin(top: 8, bottom: 24),
-                DashboardCard("Active sessions", "1,284", "Updated now", cardOpacity),
-                DashboardCard("Conversion", "18.6%", "+2.4% this week", cardOpacity)
-                    .Margin(top: 14),
-                DashboardCard("Latency", "42 ms", "p95 across regions", cardOpacity)
-                    .Margin(top: 14),
-                Button(focused ? "Dim dashboard" : "Focus dashboard", () => setFocused(current => !current))
-                    .Height(44)
-                    .Padding(18, 0, 18, 0)
-                    .Margin(top: 24)
-                    .Background("#2563eb")
-                    .FontColor("#ffffff")
-                    .Brush("#1d4ed8")
-                    .Thickness(1)
-            ))
+                    Text("Animated Dashboard")
+                        .FontSize(30)
+                        .FontWeight(FontWeightValue.Bold)
+                        .FontColor("#f8fafc"),
+                    Text("The same Core component runs through the WPF, Avalonia, and Duxel renderers.")
+                        .FontSize(14)
+                        .FontColor("#94a3b8")
+                        .Margin(top: 8, bottom: 24),
+                    DashboardCard("Active sessions", "1,284", "Updated now", cardOpacity),
+                    DashboardCard("Conversion", "18.6%", "+2.4% this week", cardOpacity)
+                        .Margin(top: 14),
+                    DashboardCard("Latency", "42 ms", "p95 across regions", cardOpacity)
+                        .Margin(top: 14),
+                    Button(focused ? "Dim dashboard" : "Focus dashboard", () => setFocused(current => !current))
+                        .Height(44)
+                        .Padding(18, 0, 18, 0)
+                        .Margin(top: 24)
+                        .Background("#2563eb")
+                        .FontColor("#ffffff")
+                        .Brush("#1d4ed8")
+                        .Thickness(1)
+                )
+            )
             .Padding(32)
             .Background("#0b1120");
     }

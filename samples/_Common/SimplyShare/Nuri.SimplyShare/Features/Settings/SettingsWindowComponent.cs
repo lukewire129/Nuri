@@ -61,26 +61,43 @@ public sealed class SettingsWindowComponent : Component
             .Thickness(1);
         saveButton.SetProperty("IsEnabled", !saving);
 
-        return Div(DivTypes.Scroll,
+        return
+            Div(
+                DivTypes.Scroll,
                 Div(
-                        Text("Settings").FontSize(28).FontWeight(FontWeightValue.Bold).FontColor(Palette.Ink),
-                        Text("Network services restart after saving.").FontSize(12).FontColor(Palette.Muted).Margin(top: 5, bottom: 24),
-                        Label("Nickname"),
-                        Field(nickname, value => setNickname(_ => value)),
-                        Label("Download folder"),
-                        Field(downloadPath, value => setDownloadPath(_ => value)),
-                        Label("Allowed IPv4 range (* or 192.168.0.*)"),
-                        Field(networkRange, value => setNetworkRange(_ => value)),
-                        Grid(
-                                Div(Label("Discovery port"), Field(discoveryPort, value => setDiscoveryPort(_ => value))).Column(0),
-                                Div(Label("Transfer port"), Field(transferPort, value => setTransferPort(_ => value))).Column(1))
-                            .Columns(Star, Star)
-                            .ColumnSpacing(12),
-                        string.IsNullOrEmpty(message)
-                            ? Div().Height(12)
-                            : Text(message).FontSize(11).FontColor(Palette.Danger).Margin(top: 12),
-                        saveButton.Margin(top: 16))
-                    .Padding(28))
+                    Text("Settings")
+                        .FontSize(28)
+                        .FontWeight(FontWeightValue.Bold)
+                        .FontColor(Palette.Ink),
+                    Text("Network services restart after saving.")
+                        .FontSize(12)
+                        .FontColor(Palette.Muted)
+                        .Margin(top: 5, bottom: 24),
+                    Label("Nickname"),
+                    Field(nickname, value => setNickname(_ => value)),
+                    Label("Download folder"),
+                    Field(downloadPath, value => setDownloadPath(_ => value)),
+                    Label("Allowed IPv4 range (* or 192.168.0.*)"),
+                    Field(networkRange, value => setNetworkRange(_ => value)),
+                    Grid(
+                        Div(
+                            Label("Discovery port"),
+                            Field(discoveryPort, value => setDiscoveryPort(_ => value))
+                        )
+                        .Column(0),
+                        Div(
+                            Label("Transfer port"),
+                            Field(transferPort, value => setTransferPort(_ => value))
+                        )
+                        .Column(1)
+                    )
+                    .Columns(Star, Star)
+                    .ColumnSpacing(12),
+                    string.IsNullOrEmpty(message) ? Div().Height(12) : Text(message).FontSize(11).FontColor(Palette.Danger).Margin(top: 12),
+                    saveButton.Margin(top: 16)
+                )
+                .Padding(28)
+            )
             .Background(Palette.Canvas);
     }
 

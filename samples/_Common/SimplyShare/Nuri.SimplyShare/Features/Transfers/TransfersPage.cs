@@ -29,6 +29,7 @@ internal sealed class TransferRow : Component
     public override IElement Render()
     {
         var (hovered, setHovered) = useState(false);
+
         var statusColor = _item.Status switch
         {
             TransferStatus.Completed => Palette.Success,
@@ -37,21 +38,44 @@ internal sealed class TransferRow : Component
         };
         var detail = _item.Error ?? $"{Formatters.FileSize(_item.BytesTransferred)} / {Formatters.FileSize(_item.TotalBytes)}";
 
-        return Div(
-            Grid(
-                    Div(
-                            Text(_item.Name).FontSize(15).FontWeight(FontWeightValue.Bold).FontColor(Palette.Ink),
-                            Text($"{_item.Direction} with {_item.Peer}").FontSize(11).FontColor(Palette.Muted).Margin(top: 4))
-                        .Column(0),
-                    Text(_item.Status.ToString()).FontSize(11).FontWeight(FontWeightValue.Bold).FontColor(statusColor).End().Column(1))
-                .Columns(Star, Auto),
+        return
             Div(
-                    Div().Height(6).Width(Math.Max(2, 500 * _item.Progress)).Background(statusColor).CornerRadius(3))
+                Grid(
+                    Div(
+                        Text(_item.Name)
+                            .FontSize(15)
+                            .FontWeight(FontWeightValue.Bold)
+                            .FontColor(Palette.Ink),
+                        Text($"{_item.Direction} with {_item.Peer}")
+                            .FontSize(11)
+                            .FontColor(Palette.Muted)
+                            .Margin(top: 4)
+                    )
+                    .Column(0),
+                    Text(_item.Status.ToString())
+                        .FontSize(11)
+                        .FontWeight(FontWeightValue.Bold)
+                        .FontColor(statusColor)
+                        .End()
+                        .Column(1)
+                )
+                .Columns(Star, Auto),
+                Div(
+                    Div()
+                    .Height(6)
+                    .Width(Math.Max(2, 500 * _item.Progress))
+                    .Background(statusColor)
+                    .CornerRadius(3)
+                )
                 .Height(6)
                 .Background(Palette.Border)
                 .CornerRadius(3)
                 .Margin(top: 14),
-            Text(detail).FontSize(10).FontColor(Palette.Muted).Margin(top: 7))
+                Text(detail)
+                    .FontSize(10)
+                    .FontColor(Palette.Muted)
+                    .Margin(top: 7)
+            )
             .Padding(20)
             .Margin(left: hovered ? 5 : 0, bottom: 14)
             .Background(hovered ? "#FAFCFD" : Palette.White)

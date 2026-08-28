@@ -11,24 +11,28 @@ namespace ContentControlChildrenTest.Components
             var (isHover, setIsHover) = useState(false);
             var (isToggle, setIsToggle) = useState(true);
 
-            return Div(DivTypes.Grid,
-                    Div(DivTypes.Block)
-                        .Background("#00070E")
-                        .Brush("#34291E")
-                        .Margin(10, 0, 0, 0),
-
+            return
+                Div(
+                    DivTypes.Grid,
+                    Div(
+                        DivTypes.Block
+                    )
+                    .Background("#00070E")
+                    .Brush("#34291E")
+                    .Margin(10, 0, 0, 0),
                     Image("Resources/logo.png")
                         .Start()
                         .Height(38)
                         .BitmapScalingMode(ImageScalingModeValue.Fant),
-
-                    Div(DivTypes.Block)
-                        .Background(isHover ? "#1D3B4A" : "#1E2328")
-                        .Brush(isHover ? "#46E6FF" : "#09343D")
-                        .Thickness(2)
-                        .Margin(50, 4, 4, 4),
-
-                    Div(DivTypes.Grid,
+                    Div(
+                        DivTypes.Block
+                    )
+                    .Background(isHover ? "#1D3B4A" : "#1E2328")
+                    .Brush(isHover ? "#46E6FF" : "#09343D")
+                    .Thickness(2)
+                    .Margin(50, 4, 4, 4),
+                    Div(
+                        DivTypes.Grid,
                         Text("Play")
                             .FontSize(15)
                             .FontWeight(FontWeightValue.Bold)

@@ -168,23 +168,18 @@ public sealed class WorkflowComponent : Component
                             .Margin(top: 6)
                     )
                     .Column(0),
-                    Component.Row(new IElement[]
-                    {
-                        Component.Button("Pan left", cameraActions.PanLeft),
-                        Component.Button("Pan right", cameraActions.PanRight),
-                        Component.Button("-", cameraActions.ZoomOut),
-                        Component.Text($"{camera.Zoom:P0}").Width(44).HCenter().VCenter(),
-                        Component.Button("+", cameraActions.ZoomIn),
-                        Component.Button("Reset", cameraActions.Reset)
-                    })
+                    Component.Row(
+                        new IElement[]{Component.Button("Pan left", cameraActions.PanLeft), Component.Button("Pan right", cameraActions.PanRight), Component.Button("-", cameraActions.ZoomOut), Component.Text($"{camera.Zoom:P0}").Width(44).HCenter().VCenter(), Component.Button("+", cameraActions.ZoomIn), Component.Button("Reset", cameraActions.Reset)}
+                    )
                     .Spacing(8)
                     .Column(1)
                 )
                 .Columns(Star, Auto)
                 .Row(0),
                 Component.Grid(
-                    viewport
-                    .Column(0),
+                    viewport.Column(
+                        0
+                    ),
                     Inspector(selected, nodes, setNodes)
                         .Column(1)
                 )

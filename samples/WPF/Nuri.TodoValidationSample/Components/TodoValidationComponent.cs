@@ -90,6 +90,7 @@ public sealed class TodoValidationComponent : Component
         }
 
         var visibleItems = useMemo(() => ApplyFilter(state.Items, state.Filter), state.Items, state.Filter);
+
         var listChildren = visibleItems.Length == 0
             ? new[]
             {
@@ -106,54 +107,67 @@ public sealed class TodoValidationComponent : Component
                     RemoveItem).Key(item.Id))
                 .ToArray();
 
-        return Grid(Rows(Auto, Auto, Star),
+        return
+            Grid(
+                Rows(Auto, Auto, Star),
                 Div(
-                        Text("할 일 검증 샘플")
-                            .FontSize(26)
-                            .FontWeight(FontWeightValue.Bold)
-                            .FontColor("#111827"),
-                        Text("controlled input, list diff, filter, item edit, remove 흐름을 한 화면에서 확인합니다.")
-                            .FontSize(13)
-                            .FontColor("#6b7280")
-                            .Margin(top: 6)
-                    )
-                    .Margin(bottom: 18)
-                    .Row(0),
+                    Text("할 일 검증 샘플")
+                        .FontSize(26)
+                        .FontWeight(FontWeightValue.Bold)
+                        .FontColor("#111827"),
+                    Text("controlled input, list diff, filter, item edit, remove 흐름을 한 화면에서 확인합니다.")
+                        .FontSize(13)
+                        .FontColor("#6b7280")
+                        .Margin(top: 6)
+                )
+                .Margin(bottom: 18)
+                .Row(0),
                 Div(
-                        Grid(
-                                TextBox(state.Draft, draft => Update(current => current with { Draft = draft }))
-                                    .Key("controlled-input")
-                                    .Height(36)
-                                    .Padding(10, 0, 10, 0)
-                                    .TextStart()
-                                    .TextVCenter()
-                                    .Column(0),
-                                PrimaryButton("추가", AddItem).Column(1)
-                            )
-                            .Columns(Star, Pixels(88)),
-                        Grid(
-                                FilterButton("전체", state.Filter == TodoFilter.All, () => Update(current => current with { Filter = TodoFilter.All })).Column(0),
-                                FilterButton("진행", state.Filter == TodoFilter.Active, () => Update(current => current with { Filter = TodoFilter.Active })).Column(1),
-                                FilterButton("완료", state.Filter == TodoFilter.Done, () => Update(current => current with { Filter = TodoFilter.Done })).Column(2),
-                                SecondaryButton("첫 항목 뒤로", MoveFirstToEnd).Column(3),
-                                SecondaryButton("초기화", () => Update(_ => new TodoState(string.Empty, TodoFilter.All, InitialItems, null, 1))).Column(4)
-                            )
-                            .Columns(Pixels(74), Pixels(74), Pixels(74), Pixels(124), Pixels(90))
-                            .Margin(top: 14),
-                        Text($"필터: {FilterLabel(state.Filter)} · 입력 길이: {state.Draft.Length} · 표시 항목: {visibleItems.Length}")
-                            .FontSize(12)
-                            .FontColor("#6b7280")
-                            .Margin(top: 14)
+                    Grid(
+                        TextBox(state.Draft, draft => Update(current => current with {Draft = draft}))
+                            .Key("controlled-input")
+                            .Height(36)
+                            .Padding(10, 0, 10, 0)
+                            .TextStart()
+                            .TextVCenter()
+                            .Column(0),
+                        PrimaryButton("추가", AddItem)
+                            .Column(1)
                     )
-                    .Padding(18)
-                    .Background("#ffffff")
-                    .Brush("#e5e7eb")
-                    .Thickness(1)
-                    .CornerRadius(16)
-                    .Row(1),
-                Div(DivTypes.Scroll, Div(listChildren))
-                    .Margin(top: 18)
-                    .Row(2)
+                    .Columns(Star, Pixels(88)),
+                    Grid(
+                        FilterButton("전체", state.Filter == TodoFilter.All, () => Update(current => current with {Filter = TodoFilter.All}))
+                            .Column(0),
+                        FilterButton("진행", state.Filter == TodoFilter.Active, () => Update(current => current with {Filter = TodoFilter.Active}))
+                            .Column(1),
+                        FilterButton("완료", state.Filter == TodoFilter.Done, () => Update(current => current with {Filter = TodoFilter.Done}))
+                            .Column(2),
+                        SecondaryButton("첫 항목 뒤로", MoveFirstToEnd)
+                            .Column(3),
+                        SecondaryButton("초기화", () => Update(_ => new TodoState(string.Empty, TodoFilter.All, InitialItems, null, 1)))
+                            .Column(4)
+                    )
+                    .Columns(Pixels(74), Pixels(74), Pixels(74), Pixels(124), Pixels(90))
+                    .Margin(top: 14),
+                    Text($"필터: {FilterLabel(state.Filter)} · 입력 길이: {state.Draft.Length} · 표시 항목: {visibleItems.Length}")
+                        .FontSize(12)
+                        .FontColor("#6b7280")
+                        .Margin(top: 14)
+                )
+                .Padding(18)
+                .Background("#ffffff")
+                .Brush("#e5e7eb")
+                .Thickness(1)
+                .CornerRadius(16)
+                .Row(1),
+                Div(
+                    DivTypes.Scroll,
+                    Div(
+                        listChildren
+                    )
+                )
+                .Margin(top: 18)
+                .Row(2)
             )
             .Padding(24)
             .Background("#f3f4f6");

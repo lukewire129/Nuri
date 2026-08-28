@@ -11,19 +11,18 @@ namespace RouterSample.Components
         {
             var (navigation, navigator) = useNavigation("counter");
 
-            return Div(DivTypes.Row,
-                new SampleSidebar(navigation, navigator),
-                Div(DivTypes.Scroll,
-                    Router(navigation,
-                        Route("counter", () => new CounterPage()),
-                        Route("form", () => new FormPage()),
-                        Route("list", () => new KeyedListPage()),
-                        Route("navigation", () => new NavigationPage()),
-                        Route("effects", () => new EffectsPage()),
-                        Route("settings", () => new SettingsPage())))
+            return
+                Div(
+                    DivTypes.Row,
+                    new SampleSidebar(navigation, navigator),
+                    Div(
+                        DivTypes.Scroll,
+                        Router(navigation, Route("counter", () => new CounterPage()), Route("form", () => new FormPage()), Route("list", () => new KeyedListPage()), Route("navigation", () => new NavigationPage()), Route("effects", () => new EffectsPage()), Route("settings", () => new SettingsPage()))
+                    )
                     .Background("#F6F4F0")
                     .Padding(28)
-                    .Width(760))
+                    .Width(760)
+                )
                 .Background("#F6F4F0");
         }
     }
@@ -41,22 +40,29 @@ namespace RouterSample.Components
 
         public override IElement Render()
         {
-            return Div(
-                Text("Nuri").FontSize(26).FontWeight(FontWeightValue.Bold).FontColor("#111827"),
-                Text("WPF-first samples").FontSize(13).FontColor("#6B7280").Margin(top: 4, bottom: 28),
-                new NavButton("counter", "Counter", _selected, _navigator),
-                new NavButton("form", "Form", _selected, _navigator),
-                new NavButton("list", "Keyed List", _selected, _navigator),
-                new NavButton("navigation", "useNavigation", _selected, _navigator),
-                new NavButton("effects", "Effects", _selected, _navigator),
-                new NavButton("settings", "Nested Router", _selected, _navigator),
-                new QuietButton("Back", _navigator.GoBack)
-                    .Margin(top: 12)
-                    .Background(_navigator.CanGoBack ? "#F3F4F6" : "#FFFFFF"),
-                Text("Small components, explicit keys, and platform-neutral routing.")
-                    .FontSize(12)
-                    .FontColor("#6B7280")
-                    .Margin(top: 28))
+            return
+                Div(
+                    Text("Nuri")
+                        .FontSize(26)
+                        .FontWeight(FontWeightValue.Bold)
+                        .FontColor("#111827"),
+                    Text("WPF-first samples")
+                        .FontSize(13)
+                        .FontColor("#6B7280")
+                        .Margin(top: 4, bottom: 28),
+                    new NavButton("counter", "Counter", _selected, _navigator),
+                    new NavButton("form", "Form", _selected, _navigator),
+                    new NavButton("list", "Keyed List", _selected, _navigator),
+                    new NavButton("navigation", "useNavigation", _selected, _navigator),
+                    new NavButton("effects", "Effects", _selected, _navigator),
+                    new NavButton("settings", "Nested Router", _selected, _navigator),
+                    new QuietButton("Back", _navigator.GoBack).Margin(top: 12)
+                        .Background(_navigator.CanGoBack ? "#F3F4F6" : "#FFFFFF"),
+                    Text("Small components, explicit keys, and platform-neutral routing.")
+                        .FontSize(12)
+                        .FontColor("#6B7280")
+                        .Margin(top: 28)
+                )
                 .Width(240)
                 .Padding(24)
                 .Background("#FFFFFF");
@@ -81,13 +87,15 @@ namespace RouterSample.Components
         public override IElement Render()
         {
             var active = string.Equals(_route, _selected, StringComparison.Ordinal);
-            return Button(_label, () => _navigator.Navigate(_route))
-                .Key(_route)
-                .Padding(12)
-                .Margin(bottom: 8)
-                .TextStart()
-                .Background(active ? "#111827" : "#F3F4F6")
-                .FontColor(active ? "#FFFFFF" : "#111827");
+
+            return
+                Button(_label, () => _navigator.Navigate(_route))
+                    .Key(_route)
+                    .Padding(12)
+                    .Margin(bottom: 8)
+                    .TextStart()
+                    .Background(active ? "#111827" : "#F3F4F6")
+                    .FontColor(active ? "#FFFFFF" : "#111827");
         }
     }
 
@@ -280,7 +288,9 @@ namespace RouterSample.Components
                 return () => _addLog($"effect cleanup v{_version}");
             }, _version);
 
-            return Text($"Probe mounted. Dependency version: {_version}").FontColor("#111827");
+            return
+                Text($"Probe mounted. Dependency version: {_version}")
+                    .FontColor("#111827");
         }
     }
 
@@ -297,9 +307,14 @@ namespace RouterSample.Components
 
         public override IElement Render()
         {
-            return Div(DivTypes.Row,
-                Text(_item.Title).FontColor("#111827").Width(360),
-                new QuietButton("Remove", _remove))
+            return
+                Div(
+                    DivTypes.Row,
+                    Text(_item.Title)
+                        .FontColor("#111827")
+                        .Width(360),
+                    new QuietButton("Remove", _remove)
+                )
                 .Padding(12)
                 .Margin(bottom: 8)
                 .Background("#F9FAFB");
@@ -321,10 +336,20 @@ namespace RouterSample.Components
 
         public override IElement Render()
         {
-            return Div(
-                Text(_title).FontSize(30).FontWeight(FontWeightValue.Bold).FontColor("#111827"),
-                Text(_description).FontSize(14).FontColor("#6B7280").Margin(top: 6, bottom: 24),
-                Div(_children));
+            return
+                Div(
+                    Text(_title)
+                        .FontSize(30)
+                        .FontWeight(FontWeightValue.Bold)
+                        .FontColor("#111827"),
+                    Text(_description)
+                        .FontSize(14)
+                        .FontColor("#6B7280")
+                        .Margin(top: 6, bottom: 24),
+                    Div(
+                        _children
+                    )
+                );
         }
     }
 
@@ -339,7 +364,10 @@ namespace RouterSample.Components
 
         public override IElement Render()
         {
-            return Div(_children)
+            return
+                Div(
+                    _children
+                )
                 .Padding(24)
                 .Background("#FFFFFF")
                 .Brush("#E5E7EB")
@@ -361,9 +389,16 @@ namespace RouterSample.Components
 
         public override IElement Render()
         {
-            return Div(
-                Text(_label).FontSize(13).FontColor("#6B7280"),
-                Text(_value).FontSize(44).FontWeight(FontWeightValue.Bold).FontColor("#111827"));
+            return
+                Div(
+                    Text(_label)
+                        .FontSize(13)
+                        .FontColor("#6B7280"),
+                    Text(_value)
+                        .FontSize(44)
+                        .FontWeight(FontWeightValue.Bold)
+                        .FontColor("#111827")
+                );
         }
     }
 
@@ -378,7 +413,12 @@ namespace RouterSample.Components
 
         public override IElement Render()
         {
-            return Text(_text).FontSize(13).FontWeight(FontWeightValue.Bold).FontColor("#374151").Margin(bottom: 8);
+            return
+                Text(_text)
+                    .FontSize(13)
+                    .FontWeight(FontWeightValue.Bold)
+                    .FontColor("#374151")
+                    .Margin(bottom: 8);
         }
     }
 
@@ -395,7 +435,12 @@ namespace RouterSample.Components
 
         public override IElement Render()
         {
-            return Button(_label, _action).Padding(10).Margin(right: 8).Background("#111827").FontColor("#FFFFFF");
+            return
+                Button(_label, _action)
+                    .Padding(10)
+                    .Margin(right: 8)
+                    .Background("#111827")
+                    .FontColor("#FFFFFF");
         }
     }
 
@@ -412,7 +457,12 @@ namespace RouterSample.Components
 
         public override IElement Render()
         {
-            return Button(_label, _action).Padding(10).Margin(right: 8).Background("#F3F4F6").FontColor("#111827");
+            return
+                Button(_label, _action)
+                    .Padding(10)
+                    .Margin(right: 8)
+                    .Background("#F3F4F6")
+                    .FontColor("#111827");
         }
     }
 
@@ -434,11 +484,13 @@ namespace RouterSample.Components
         public override IElement Render()
         {
             var active = string.Equals(_route, _selected, StringComparison.Ordinal);
-            return Button(_label, () => _navigator.Navigate(_route))
-                .Padding(10)
-                .Margin(right: 8)
-                .Background(active ? "#E5E7EB" : "#FFFFFF")
-                .FontColor("#111827");
+
+            return
+                Button(_label, () => _navigator.Navigate(_route))
+                    .Padding(10)
+                    .Margin(right: 8)
+                    .Background(active ? "#E5E7EB" : "#FFFFFF")
+                    .FontColor("#111827");
         }
     }
 
@@ -455,9 +507,16 @@ namespace RouterSample.Components
 
         public override IElement Render()
         {
-            return Div(
-                Text(_title).FontSize(18).FontWeight(FontWeightValue.Bold).FontColor("#111827"),
-                Text(_body).FontColor("#6B7280").Margin(top: 8));
+            return
+                Div(
+                    Text(_title)
+                        .FontSize(18)
+                        .FontWeight(FontWeightValue.Bold)
+                        .FontColor("#111827"),
+                    Text(_body)
+                        .FontColor("#6B7280")
+                        .Margin(top: 8)
+                );
         }
     }
 
@@ -474,9 +533,16 @@ namespace RouterSample.Components
 
         public override IElement Render()
         {
-            return Div(
-                Text(_title).FontSize(18).FontWeight(FontWeightValue.Bold).FontColor("#111827"),
-                Text(_body).FontColor("#6B7280").Margin(top: 8))
+            return
+                Div(
+                    Text(_title)
+                        .FontSize(18)
+                        .FontWeight(FontWeightValue.Bold)
+                        .FontColor("#111827"),
+                    Text(_body)
+                        .FontColor("#6B7280")
+                        .Margin(top: 8)
+                )
                 .Padding(16)
                 .Background("#F9FAFB")
                 .Margin(bottom: 18);
@@ -494,12 +560,13 @@ namespace RouterSample.Components
 
         public override IElement Render()
         {
-            return Text(_code)
-                .FontFamily("Consolas")
-                .FontSize(13)
-                .FontColor("#111827")
-                .Padding(16)
-                .Background("#F3F4F6");
+            return
+                Text(_code)
+                    .FontFamily("Consolas")
+                    .FontSize(13)
+                    .FontColor("#111827")
+                    .Padding(16)
+                    .Background("#F3F4F6");
         }
     }
 

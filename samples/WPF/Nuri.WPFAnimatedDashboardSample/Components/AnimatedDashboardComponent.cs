@@ -8,6 +8,7 @@ public sealed class AnimatedDashboardComponent : Component
     public override IElement Render()
     {
         var (highlighted, setHighlighted) = useState(false);
+
         var duration = TimeSpan.FromMilliseconds(550);
         var cardMargin = highlighted ? 18 : 6;
         var cardBackground = highlighted ? "#1d4ed8" : "#111827";
@@ -16,7 +17,8 @@ public sealed class AnimatedDashboardComponent : Component
         var translation = highlighted ? 10 : -4;
         var scale = highlighted ? 1.08 : 0.98;
 
-        return Div(
+        return
+            Div(
                 Text("WPF Animated Dashboard")
                     .FontSize(30)
                     .FontWeight(FontWeightValue.Bold)

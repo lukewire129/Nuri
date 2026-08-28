@@ -84,41 +84,44 @@ public sealed class ChatWindowComponent : Component
             .Column(2);
         sendButton.SetProperty("IsEnabled", !busy);
 
-        return Grid(
-                new ChatHeader(_device).Row(0),
-                Div(DivTypes.Scroll,
-                        messages.Count == 0
-                            ? new ChatEmptyState(_device.Nickname)
-                            : Div(messages.Select(message => (IElement)new MessageBubble(message).Key(message.Id)).ToArray())
-                                .Padding(20))
-                    .Row(1)
-                    .Background(Palette.Canvas),
+        return
+            Grid(
+                new ChatHeader(_device).Row(
+                    0
+                ),
                 Div(
-                        string.IsNullOrEmpty(error)
-                            ? Div().Height(0)
-                            : Text(error).FontSize(11).FontColor(Palette.Danger).Margin(bottom: 8),
-                        Grid(
-                                Button("Attach", SendFile)
-                                    .Width(82)
-                                    .Height(42)
-                                    .Background(Palette.White)
-                                    .Brush(Palette.Border)
-                                    .Thickness(1)
-                                    .Column(0),
-                                TextBox(input, value =>
-                                    {
-                                        inputRef.Current = value;
-                                        setInput(_ => value);
-                                    })
-                                    .Height(42)
-                                    .Padding(12, 0, 12, 0)
-                                    .Margin(left: 8, right: 8)
-                                    .Column(1),
-                                sendButton)
-                            .Columns(Auto, Star, Auto))
-                    .Padding(14)
-                    .Background(Palette.White)
-                    .Row(2))
+                    DivTypes.Scroll,
+                    messages.Count == 0 ? new ChatEmptyState(_device.Nickname) : Div(messages.Select(message => (IElement)new MessageBubble(message).Key(message.Id)).ToArray()).Padding(20)
+                )
+                .Row(1)
+                .Background(Palette.Canvas),
+                Div(
+                    string.IsNullOrEmpty(error) ? Div().Height(0) : Text(error).FontSize(11).FontColor(Palette.Danger).Margin(bottom: 8),
+                    Grid(
+                        Button("Attach", SendFile)
+                            .Width(82)
+                            .Height(42)
+                            .Background(Palette.White)
+                            .Brush(Palette.Border)
+                            .Thickness(1)
+                            .Column(0),
+                        TextBox(input, value =>
+{
+    inputRef.Current = value;
+    setInput(_ => value);
+})
+                            .Height(42)
+                            .Padding(12, 0, 12, 0)
+                            .Margin(left: 8, right: 8)
+                            .Column(1),
+                        sendButton
+                    )
+                    .Columns(Auto, Star, Auto)
+                )
+                .Padding(14)
+                .Background(Palette.White)
+                .Row(2)
+            )
             .Rows(Auto, Star, Auto);
     }
 }
@@ -131,15 +134,31 @@ internal sealed class ChatHeader : Component
 
     public override IElement Render()
     {
-        return Div(DivTypes.Row,
-                Div(Text("ON").FontSize(9).FontWeight(FontWeightValue.Bold).FontColor(Palette.Success).Center())
-                    .Size(36, 36)
-                    .Background(Palette.SoftGreen)
-                    .CornerRadius(18)
-                    .Margin(right: 12),
+        return
+            Div(
+                DivTypes.Row,
                 Div(
-                    Text(_device.Nickname).FontSize(16).FontWeight(FontWeightValue.Bold).FontColor(Palette.Ink),
-                    Text($"Encrypted direct connection to {_device.IpAddress}").FontSize(10).FontColor(Palette.Muted).Margin(top: 3)))
+                    Text("ON")
+                        .FontSize(9)
+                        .FontWeight(FontWeightValue.Bold)
+                        .FontColor(Palette.Success)
+                        .Center()
+                )
+                .Size(36, 36)
+                .Background(Palette.SoftGreen)
+                .CornerRadius(18)
+                .Margin(right: 12),
+                Div(
+                    Text(_device.Nickname)
+                        .FontSize(16)
+                        .FontWeight(FontWeightValue.Bold)
+                        .FontColor(Palette.Ink),
+                    Text($"Encrypted direct connection to {_device.IpAddress}")
+                        .FontSize(10)
+                        .FontColor(Palette.Muted)
+                        .Margin(top: 3)
+                )
+            )
             .Padding(18, 14, 18, 14)
             .Background(Palette.White);
     }
@@ -153,13 +172,19 @@ internal sealed class ChatEmptyState : Component
 
     public override IElement Render()
     {
-        return Div(
-                Text("Start a private conversation").FontSize(20).FontWeight(FontWeightValue.Bold).FontColor(Palette.Ink).Center(),
+        return
+            Div(
+                Text("Start a private conversation")
+                    .FontSize(20)
+                    .FontWeight(FontWeightValue.Bold)
+                    .FontColor(Palette.Ink)
+                    .Center(),
                 Text($"Messages and files sent to {_name} are encrypted in transit.")
                     .FontSize(12)
                     .FontColor(Palette.Muted)
                     .HCenter()
-                    .Margin(top: 8))
+                    .Margin(top: 8)
+            )
             .Padding(30)
             .Center();
     }

@@ -46,8 +46,9 @@ internal sealed class DialogOverlay : Component
         if (_confirmOpen)
             children.Add(new ConfirmOverlay(_close, _closeConfirm, _addLog).Key($"confirm-{_version}"));
 
-        return Overlay(OverlayTypes.Modal, children.ToArray())
-            .Background("#00000066");
+        return
+            Overlay(OverlayTypes.Modal, children.ToArray())
+                .Background("#00000066");
     }
 
     private IElement Backdrop()

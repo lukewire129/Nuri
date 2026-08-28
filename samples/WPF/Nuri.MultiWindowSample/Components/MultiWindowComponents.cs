@@ -22,7 +22,8 @@ public sealed class MultiWindowLauncherComponent : Component
             setOpenedWindowCount(current => current + 1);
         }
 
-        return Div(
+        return
+            Div(
                 Text("Multi-Window Lifecycle")
                     .FontSize(30)
                     .FontWeight(FontWeightValue.Bold)
@@ -49,7 +50,8 @@ public sealed class MultiWindowLauncherComponent : Component
                     .Background("#0f766e")
                     .FontColor("#ffffff")
                     .Brush("#115e59")
-                    .Thickness(1))
+                    .Thickness(1)
+            )
             .Padding(32)
             .Background("#0b1120");
     }
@@ -89,7 +91,8 @@ public sealed class CounterWindowComponent : Component
             return () => Console.WriteLine($"[MultiWindow] cleaned window {_windowNumber}");
         }, []);
 
-        return Div(
+        return
+            Div(
                 Text($"Counter Window #{_windowNumber}")
                     .FontSize(28)
                     .FontWeight(FontWeightValue.Bold)
@@ -114,7 +117,8 @@ public sealed class CounterWindowComponent : Component
                     .Background("#0f766e")
                     .FontColor("#ffffff")
                     .Brush("#115e59")
-                    .Thickness(1))
+                    .Thickness(1)
+            )
             .Padding(28)
             .Background("#0b1120");
     }

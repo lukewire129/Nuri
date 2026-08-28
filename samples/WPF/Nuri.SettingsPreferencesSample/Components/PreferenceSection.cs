@@ -18,7 +18,8 @@ internal sealed class PreferenceSection : Component
 
     public override IElement Render()
     {
-        return Div(
+        return
+            Div(
                 Text(_title)
                     .FontSize(17)
                     .FontWeight(FontWeightValue.Bold)
@@ -27,7 +28,9 @@ internal sealed class PreferenceSection : Component
                     .FontSize(12)
                     .FontColor("#6b7280")
                     .Margin(top: 4, bottom: 14),
-                Div(_children)
+                Div(
+                    _children
+                )
             )
             .Padding(18)
             .Margin(bottom: 14)

@@ -70,7 +70,11 @@ public sealed class ModalDialogComponent : Component
                     .Row(0));
         }
 
-        return Grid(Rows(Star), rootChildren.ToArray())
+        return
+            Grid(
+                Rows(Star),
+                rootChildren.ToArray()
+            )
             .Background("#f3f4f6");
     }
 
